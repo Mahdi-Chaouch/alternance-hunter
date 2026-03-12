@@ -12,6 +12,9 @@ Non, **le repo complet tel quel** ne doit pas être déployé directement sur Ve
 - **Repo privé (actuel)**: source complète (frontend + backend + scripts).
 - **Repo public (nouveau)**: frontend uniquement (`web/`), sans secrets ni données.
 - **Vercel**: connecté au repo public (ou à `web/` en root directory), avec variables d'environnement.
+- **Backend Python**: free tier retenu actuellement (migration VPS prévue dès que volume/durée/fiabilité dépassent les seuils).
+
+Voir aussi: `docs/BACKEND_HOSTING_DECISION.md` pour la matrice de choix (volume, durée, fiabilité).
 
 ## Variables Vercel (repo public)
 
