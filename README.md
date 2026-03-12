@@ -63,9 +63,10 @@ Voir `web/README.md` pour le detail.
 ## Deploiement
 
 - Frontend (`web/`) -> Vercel
-- Backend Python -> service separe (VM/VPS/Render/Railway/Fly.io)
+- Backend Python -> service separe (free tier choisi actuellement, migration VPS des que les seuils de charge/fiabilite sont depasses)
 
 Guide public/prive: `docs/PUBLIC_PRIVATE_SETUP.md`.
+Decision backend: `docs/BACKEND_HOSTING_DECISION.md`.
 
 ## Securite et publication
 
