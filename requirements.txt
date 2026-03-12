@@ -1,0 +1,12 @@
+# alternance_hunter + create_gmail_drafts
+requests>=2.28.0
+beautifulsoup4>=4.11.0
+lxml>=4.9.0
+python-docx>=1.0.0
+google-auth-oauthlib>=1.0.0
+google-api-python-client>=2.0.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+
+# Optionnel : personnalisation des LM par IA (generate_lm.py --use-ai)
+openai>=1.0.0
