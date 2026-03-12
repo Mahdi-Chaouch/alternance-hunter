@@ -1,0 +1,38 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# --- Local environment / secrets ---
+.env
+.env.*
+!.env.example
+secrets/*
+!secrets/.gitkeep
+**/credentials.json
+**/token.json
+**/client_secret*.json
+
+# --- Sensitive personal assets ---
+assets/CV.pdf
+assets/CV_*.pdf
+
+# --- Generated data and logs ---
+data/exports/*
+!data/exports/.gitkeep
+outputs/letters/*
+!outputs/letters/.gitkeep
+outputs/logs/*
+!outputs/logs/.gitkeep
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
