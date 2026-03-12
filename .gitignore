@@ -13,11 +13,7 @@ venv/
 .env
 .env.*
 !.env.example
-secrets/*
-!secrets/.gitkeep
-**/credentials.json
-**/token.json
-**/client_secret*.json
+
 
 # --- Sensitive personal assets ---
 assets/CV.pdf
