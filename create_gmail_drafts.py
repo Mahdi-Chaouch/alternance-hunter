@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from email.message import EmailMessage
 from datetime import date
+from typing import Dict, Tuple
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -147,20 +148,46 @@ def guess_mime(path: Path):
     return ("application", "octet-stream")
 
 
-def make_message(to_email: str, subject: str, body: str, attachments: list[Path]) -> dict:
+AttachmentPayload = Tuple[bytes, str, str, str]
+
+
+def _resolve_attachment_payload(
+    path: Path,
+    cache: Dict[str, AttachmentPayload],
+) -> AttachmentPayload | None:
+    key = str(path.resolve())
+    if key in cache:
+        return cache[key]
+
+    if not path.exists():
+        print(f"⚠️ Pièce jointe introuvable (skip): {path}")
+        return None
+
+    data = path.read_bytes()
+    maintype, subtype = guess_mime(path)
+    payload = (data, maintype, subtype, path.name)
+    cache[key] = payload
+    return payload
+
+
+def make_message(
+    to_email: str,
+    subject: str,
+    body: str,
+    attachments: list[Path],
+    attachment_cache: Dict[str, AttachmentPayload],
+) -> dict:
     msg = EmailMessage()
     msg["To"] = to_email
     msg["Subject"] = subject
     msg.set_content(body)
 
     for path in attachments:
-        if not path.exists():
-            print(f"⚠️ Pièce jointe introuvable (skip): {path}")
+        payload = _resolve_attachment_payload(path, attachment_cache)
+        if payload is None:
             continue
-
-        data = path.read_bytes()
-        maintype, subtype = guess_mime(path)
-        msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=path.name)
+        data, maintype, subtype, filename = payload
+        msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=filename)
 
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
     return {"message": {"raw": raw}}
@@ -235,6 +262,8 @@ def main():
                     help="force auth console (utile si navigateur/ssh)")
     ap.add_argument("--resume-log", default="outputs/logs/drafts_created_log.csv",
                     help="log pour reprise/anti-doublon")
+    ap.add_argument("--progress-every", type=int, default=25,
+                    help="affiche une progression toutes les N entrées analysées")
 
     args = ap.parse_args()
 
@@ -273,11 +302,14 @@ def main():
 
     created = 0
     skipped = 0
+    scanned = 0
+    attachment_cache: Dict[str, AttachmentPayload] = {}
 
     with log_csv.open("a", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["key", "company", "to", "subject", "status", "draft_id", "error", "lm_attached"])
 
         for it in items:
+            scanned += 1
             if created >= args.max:
                 break
 
@@ -285,6 +317,8 @@ def main():
             key = f"{it['to']}|{it['subject']}"
             if key in done:
                 skipped += 1
+                if args.progress_every > 0 and scanned % args.progress_every == 0:
+                    print(f"⏳ Progression: lus={scanned}/{len(items)} | créés={created} | skippés={skipped}")
                 continue
 
             # Attachments: CV + LM (auto ou forcée)
@@ -309,7 +343,13 @@ def main():
                     lm_attached = "MISSING"
 
             try:
-                draft_body = make_message(it["to"], it["subject"], it["body"], attachments)
+                draft_body = make_message(
+                    it["to"],
+                    it["subject"],
+                    it["body"],
+                    attachments,
+                    attachment_cache,
+                )
                 res = create_draft(service, draft_body)
                 draft_id = res.get("id", "")
 
