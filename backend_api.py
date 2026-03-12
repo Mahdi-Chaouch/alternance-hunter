@@ -8,6 +8,7 @@ import signal
 import subprocess
 import sys
 import threading
+import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -25,10 +26,30 @@ RUN_LOG_DIR = PROJECT_ROOT / "outputs" / "logs" / "api_runs"
 RUN_LOG_DIR.mkdir(parents=True, exist_ok=True)
 MAX_IN_MEMORY_LOG_LINES = 500
 
-API_TOKEN = os.getenv("PIPELINE_API_TOKEN") or os.getenv("API_TOKEN")
+def _read_token_from_env_file(path: Path) -> Optional[str]:
+    if not path.exists():
+        return None
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if key.strip() in {"PIPELINE_API_TOKEN", "API_TOKEN"}:
+            cleaned = value.strip().strip('"').strip("'")
+            if cleaned:
+                return cleaned
+    return None
+
+
+API_TOKEN = (
+    os.getenv("PIPELINE_API_TOKEN")
+    or os.getenv("API_TOKEN")
+    or _read_token_from_env_file(PROJECT_ROOT / ".env")
+    or _read_token_from_env_file(PROJECT_ROOT / "web" / ".env.local")
+)
 if not API_TOKEN:
     raise RuntimeError(
-        "Missing API token. Set PIPELINE_API_TOKEN (or API_TOKEN) before starting the API."
+        "Missing API token. Set PIPELINE_API_TOKEN/API_TOKEN or define it in .env or web/.env.local."
     )
 
 
@@ -98,6 +119,7 @@ class RunState:
     log_file: Path
     status: str = "queued"
     created_at: str = field(default_factory=utc_now_iso)
+    started_monotonic: Optional[float] = None
     started_at: Optional[str] = None
     finished_at: Optional[str] = None
     exit_code: Optional[int] = None
@@ -107,10 +129,12 @@ class RunState:
     logs_tail: Deque[str] = field(
         default_factory=lambda: deque(maxlen=MAX_IN_MEMORY_LOG_LINES)
     )
+    last_output_monotonic: float = field(default_factory=time.monotonic)
 
     def append_log(self, line: str) -> None:
         clean = line.rstrip("\n")
         self.logs_tail.append(clean)
+        self.last_output_monotonic = time.monotonic()
         with self.log_file.open("a", encoding="utf-8") as fh:
             fh.write(clean + "\n")
 
@@ -139,7 +163,7 @@ def verify_token(
 
 
 def build_pipeline_command(payload: RunRequest) -> List[str]:
-    cmd = [payload.python or sys.executable, str(PIPELINE_PATH)]
+    cmd = [payload.python or sys.executable, "-u", str(PIPELINE_PATH)]
     cmd += ["--mode", payload.mode, "--zone", payload.zone]
     cmd += ["--max-minutes", str(payload.max_minutes)]
     cmd += ["--max-sites", str(payload.max_sites)]
@@ -198,6 +222,7 @@ def run_in_background(run_id: str) -> None:
         run = RUNS[run_id]
         run.status = "running"
         run.started_at = utc_now_iso()
+        run.started_monotonic = time.monotonic()
 
     run.append_log(f"[{utc_now_iso()}] Starting command: {' '.join(run.command)}")
 
@@ -207,6 +232,7 @@ def run_in_background(run_id: str) -> None:
         "stderr": subprocess.STDOUT,
         "text": True,
         "bufsize": 1,
+        "env": {**os.environ, "PYTHONUNBUFFERED": "1"},
     }
     if sys.platform.startswith("win"):
         popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
@@ -217,6 +243,26 @@ def run_in_background(run_id: str) -> None:
     with RUNS_LOCK:
         run.process = process
         run.pid = process.pid
+
+    def heartbeat_worker() -> None:
+        while True:
+            time.sleep(15)
+            with RUNS_LOCK:
+                current = RUNS.get(run_id)
+                if current is None or current.status != "running":
+                    return
+                silence = time.monotonic() - current.last_output_monotonic
+                started_mono = current.started_monotonic
+                pid = current.pid
+
+            if silence < 15:
+                continue
+            elapsed = int(time.monotonic() - (started_mono or time.monotonic()))
+            run.append_log(
+                f"[{utc_now_iso()}] Still running... {elapsed}s elapsed (pid={pid}). Waiting for next output."
+            )
+
+    threading.Thread(target=heartbeat_worker, daemon=True).start()
 
     if process.stdout:
         for line in process.stdout:

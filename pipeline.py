@@ -17,6 +17,7 @@ Usage rapide:
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -45,11 +46,20 @@ def _script_path(name: str) -> Path:
 
 def _run(cmd: List[str], dry_run: bool) -> int:
     printable = " ".join(cmd)
-    print(f"\n>>> {printable}")
+    print(f"\n>>> {printable}", flush=True)
     if dry_run:
         return 0
-    result = subprocess.run(cmd, cwd=str(_project_root()), check=False)
+    result = subprocess.run(
+        cmd,
+        cwd=str(_project_root()),
+        check=False,
+        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+    )
     return int(result.returncode)
+
+
+def _python_cmd(python_executable: str) -> List[str]:
+    return [python_executable, "-u"]
 
 
 def _zone_to_hunter_filter(zone: str) -> str:
@@ -62,7 +72,7 @@ def _zone_to_hunter_filter(zone: str) -> str:
 
 def build_hunter_cmd(args: argparse.Namespace) -> List[str]:
     cmd = [
-        args.python,
+        *_python_cmd(args.python),
         str(_script_path("alternance_hunter.py")),
         "--max-minutes",
         str(args.max_minutes),
@@ -90,7 +100,7 @@ def build_hunter_cmd(args: argparse.Namespace) -> List[str]:
 
 def build_generate_cmd(args: argparse.Namespace) -> List[str]:
     cmd = [
-        args.python,
+        *_python_cmd(args.python),
         str(_script_path("generate_lm.py")),
         "--draft-file",
         args.draft_file,
@@ -108,7 +118,7 @@ def build_generate_cmd(args: argparse.Namespace) -> List[str]:
 
 def build_drafts_cmd(args: argparse.Namespace) -> List[str]:
     cmd = [
-        args.python,
+        *_python_cmd(args.python),
         str(_script_path("create_gmail_drafts.py")),
         "--draft-file",
         args.draft_file,
@@ -215,12 +225,12 @@ def main() -> None:
         order = [args.mode]
 
     for step in order:
-        print(f"\n=== ETAPE: {step} ===")
+        print(f"\n=== ETAPE: {step} ===", flush=True)
         exit_code = _run(pipeline_steps[step], dry_run=args.dry_run)
         if exit_code != 0:
             raise SystemExit(exit_code)
 
-    print("\nPipeline termine.")
+    print("\nPipeline termine.", flush=True)
 
 
 if __name__ == "__main__":
