@@ -22,8 +22,7 @@ assets/CV_*.pdf
 # --- Generated data and logs ---
 data/exports/*
 !data/exports/.gitkeep
-outputs/letters/*
-!outputs/letters/.gitkeep
+
 outputs/logs/*
 !outputs/logs/.gitkeep
 
