@@ -81,6 +81,11 @@ class RunRequest(BaseModel):
     out_dir: str = "outputs/letters"
     use_ai: bool = False
     ai_model: str = "gpt-4o-mini"
+    sender_first_name: str = ""
+    sender_last_name: str = ""
+    sender_linkedin_url: str = ""
+    mail_subject_template: str = ""
+    mail_body_template: str = ""
 
     # drafts
     cv: str = "assets/CV.pdf"
@@ -202,6 +207,16 @@ def build_pipeline_command(
     cmd += ["--template", template_path]
     cmd += ["--out-dir", payload.out_dir]
     cmd += ["--ai-model", payload.ai_model]
+    if payload.sender_first_name:
+        cmd += ["--sender-first-name", payload.sender_first_name]
+    if payload.sender_last_name:
+        cmd += ["--sender-last-name", payload.sender_last_name]
+    if payload.sender_linkedin_url:
+        cmd += ["--sender-linkedin-url", payload.sender_linkedin_url]
+    if payload.mail_subject_template:
+        cmd += ["--mail-subject-template", payload.mail_subject_template]
+    if payload.mail_body_template:
+        cmd += ["--mail-body-template", payload.mail_body_template]
     cmd += ["--cv", cv_path]
     cmd += ["--lm-suffix", payload.lm_suffix]
     if payload.oauth_access_token:

@@ -60,7 +60,7 @@ configure_safe_stdio()
 # ============================================================
 # USER CONFIG
 # ============================================================
-LINKEDIN = "https://www.linkedin.com/in/mahdi-chaouch-3a27263a0/"
+LINKEDIN = ""
 
 DEFAULT_TARGETS_AUTO_CSV = "data/exports/targets_auto.csv"
 DEFAULT_EMAILS_FOUND_CSV = "data/exports/emails_found.csv"
@@ -760,22 +760,48 @@ def fetch_html(url: str) -> Tuple[Optional[str], Optional[int]]:
 # ============================================================
 # DRAFT TEMPLATE
 # ============================================================
-def build_email_draft(company: str) -> Tuple[str, str]:
-    subject = f"Candidature spontanée – Alternance Développeur Web – Septembre 2026 – {company}"
-    body = f"""Madame, Monsieur,
+def render_template(text: str, variables: Dict[str, str]) -> str:
+    out = text
+    for key, value in variables.items():
+        out = out.replace(f"{{{{{key}}}}}", value)
+    return out
 
-Actuellement étudiant en 1ère année de BUT Informatique, je recherche une alternance à partir de septembre 2026, idéalement en développement web (et je suis également ouvert au télétravail).
 
-Je souhaite rejoindre {company} afin de contribuer à des projets concrets (front/back, intégration, bases de données, amélioration continue) tout en progressant au contact d’une équipe.
+def build_email_draft(
+    company: str,
+    sender_first_name: str,
+    sender_last_name: str,
+    sender_linkedin_url: str,
+    custom_subject_template: str,
+    custom_body_template: str,
+) -> Tuple[str, str]:
+    full_name = " ".join(part for part in [sender_first_name.strip(), sender_last_name.strip()] if part).strip()
+    display_name = full_name or "Candidat"
+    variables = {
+        "ENTREPRISE": company,
+        "PRENOM": sender_first_name.strip(),
+        "NOM": sender_last_name.strip(),
+        "NOM_COMPLET": display_name,
+        "LINKEDIN": sender_linkedin_url.strip(),
+    }
 
-Compétences actuelles : HTML/CSS, SQL, C, Linux (et montée en compétences en développement web tout au long du BUT).
+    default_subject = "Candidature spontanee - Alternance Developpeur Web - Septembre 2026 - {{ENTREPRISE}}"
+    default_body = """Madame, Monsieur,
 
-Je vous joins mon CV et je serais ravi d’échanger si vous avez une opportunité d’alternance.
+Je suis a la recherche d'une alternance en developpement web a partir de septembre 2026.
+
+Je souhaite rejoindre {{ENTREPRISE}} afin de contribuer a des projets concrets et progresser au contact d'une equipe.
+
+Je vous joins mon CV et ma lettre de motivation en pieces jointes.
 
 Cordialement,
-Mahdi Chaouch
-LinkedIn : {LINKEDIN}
+{{NOM_COMPLET}}
+LinkedIn : {{LINKEDIN}}
 """
+    subject_template = custom_subject_template.strip() or default_subject
+    body_template = custom_body_template.strip() or default_body
+    subject = render_template(subject_template, variables).strip() or render_template(default_subject, variables)
+    body = render_template(body_template, variables).strip() or render_template(default_body, variables)
     return subject, body
 
 
@@ -862,6 +888,11 @@ def run_email_finder(
     workers: int,
     target_found: int,
     focus: str,
+    sender_first_name: str,
+    sender_last_name: str,
+    sender_linkedin_url: str,
+    mail_subject_template: str,
+    mail_body_template: str,
     rh_only: bool = False,
 ) -> None:
     fieldnames = ["entreprise", "zone", "ville", "site", "score", "status", "email", "source_url", "contact_urls", "reason"]
@@ -943,7 +974,14 @@ def run_email_finder(
                                 found += 1
 
                             if write_draft:
-                                subj, body = build_email_draft(t.entreprise)
+                                subj, body = build_email_draft(
+                                    company=t.entreprise,
+                                    sender_first_name=sender_first_name,
+                                    sender_last_name=sender_last_name,
+                                    sender_linkedin_url=sender_linkedin_url,
+                                    custom_subject_template=mail_subject_template,
+                                    custom_body_template=mail_body_template,
+                                )
                                 fdraft.write(
                                     f"{SEP}\n"
                                     f"Entreprise: {t.entreprise}\n"
@@ -1031,6 +1069,13 @@ def parse_args():
                    help="Chemin du CSV des emails trouvés.")
     p.add_argument("--drafts-txt", type=str, default=DEFAULT_DRAFT_EMAILS_TXT,
                    help="Chemin du fichier de brouillons générés.")
+    p.add_argument("--sender-first-name", type=str, default="", help="Prenom du candidat.")
+    p.add_argument("--sender-last-name", type=str, default="", help="Nom du candidat.")
+    p.add_argument("--sender-linkedin-url", type=str, default="", help="Profil LinkedIn du candidat.")
+    p.add_argument("--mail-subject-template", type=str, default="",
+                   help="Template de sujet avec placeholders (ex: {{ENTREPRISE}}, {{NOM_COMPLET}}).")
+    p.add_argument("--mail-body-template", type=str, default="",
+                   help="Template complet du corps de mail avec placeholders.")
     return p.parse_args()
 
 def main():
@@ -1061,6 +1106,11 @@ def main():
         workers=args.workers,
         target_found=args.target_found,
         focus=args.focus,
+        sender_first_name=args.sender_first_name,
+        sender_last_name=args.sender_last_name,
+        sender_linkedin_url=args.sender_linkedin_url or LINKEDIN,
+        mail_subject_template=args.mail_subject_template,
+        mail_body_template=args.mail_body_template,
         rh_only=args.rh_only,
     )
 

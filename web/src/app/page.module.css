@@ -140,6 +140,15 @@
   gap: 0.65rem;
 }
 
+.profileCard {
+  border: 1px dashed var(--panel-border);
+  border-radius: 12px;
+  padding: 0.9rem;
+  margin-bottom: 1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
 .uploadTitle {
   margin: 0;
   font-weight: 700;
@@ -166,9 +175,33 @@
   color: var(--muted-text);
 }
 
+.profileCard label {
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted-text);
+}
+
 .uploadCard input[type="file"] {
   width: 100%;
   font-size: 0.85rem;
+}
+
+.profileCard input,
+.profileCard textarea {
+  width: 100%;
+  padding: 0.58rem 0.68rem;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.profileCard textarea {
+  resize: vertical;
+  min-height: 120px;
 }
 
 .uploadSuccess {
