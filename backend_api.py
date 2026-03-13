@@ -562,6 +562,14 @@ def get_upload_status(
 
     target_dir = USER_ASSETS_DIR / user_key
     cv_path, template_path = resolve_user_assets(user_key)
+
+    # Presence d'un draft_emails.txt pour ce compte
+    user_exports_dir = PROJECT_ROOT / "data" / "exports" / "users" / user_key
+    draft_path_obj = user_exports_dir / "draft_emails.txt"
+    draft_path: Optional[str] = None
+    if draft_path_obj.exists():
+        draft_path = str(draft_path_obj.relative_to(PROJECT_ROOT))
+
     return {
         "ok": True,
         "user_key": user_key,
@@ -570,6 +578,8 @@ def get_upload_status(
         "template_uploaded": bool(template_path),
         "cv_path": cv_path,
         "template_path": template_path,
+        "draft_uploaded": bool(draft_path),
+        "draft_path": draft_path,
     }
 
 
