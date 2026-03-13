@@ -1,0 +1,1472 @@
+"use client";
+
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import styles from "../page.module.css";
+import { authClient } from "@/lib/auth-client";
+
+type RunMode = "pipeline" | "hunter" | "generate" | "drafts";
+type Zone = "paris" | "cannes" | "auxerre" | "fontainebleau" | "all";
+
+type RunListItem = {
+  run_id: string;
+  status: string;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  exit_code: number | null;
+  pid: number | null;
+  cancel_requested: boolean;
+  log_file: string;
+  zone?: string | null;
+  duration_seconds?: number | null;
+  targets_found?: number | null;
+  target_found?: number | null;
+  emails_generated?: number | null;
+  drafts_generated?: number | null;
+};
+
+type RunStatusResponse = {
+  run_id: string;
+  status: string;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  exit_code: number | null;
+  command: string[];
+  pid: number | null;
+  cancel_requested: boolean;
+  log_file: string;
+  logs_tail: string[];
+  zone?: string | null;
+  duration_seconds?: number | null;
+  targets_found?: number | null;
+  target_found?: number | null;
+  emails_generated?: number | null;
+  drafts_generated?: number | null;
+};
+
+const END_STATUSES = new Set(["succeeded", "failed", "cancelled"]);
+type ThemeMode = "light" | "dark";
+const MODE_LABELS: Record<RunMode, string> = {
+  pipeline: "Pipeline complet",
+  hunter: "Recherche d'entreprises",
+  generate: "Generation des emails",
+  drafts: "Creation des brouillons Gmail",
+};
+
+const ZONE_LABELS: Record<Zone, string> = {
+  all: "Toutes les zones",
+  paris: "Paris",
+  cannes: "Cannes",
+  auxerre: "Auxerre",
+  fontainebleau: "Fontainebleau",
+};
+
+async function safeJson<T>(response: Response): Promise<T | Record<string, unknown>> {
+  const rawBody = await response.text();
+  if (!rawBody) {
+    return {};
+  }
+  try {
+    return JSON.parse(rawBody) as T;
+  } catch {
+    return {};
+  }
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  return new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "short",
+    timeStyle: "medium",
+  }).format(date);
+}
+
+function formatDuration(
+  startedAt: string | null,
+  finishedAt: string | null,
+  explicitSeconds?: number | null,
+): string {
+  if (typeof explicitSeconds === "number" && explicitSeconds >= 0) {
+    const minutes = Math.floor(explicitSeconds / 60);
+    const seconds = explicitSeconds % 60;
+    return `${minutes} min ${seconds.toString().padStart(2, "0")} s`;
+  }
+  if (!startedAt) {
+    return "-";
+  }
+  const startMs = new Date(startedAt).getTime();
+  const endMs = finishedAt ? new Date(finishedAt).getTime() : Date.now();
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs < startMs) {
+    return "-";
+  }
+  const deltaSeconds = Math.floor((endMs - startMs) / 1000);
+  const hours = Math.floor(deltaSeconds / 3600);
+  const minutes = Math.floor((deltaSeconds % 3600) / 60);
+  const seconds = deltaSeconds % 60;
+  if (hours > 0) {
+    return `${hours} h ${minutes.toString().padStart(2, "0")} min`;
+  }
+  return `${minutes} min ${seconds.toString().padStart(2, "0")} s`;
+}
+
+function formatOptionalNumber(value: number | null | undefined): string {
+  return typeof value === "number" ? String(value) : "-";
+}
+
+function getStatusTone(status: string): "running" | "success" | "failed" | "neutral" {
+  const normalized = status.toLowerCase();
+  if (normalized === "succeeded" || normalized === "success") {
+    return "success";
+  }
+  if (normalized === "failed" || normalized === "error") {
+    return "failed";
+  }
+  if (normalized === "cancelled") {
+    return "neutral";
+  }
+  return "running";
+}
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const [accessState, setAccessState] = useState<
+    "checking" | "unauthenticated" | "granted" | "forbidden"
+  >("checking");
+  const [accessError, setAccessError] = useState("");
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [googleAccountLinked, setGoogleAccountLinked] = useState(false);
+  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [mailSubjectTemplate, setMailSubjectTemplate] = useState("");
+  const [mailBodyTemplate, setMailBodyTemplate] = useState("");
+  const [profileInfo, setProfileInfo] = useState("");
+  const [cvFile, setCvFile] = useState<File | null>(null);
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [isUploadingAssets, setIsUploadingAssets] = useState(false);
+  const [assetInfo, setAssetInfo] = useState("");
+  const [draftInfo, setDraftInfo] = useState("");
+  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [mode, setMode] = useState<RunMode>("pipeline");
+  const [zone, setZone] = useState<Zone>("all");
+  const [dryRun, setDryRun] = useState(false);
+  const [maxMinutes, setMaxMinutes] = useState(30);
+  const [maxSites, setMaxSites] = useState(1500);
+  const [targetFound, setTargetFound] = useState(100);
+  const [workers, setWorkers] = useState(20);
+  const [useAi, setUseAi] = useState(false);
+  const [isLaunchingRun, setIsLaunchingRun] = useState(false);
+  const [isRefreshingRuns, setIsRefreshingRuns] = useState(false);
+  const [isRefreshingDetails, setIsRefreshingDetails] = useState(false);
+  const [isCancellingRun, setIsCancellingRun] = useState(false);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [runs, setRuns] = useState<RunListItem[]>([]);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [runDetails, setRunDetails] = useState<RunStatusResponse | null>(null);
+  const [autoScrollLogs, setAutoScrollLogs] = useState(true);
+  const [isTerminalFullscreen, setIsTerminalFullscreen] = useState(false);
+  const [terminalFlash, setTerminalFlash] = useState(false);
+  const [animatedLogs, setAnimatedLogs] = useState("");
+  const [isTypingLogs, setIsTypingLogs] = useState(false);
+  const logsRef = useRef<HTMLPreElement | null>(null);
+  const typingTimerRef = useRef<number | null>(null);
+  const animatedLogsRef = useRef("");
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("alternance-ui-theme");
+    if (saved === "dark" || saved === "light") {
+      setTheme(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("alternance-ui-theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function verifyAccess() {
+      try {
+        const response = await fetch("/api/auth/authorized", { cache: "no-store" });
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (response.status === 401) {
+          setAccessState("unauthenticated");
+          return;
+        }
+
+        if (!response.ok) {
+          const data = (await safeJson<{ detail?: string }>(response)) as { detail?: string };
+          setAccessError(
+            data.detail ??
+              "Acces refuse. Votre session est absente ou votre email n'est pas autorise.",
+          );
+          setAccessState("forbidden");
+          return;
+        }
+
+        const data = (await safeJson<{
+          gmail_connected?: boolean;
+          google_account_linked?: boolean;
+        }>(response)) as {
+          gmail_connected?: boolean;
+          google_account_linked?: boolean;
+        };
+        setGmailConnected(Boolean(data.gmail_connected));
+        setGoogleAccountLinked(Boolean(data.google_account_linked));
+        setAccessState("granted");
+      } catch {
+        if (!isCancelled) {
+          setAccessError("Impossible de verifier votre session. Reessayez dans quelques instants.");
+          setAccessState("forbidden");
+        }
+      }
+    }
+
+    void verifyAccess();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [router]);
+
+  const refreshRuns = useCallback(async (): Promise<RunListItem[]> => {
+    setIsRefreshingRuns(true);
+    try {
+      const response = await fetch("/api/runs?limit=30", { cache: "no-store" });
+      const data = (await safeJson<{ runs: RunListItem[]; detail?: string }>(
+        response,
+      )) as { runs?: RunListItem[]; detail?: string };
+      if (!response.ok) {
+        throw new Error(data.detail ?? "Impossible de recuperer la liste des executions.");
+      }
+      const nextRuns = [...(data.runs ?? [])].reverse();
+      setRuns(nextRuns);
+      if (!activeRunId && nextRuns[0]?.run_id) {
+        setActiveRunId(nextRuns[0].run_id);
+      }
+      return nextRuns;
+    } finally {
+      setIsRefreshingRuns(false);
+    }
+  }, [activeRunId]);
+
+  const refreshRunDetails = useCallback(
+    async (runId?: string | null) => {
+      const runIdToLoad = runId ?? activeRunId;
+      if (!runIdToLoad) {
+        setRunDetails(null);
+        return;
+      }
+      setIsRefreshingDetails(true);
+      try {
+        const response = await fetch(`/api/runs/${runIdToLoad}?tail=400`, {
+          cache: "no-store",
+        });
+        const data = (await safeJson<RunStatusResponse & { detail?: string }>(
+          response,
+        )) as Partial<RunStatusResponse> & { detail?: string };
+
+        if (!response.ok) {
+          if (
+            response.status === 404 &&
+            typeof data.detail === "string" &&
+            data.detail.includes("Run '") &&
+            data.detail.includes("not found")
+          ) {
+            // Cas transitoire / instance backend differente : ne pas afficher d'erreur bloquante.
+            setRunDetails(null);
+            setActiveRunId(null);
+            return;
+          }
+          throw new Error(data.detail ?? `Impossible de recuperer le run ${runIdToLoad}.`);
+        }
+
+        setRunDetails(data as RunStatusResponse);
+      } finally {
+        setIsRefreshingDetails(false);
+      }
+    },
+    [activeRunId],
+  );
+
+  const refreshAll = useCallback(async () => {
+    setError("");
+    try {
+      const latestRuns = await refreshRuns();
+      const runIdToLoad = activeRunId ?? latestRuns[0]?.run_id ?? null;
+      await refreshRunDetails(runIdToLoad);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur inconnue.";
+      setError(message);
+    }
+  }, [activeRunId, refreshRuns, refreshRunDetails]);
+
+  useEffect(() => {
+    if (accessState !== "granted") {
+      return;
+    }
+    void refreshAll();
+  }, [accessState, refreshAll]);
+
+  useEffect(() => {
+    if (accessState !== "granted") {
+      return;
+    }
+    let cancelled = false;
+
+    async function loadProfile() {
+      setIsProfileLoading(true);
+      try {
+        const response = await fetch("/api/profile", { cache: "no-store" });
+        const data = (await safeJson<{
+          detail?: string;
+          profile?: {
+            first_name?: string;
+            last_name?: string;
+            linkedin_url?: string;
+            subject_template?: string;
+            body_template?: string;
+            run_mode?: RunMode;
+            run_zone?: Zone;
+            run_dry_run?: boolean;
+            run_max_minutes?: number;
+            run_max_sites?: number;
+            run_target_found?: number;
+            run_workers?: number;
+            run_use_ai?: boolean;
+          };
+        }>(response)) as {
+          detail?: string;
+          profile?: {
+            first_name?: string;
+            last_name?: string;
+            linkedin_url?: string;
+            subject_template?: string;
+            body_template?: string;
+            run_mode?: RunMode;
+            run_zone?: Zone;
+            run_dry_run?: boolean;
+            run_max_minutes?: number;
+            run_max_sites?: number;
+            run_target_found?: number;
+            run_workers?: number;
+            run_use_ai?: boolean;
+          };
+        };
+        if (!response.ok) {
+          throw new Error(data.detail ?? "Impossible de charger votre profil.");
+        }
+        if (cancelled) {
+          return;
+        }
+        setFirstName(data.profile?.first_name ?? "");
+        setLastName(data.profile?.last_name ?? "");
+        setLinkedinUrl(data.profile?.linkedin_url ?? "");
+        setMailSubjectTemplate(data.profile?.subject_template ?? "");
+        setMailBodyTemplate(data.profile?.body_template ?? "");
+        if (data.profile?.run_mode) {
+          setMode(data.profile.run_mode);
+        }
+        if (data.profile?.run_zone) {
+          setZone(data.profile.run_zone);
+        }
+        setDryRun(Boolean(data.profile?.run_dry_run));
+        setMaxMinutes(Number(data.profile?.run_max_minutes ?? 30));
+        setMaxSites(Number(data.profile?.run_max_sites ?? 1500));
+        setTargetFound(Number(data.profile?.run_target_found ?? 100));
+        setWorkers(Number(data.profile?.run_workers ?? 20));
+        setUseAi(Boolean(data.profile?.run_use_ai));
+      } catch (err) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : "Erreur de chargement du profil.";
+          setError(message);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsProfileLoading(false);
+        }
+      }
+    }
+
+    void loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessState]);
+
+  useEffect(() => {
+    if (accessState !== "granted") {
+      return;
+    }
+    let cancelled = false;
+
+    async function loadUploadStatus() {
+      try {
+        const response = await fetch("/api/uploads", { method: "GET", cache: "no-store" });
+        const data = (await safeJson<{
+          ok?: boolean;
+          cv_uploaded?: boolean;
+          template_uploaded?: boolean;
+          draft_uploaded?: boolean;
+        }>(response)) as {
+          ok?: boolean;
+          cv_uploaded?: boolean;
+          template_uploaded?: boolean;
+          draft_uploaded?: boolean;
+        };
+        if (!response.ok || !data.ok || cancelled) {
+          return;
+        }
+        if (data.cv_uploaded && data.template_uploaded) {
+          setAssetInfo("CV et template LM deja enregistres pour ce compte.");
+        } else if (data.cv_uploaded) {
+          setAssetInfo("CV deja enregistre pour ce compte.");
+        } else if (data.template_uploaded) {
+          setAssetInfo("Template LM deja enregistre pour ce compte.");
+        }
+        if (data.draft_uploaded) {
+          setDraftInfo("Un fichier draft_emails.txt existe deja pour ce compte.");
+        } else {
+          setDraftInfo("Aucun draft_emails.txt existant pour ce compte pour le moment.");
+        }
+      } catch {
+        // Ignore upload status failures to avoid blocking the dashboard.
+      }
+    }
+
+    void loadUploadStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessState]);
+
+  const activeRun = useMemo(
+    () => runs.find((run) => run.run_id === activeRunId) ?? null,
+    [runs, activeRunId],
+  );
+  const isRunning = runDetails ? !END_STATUSES.has(runDetails.status) : false;
+  const logsText = runDetails?.logs_tail.join("\n") ?? "";
+  const draftsRequireGmail = mode === "drafts" && !gmailConnected;
+
+  useEffect(() => {
+    animatedLogsRef.current = animatedLogs;
+  }, [animatedLogs]);
+
+  useEffect(() => {
+    if (accessState !== "granted") {
+      return;
+    }
+    const intervalMs = isRunning ? 2000 : 5000;
+    const intervalId = window.setInterval(() => {
+      void refreshAll();
+    }, intervalMs);
+    return () => window.clearInterval(intervalId);
+  }, [accessState, isRunning, refreshAll]);
+
+  useEffect(() => {
+    if (typingTimerRef.current) {
+      window.clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+
+    const currentAnimated = animatedLogsRef.current;
+    if (!logsText) {
+      setAnimatedLogs("");
+      setIsTypingLogs(false);
+      return;
+    }
+
+    if (!logsText.startsWith(currentAnimated)) {
+      setAnimatedLogs(logsText);
+      setIsTypingLogs(false);
+      return;
+    }
+
+    const pending = logsText.slice(currentAnimated.length);
+    if (!pending) {
+      setIsTypingLogs(false);
+      return;
+    }
+
+    setIsTypingLogs(true);
+    let cursor = 0;
+    const chunkSize = pending.length > 240 ? 6 : 2;
+    const delayMs = 14;
+
+    const typeStep = () => {
+      const nextChunk = pending.slice(cursor, cursor + chunkSize);
+      cursor += chunkSize;
+      setAnimatedLogs((prev) => prev + nextChunk);
+      if (cursor < pending.length) {
+        typingTimerRef.current = window.setTimeout(typeStep, delayMs);
+      } else {
+        setIsTypingLogs(false);
+      }
+    };
+
+    typingTimerRef.current = window.setTimeout(typeStep, 10);
+    return () => {
+      if (typingTimerRef.current) {
+        window.clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+    };
+  }, [logsText]);
+
+  useEffect(() => {
+    if (autoScrollLogs && logsRef.current) {
+      logsRef.current.scrollTop = logsRef.current.scrollHeight;
+    }
+  }, [autoScrollLogs, animatedLogs]);
+
+  useEffect(() => {
+    if (!logsText) {
+      return;
+    }
+    setTerminalFlash(true);
+    const timer = window.setTimeout(() => setTerminalFlash(false), 450);
+    return () => window.clearTimeout(timer);
+  }, [logsText]);
+
+  useEffect(() => {
+    if (!isTerminalFullscreen) {
+      return;
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsTerminalFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isTerminalFullscreen]);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("Renseignez votre prenom et nom dans 'Profil expediteur' avant de lancer.");
+      setInfo("");
+      return;
+    }
+    if (draftsRequireGmail) {
+      setError(
+        "Connexion Gmail requise pour le mode brouillons. Connectez votre compte Google puis reessayez.",
+      );
+      setInfo("");
+      return;
+    }
+    setIsLaunchingRun(true);
+    setError("");
+    setInfo("");
+    try {
+      const payload = {
+        mode,
+        zone,
+        dry_run: dryRun,
+        max_minutes: maxMinutes,
+        max_sites: maxSites,
+        target_found: targetFound,
+        workers,
+        use_ai: useAi,
+      };
+      const response = await fetch("/api/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = (await safeJson<{ run_id?: string; detail?: string; message?: string }>(
+        response,
+      )) as { run_id?: string; detail?: string; message?: string };
+      if (!response.ok || !data.run_id) {
+        throw new Error(data.detail ?? data.message ?? "Echec du lancement du run.");
+      }
+
+      setInfo(`Execution lancee : ${data.run_id}`);
+      setActiveRunId(data.run_id);
+      await refreshAll();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur inconnue.";
+      setError(message);
+    } finally {
+      setIsLaunchingRun(false);
+    }
+  }
+
+  async function onConnectGoogle() {
+    setError("");
+    setInfo("");
+    setIsConnectingGoogle(true);
+    try {
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: "/dashboard",
+      });
+      if (result?.error?.message) {
+        setError(result.error.message);
+      }
+    } catch {
+      setError("Impossible de demarrer la connexion Google.");
+    } finally {
+      setIsConnectingGoogle(false);
+    }
+  }
+
+  async function onUploadAssets(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!cvFile && !templateFile) {
+      setError("Ajoutez au moins un fichier (CV PDF et/ou template LM) avant l'upload.");
+      setAssetInfo("");
+      return;
+    }
+
+    setError("");
+    setInfo("");
+    setAssetInfo("");
+    setIsUploadingAssets(true);
+    try {
+      const formData = new FormData();
+      if (cvFile) {
+        formData.append("cv", cvFile);
+      }
+      if (templateFile) {
+        formData.append("template", templateFile);
+      }
+
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        body: formData,
+      });
+      const data = (await safeJson<{
+        ok?: boolean;
+        detail?: string;
+        uploaded?: { cv?: string; template?: string };
+      }>(response)) as {
+        ok?: boolean;
+        detail?: string;
+        uploaded?: { cv?: string; template?: string };
+      };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.detail ?? "Echec de l'upload des fichiers.");
+      }
+
+      const uploadedParts: string[] = [];
+      if (data.uploaded?.cv) {
+        uploadedParts.push("CV");
+      }
+      if (data.uploaded?.template) {
+        uploadedParts.push("template LM");
+      }
+      setAssetInfo(
+        uploadedParts.length > 0
+          ? `Fichiers enregistres: ${uploadedParts.join(" + ")}`
+          : "Upload termine.",
+      );
+      setCvFile(null);
+      setTemplateFile(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur inconnue lors de l'upload.";
+      setError(message);
+    } finally {
+      setIsUploadingAssets(false);
+    }
+  }
+
+  async function onSaveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedFirstName = firstName.trim();
+    const normalizedLastName = lastName.trim();
+    if (!normalizedFirstName || !normalizedLastName) {
+      setError("Le prenom et le nom sont obligatoires.");
+      setProfileInfo("");
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setError("");
+    setInfo("");
+    setProfileInfo("");
+    const uploadedParts: string[] = [];
+
+    try {
+      if (cvFile || templateFile) {
+        const formData = new FormData();
+        if (cvFile) {
+          formData.append("cv", cvFile);
+        }
+        if (templateFile) {
+          formData.append("template", templateFile);
+        }
+        const uploadResponse = await fetch("/api/uploads", {
+          method: "POST",
+          body: formData,
+        });
+        const uploadData = (await safeJson<{
+          ok?: boolean;
+          detail?: string;
+          uploaded?: { cv?: string; template?: string };
+        }>(uploadResponse)) as {
+          ok?: boolean;
+          detail?: string;
+          uploaded?: { cv?: string; template?: string };
+        };
+        if (!uploadResponse.ok || !uploadData.ok) {
+          throw new Error(uploadData.detail ?? "Echec de l'upload des fichiers.");
+        }
+        if (uploadData.uploaded?.cv) {
+          uploadedParts.push("CV");
+        }
+        if (uploadData.uploaded?.template) {
+          uploadedParts.push("template LM");
+        }
+        setCvFile(null);
+        setTemplateFile(null);
+      }
+
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          first_name: normalizedFirstName,
+          last_name: normalizedLastName,
+          linkedin_url: linkedinUrl,
+          subject_template: mailSubjectTemplate,
+          body_template: mailBodyTemplate,
+          run_mode: mode,
+          run_zone: zone,
+          run_dry_run: dryRun,
+          run_max_minutes: maxMinutes,
+          run_max_sites: maxSites,
+          run_target_found: targetFound,
+          run_workers: workers,
+          run_use_ai: useAi,
+        }),
+      });
+      const data = (await safeJson<{ ok?: boolean; detail?: string }>(response)) as {
+        ok?: boolean;
+        detail?: string;
+      };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.detail ?? "Impossible de sauvegarder le profil.");
+      }
+      const message =
+        uploadedParts.length > 0
+          ? `Profil, ${uploadedParts.join(" et ")} enregistres. Vos prochains mails utiliseront ces informations.`
+          : "Profil enregistre. Vos prochains mails utiliseront ces informations.";
+      setProfileInfo(message);
+      if (uploadedParts.length > 0) {
+        setAssetInfo(`Fichiers enregistres: ${uploadedParts.join(" + ")}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur inconnue lors de la sauvegarde.";
+      setError(message);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
+
+  async function onCancelRun() {
+    if (!activeRunId) {
+      return;
+    }
+    setIsCancellingRun(true);
+    setError("");
+    setInfo("");
+    try {
+      const response = await fetch(`/api/runs/${activeRunId}/cancel`, {
+        method: "POST",
+      });
+      const data = (await safeJson<{ status?: string; message?: string; detail?: string }>(
+        response,
+      )) as { status?: string; message?: string; detail?: string };
+      if (!response.ok) {
+        throw new Error(data.detail ?? data.message ?? "Impossible d'annuler ce run.");
+      }
+      setInfo(
+        data.message
+          ? data.message
+          : `Demande d'annulation envoyee (${data.status ?? "cancelling"}).`,
+      );
+      await refreshAll();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur inconnue.";
+      setError(message);
+    } finally {
+      setIsCancellingRun(false);
+    }
+  }
+
+  async function onSignOut() {
+    setError("");
+    setInfo("");
+    setIsSigningOut(true);
+    try {
+      await authClient.signOut();
+      setAccessState("unauthenticated");
+      router.push("/login");
+      router.refresh();
+    } catch {
+      setError("Impossible de se deconnecter pour le moment. Reessayez.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
+
+  async function onSaveWorkInProgress() {
+    try {
+      const normalizedFirstName = firstName.trim();
+      const normalizedLastName = lastName.trim();
+      if (!normalizedFirstName || !normalizedLastName) {
+        throw new Error("Renseignez d'abord votre prenom et nom pour sauvegarder ce compte.");
+      }
+
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          first_name: normalizedFirstName,
+          last_name: normalizedLastName,
+          linkedin_url: linkedinUrl,
+          subject_template: mailSubjectTemplate,
+          body_template: mailBodyTemplate,
+          run_mode: mode,
+          run_zone: zone,
+          run_dry_run: dryRun,
+          run_max_minutes: maxMinutes,
+          run_max_sites: maxSites,
+          run_target_found: targetFound,
+          run_workers: workers,
+          run_use_ai: useAi,
+        }),
+      });
+      const data = (await safeJson<{ ok?: boolean; detail?: string }>(response)) as {
+        ok?: boolean;
+        detail?: string;
+      };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.detail ?? "Impossible d'enregistrer le travail en cours.");
+      }
+
+      setInfo("Travail en cours enregistre pour ce compte.");
+      setError("");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Impossible d'enregistrer le travail en cours.";
+      setError(message);
+    }
+  }
+
+  function onSelectRun(runId: string) {
+    setActiveRunId(runId);
+    void refreshRunDetails(runId);
+  }
+
+  if (accessState === "checking") {
+    return (
+      <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
+        <main className={styles.main}>
+          <section className={styles.panel}>
+            <h2>Verification de la session...</h2>
+            <p className={styles.sectionHint}>Chargement du dashboard securise.</p>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (accessState === "forbidden") {
+    return (
+      <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
+        <main className={styles.main}>
+          <section className={styles.panel}>
+            <h2>Acces refuse</h2>
+            <p className={styles.error} role="alert">
+              {accessError || "Votre compte n'est pas autorise pour ce dashboard."}
+            </p>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (accessState === "unauthenticated") {
+    return (
+      <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
+        <main className={styles.main}>
+          <section className={styles.panel}>
+            <p className={styles.eyebrow}>Alternance Pipeline</p>
+            <h1>Bienvenue</h1>
+            <p className={styles.panelHint}>
+              Connectez-vous avec votre compte Google invite pour acceder au dashboard et lancer vos
+              executions.
+            </p>
+            <div className={styles.controls}>
+              <button className={styles.primaryBtn} type="button" onClick={() => router.push("/login")}>
+                Se connecter
+              </button>
+              <button
+                className={styles.secondaryBtn}
+                type="button"
+                onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+              >
+                {theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
+              </button>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
+      <main className={styles.main}>
+        <header className={styles.headerCard}>
+          <div>
+            <p className={styles.eyebrow}>Tableau de bord</p>
+            <h1>Pilotage du pipeline alternance</h1>
+            <p className={styles.panelHint}>
+              Configurez le pipeline, lancez une execution et suivez les resultats en temps reel.
+            </p>
+          </div>
+          <div className={styles.headerActions}>
+            <button
+              className={styles.secondaryBtn}
+              type="button"
+              onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+            >
+              {theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
+            </button>
+            <button className={styles.secondaryBtn} type="button" onClick={onSaveWorkInProgress}>
+              Enregistrer le travail
+            </button>
+            <button
+              className={styles.secondaryBtn}
+              type="button"
+              onClick={onSignOut}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? "Deconnexion..." : "Se deconnecter"}
+            </button>
+          </div>
+        </header>
+
+        <div className={styles.topGrid}>
+          <section className={styles.panel}>
+            <h2>Configuration du pipeline</h2>
+            <p className={styles.sectionHint}>
+              Definissez les parametres principaux avant de lancer une execution.
+            </p>
+            <form className={styles.profileCard} onSubmit={onSaveProfile}>
+              <p className={styles.uploadTitle}>Profil expediteur</p>
+              <p className={styles.uploadHint}>
+                Premiere connexion: renseignez votre prenom/nom. Vous pouvez personnaliser le sujet et
+                le corps complet du mail avec des placeholders ({`{{ENTREPRISE}}`},{" "}
+                {`{{NOM_COMPLET}}`}, {`{{PRENOM}}`}, {`{{NOM}}`}, {`{{LINKEDIN}}`}).
+              </p>
+              <div className={styles.uploadGrid}>
+                <label>
+                  Prenom
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Nom
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
+                </label>
+              </div>
+              <label>
+                LinkedIn (optionnel)
+                <input
+                  type="url"
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                  placeholder="https://www.linkedin.com/in/votre-profil"
+                />
+              </label>
+              <label>
+                Sujet personnalise (optionnel)
+                <input
+                  type="text"
+                  value={mailSubjectTemplate}
+                  onChange={(e) => setMailSubjectTemplate(e.target.value)}
+                  placeholder="Ex: Candidature alternance - {{ENTREPRISE}} - {{NOM_COMPLET}}"
+                />
+              </label>
+              <label>
+                Corps du mail personnalise (optionnel)
+                <textarea
+                  value={mailBodyTemplate}
+                  onChange={(e) => setMailBodyTemplate(e.target.value)}
+                  rows={8}
+                  placeholder={"Ex: Bonjour,\nJe suis {{NOM_COMPLET}} et je candidate chez {{ENTREPRISE}}."}
+                />
+              </label>
+              <button className={styles.secondaryBtn} type="submit" disabled={isSavingProfile}>
+                {isSavingProfile
+                  ? "Sauvegarde..."
+                  : isProfileLoading
+                    ? "Chargement du profil..."
+                    : "Enregistrer mon profil"}
+              </button>
+              {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
+            </form>
+            <form className={styles.uploadCard} onSubmit={onUploadAssets}>
+              <p className={styles.uploadTitle}>Vos documents</p>
+              <p className={styles.uploadHint}>
+                Importez votre CV (PDF) et votre template LM (.docx/.doc). Les runs utiliseront vos
+                fichiers automatiquement.
+              </p>
+              <div className={styles.uploadGrid}>
+                <label>
+                  CV (PDF)
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={(e) => setCvFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+                <label>
+                  Template LM (.docx/.doc)
+                  <input
+                    type="file"
+                    accept=".docx,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+                    onChange={(e) => setTemplateFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              </div>
+              <button className={styles.secondaryBtn} type="submit" disabled={isUploadingAssets}>
+                {isUploadingAssets ? "Upload en cours..." : "Uploader mes fichiers"}
+              </button>
+              {assetInfo ? <p className={styles.uploadSuccess}>{assetInfo}</p> : null}
+              {draftInfo ? <p className={styles.uploadHint}>{draftInfo}</p> : null}
+            </form>
+            <form id="pipeline-config-form" className={styles.form} onSubmit={onSubmit}>
+              <div className={styles.inputGrid}>
+                <label>
+                  Mode du pipeline
+                  <select value={mode} onChange={(e) => setMode(e.target.value as RunMode)}>
+                    {(Object.keys(MODE_LABELS) as RunMode[]).map((option) => (
+                      <option key={option} value={option}>
+                        {MODE_LABELS[option]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Zone geographique
+                  <select value={zone} onChange={(e) => setZone(e.target.value as Zone)}>
+                    {(Object.keys(ZONE_LABELS) as Zone[]).map((option) => (
+                      <option key={option} value={option}>
+                        {ZONE_LABELS[option]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Duree maximale (minutes)
+                  <input
+                    type="number"
+                    min={1}
+                    value={maxMinutes}
+                    onChange={(e) => setMaxMinutes(Number(e.target.value))}
+                  />
+                </label>
+
+                <label>
+                  Nombre maximal de sites
+                  <input
+                    type="number"
+                    min={1}
+                    value={maxSites}
+                    onChange={(e) => setMaxSites(Number(e.target.value))}
+                  />
+                </label>
+
+                <label>
+                  Objectif de cibles trouvees
+                  <input
+                    type="number"
+                    min={1}
+                    value={targetFound}
+                    onChange={(e) => setTargetFound(Number(e.target.value))}
+                  />
+                </label>
+
+                <label>
+                  Nombre de workers
+                  <input
+                    type="number"
+                    min={1}
+                    value={workers}
+                    onChange={(e) => setWorkers(Number(e.target.value))}
+                  />
+                </label>
+              </div>
+
+              <fieldset className={styles.switchGroup}>
+                <legend>Options</legend>
+                <label className={styles.switchField}>
+                  <span>Execution simulee (dry run)</span>
+                  <span className={styles.switchControl}>
+                    <input
+                      type="checkbox"
+                      checked={dryRun}
+                      onChange={(e) => setDryRun(e.target.checked)}
+                    />
+                    <span className={styles.switchTrack} aria-hidden="true" />
+                  </span>
+                </label>
+                <label className={styles.switchField}>
+                  <span>Utiliser IA pour enrichir les resultats</span>
+                  <span className={styles.switchControl}>
+                    <input
+                      type="checkbox"
+                      checked={useAi}
+                      onChange={(e) => setUseAi(e.target.checked)}
+                    />
+                    <span className={styles.switchTrack} aria-hidden="true" />
+                  </span>
+                </label>
+              </fieldset>
+            </form>
+          </section>
+
+          <section className={styles.panel}>
+            <h2>Controles du pipeline</h2>
+            <p className={styles.sectionHint}>
+              Lancez un nouveau pipeline ou rechargez la liste et les details des executions.
+            </p>
+            <div className={styles.gmailStatusCard}>
+              <p className={styles.gmailStatusTitle}>Connexion Gmail</p>
+              <p
+                className={`${styles.gmailStatusText} ${
+                  gmailConnected ? styles.gmailStatusConnected : styles.gmailStatusMissing
+                }`}
+              >
+                {gmailConnected
+                  ? "Connecte: les brouillons seront crees avec votre compte Google."
+                  : googleAccountLinked
+                    ? "Compte Google lie, mais les permissions Gmail manquent."
+                    : "Non connecte: reliez votre compte Google pour le mode brouillons."}
+              </p>
+              {!gmailConnected ? (
+                <button
+                  className={styles.secondaryBtn}
+                  type="button"
+                  onClick={onConnectGoogle}
+                  disabled={isConnectingGoogle}
+                >
+                  {isConnectingGoogle ? "Connexion Google..." : "Connecter Gmail"}
+                </button>
+              ) : null}
+            </div>
+            <div className={styles.controls}>
+              <button
+                className={styles.primaryBtn}
+                form="pipeline-config-form"
+                type="submit"
+                disabled={isLaunchingRun || draftsRequireGmail}
+              >
+                {isLaunchingRun
+                  ? "Lancement en cours..."
+                  : draftsRequireGmail
+                    ? "Connexion Gmail requise"
+                    : "Lancer le pipeline"}
+              </button>
+              <button
+                className={styles.secondaryBtn}
+                type="button"
+                onClick={() => void refreshAll()}
+                disabled={isRefreshingRuns || isRefreshingDetails}
+              >
+                {isRefreshingRuns || isRefreshingDetails ? "Rafraichissement..." : "Rafraichir"}
+              </button>
+            </div>
+
+            {info ? (
+              <p className={styles.info} role="status">
+                {info}
+              </p>
+            ) : null}
+            {error ? (
+              <p className={styles.error} role="alert">
+                {error}
+              </p>
+            ) : null}
+          </section>
+        </div>
+
+        <section className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <h2>Executions recentes</h2>
+            {isRefreshingRuns ? <span className={styles.loadingText}>Mise a jour...</span> : null}
+          </div>
+          {runs.length === 0 ? (
+            <p className={styles.emptyState}>
+              Aucune execution pour le moment. Configurez les parametres puis lancez un pipeline.
+            </p>
+          ) : (
+            <div className={styles.tableWrap}>
+              <table className={styles.runTable}>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Statut</th>
+                    <th>Zone</th>
+                    <th>Duree</th>
+                    <th>Cibles trouvees</th>
+                    <th>Emails generes</th>
+                    <th>Debut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {runs.map((run) => {
+                    const statusTone = getStatusTone(run.status);
+                    const targetCount = run.targets_found ?? run.target_found;
+                    const generatedCount = run.emails_generated ?? run.drafts_generated;
+                    return (
+                      <tr
+                        key={run.run_id}
+                        className={
+                          activeRunId === run.run_id ? styles.tableRowActive : styles.tableRow
+                        }
+                      >
+                        <td>
+                          <button
+                            className={styles.rowSelectBtn}
+                            type="button"
+                            onClick={() => onSelectRun(run.run_id)}
+                          >
+                            {run.run_id.slice(0, 8)}...
+                          </button>
+                        </td>
+                        <td>
+                          <span
+                            className={`${styles.statusBadge} ${
+                              statusTone === "success"
+                                ? styles.badgeSuccess
+                                : statusTone === "failed"
+                                  ? styles.badgeFailed
+                                  : statusTone === "running"
+                                    ? styles.badgeRunning
+                                    : styles.badgeNeutral
+                            }`}
+                          >
+                            {run.status}
+                          </span>
+                        </td>
+                        <td>{run.zone ?? "-"}</td>
+                        <td>{formatDuration(run.started_at, run.finished_at, run.duration_seconds)}</td>
+                        <td>{formatOptionalNumber(targetCount)}</td>
+                        <td>{formatOptionalNumber(generatedCount)}</td>
+                        <td>{formatDateTime(run.started_at ?? run.created_at)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <h2>Details de execution</h2>
+            <div className={styles.panelHeaderActions}>
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                disabled={!activeRun || !isRunning}
+                onClick={() =>
+                  setInfo(
+                    "Les donnees sont deja enregistrees au fur et a mesure. En annulant, tout le travail deja effectue restera sauvegarde (entreprises, brouillons, lettres de motivation).",
+                  )
+                }
+              >
+                Sauvegarder l'etat actuel
+              </button>
+              <button
+                className={styles.dangerBtn}
+                type="button"
+                onClick={onCancelRun}
+                disabled={!activeRun || END_STATUSES.has(activeRun.status) || isCancellingRun}
+              >
+                {isCancellingRun ? "Annulation..." : "Annuler l'execution"}
+              </button>
+            </div>
+          </div>
+          <p className={styles.runSaveNote}>
+            L'annulation conserve les donnees deja enregistrees (entreprises trouvees, brouillons,
+            lettres de motivation).
+          </p>
+          {!activeRunId ? (
+            <p className={styles.emptyState}>
+              Selectionnez une execution dans le tableau pour afficher les details et les logs.
+            </p>
+          ) : isRefreshingDetails && !runDetails ? (
+            <p className={styles.loadingText}>Chargement des details...</p>
+          ) : !runDetails ? (
+            <p className={styles.emptyState}>
+              Les details sont indisponibles pour le moment. Relancez un rafraichissement.
+            </p>
+          ) : (
+            <>
+              <dl className={styles.metaGrid}>
+                <div>
+                  <dt>ID</dt>
+                  <dd>{runDetails.run_id}</dd>
+                </div>
+                <div>
+                  <dt>Statut</dt>
+                  <dd>
+                    <span
+                      className={`${styles.statusBadge} ${
+                        getStatusTone(runDetails.status) === "success"
+                          ? styles.badgeSuccess
+                          : getStatusTone(runDetails.status) === "failed"
+                            ? styles.badgeFailed
+                            : getStatusTone(runDetails.status) === "running"
+                              ? styles.badgeRunning
+                              : styles.badgeNeutral
+                      }`}
+                    >
+                      {runDetails.status}
+                    </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Demarrage</dt>
+                  <dd>{formatDateTime(runDetails.started_at ?? runDetails.created_at)}</dd>
+                </div>
+                <div>
+                  <dt>Fin</dt>
+                  <dd>{formatDateTime(runDetails.finished_at)}</dd>
+                </div>
+                <div>
+                  <dt>Duree</dt>
+                  <dd>
+                    {formatDuration(
+                      runDetails.started_at,
+                      runDetails.finished_at,
+                      runDetails.duration_seconds,
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>PID</dt>
+                  <dd>{runDetails.pid ?? "n/a"}</dd>
+                </div>
+                <div>
+                  <dt>Code de sortie</dt>
+                  <dd>{runDetails.exit_code ?? "n/a"}</dd>
+                </div>
+                <div>
+                  <dt>Zone</dt>
+                  <dd>{runDetails.zone ?? "-"}</dd>
+                </div>
+              </dl>
+              {isTerminalFullscreen ? (
+                <div
+                  className={styles.terminalBackdrop}
+                  onClick={() => setIsTerminalFullscreen(false)}
+                />
+              ) : null}
+              <div
+                className={`${styles.terminalShell} ${terminalFlash ? styles.terminalFlash : ""} ${
+                  isTypingLogs ? styles.terminalShellTyping : ""
+                } ${isTerminalFullscreen ? styles.terminalFullscreen : ""}`}
+              >
+                <div className={styles.terminalHeader}>
+                  <span className={styles.dotRed} />
+                  <span className={styles.dotYellow} />
+                  <span className={styles.dotGreen} />
+                  <strong>Logs en direct</strong>
+                  <span className={styles.terminalStatus}>
+                    {isRunning ? "Execution en cours..." : "Execution terminee"}
+                  </span>
+                  <button
+                    className={styles.secondaryBtn}
+                    type="button"
+                    onClick={() => setAutoScrollLogs((prev) => !prev)}
+                  >
+                    {autoScrollLogs ? "Defiler automatiquement: oui" : "Defiler automatiquement: non"}
+                  </button>
+                  <button
+                    className={styles.secondaryBtn}
+                    type="button"
+                    onClick={() => {
+                      setAnimatedLogs("");
+                      animatedLogsRef.current = "";
+                      setRunDetails((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              logs_tail: [],
+                            }
+                          : prev,
+                      );
+                    }}
+                  >
+                    Clear terminal
+                  </button>
+                  <button
+                    className={styles.secondaryBtn}
+                    type="button"
+                    onClick={() => setIsTerminalFullscreen((prev) => !prev)}
+                  >
+                    {isTerminalFullscreen ? "Quitter le plein ecran" : "Plein ecran"}
+                  </button>
+                </div>
+                <pre
+                  ref={logsRef}
+                  className={`${styles.logs} ${isTerminalFullscreen ? styles.logsFullscreen : ""} ${
+                    isTypingLogs ? styles.logsTyping : ""
+                  }`}
+                >
+                  {animatedLogs || "Aucun log disponible pour cette execution."}
+                  {isRunning || isTypingLogs ? <span className={styles.cursor}>█</span> : null}
+                </pre>
+              </div>
+            </>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}
+
