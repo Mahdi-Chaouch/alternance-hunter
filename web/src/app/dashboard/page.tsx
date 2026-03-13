@@ -187,13 +187,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const saved = window.localStorage.getItem("alternance-ui-theme");
-    if (saved === "dark" || saved === "light") {
-      setTheme(saved);
-    }
+    const initialTheme: ThemeMode = saved === "dark" || saved === "light" ? saved : "light";
+    setTheme(initialTheme);
+    document.documentElement.dataset.theme = initialTheme;
   }, []);
 
   useEffect(() => {
     window.localStorage.setItem("alternance-ui-theme", theme);
+    document.documentElement.dataset.theme = theme;
   }, [theme]);
 
   useEffect(() => {

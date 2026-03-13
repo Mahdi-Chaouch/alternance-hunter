@@ -23,7 +23,7 @@
   --status-neutral-bg: #e2e8f0;
   --status-neutral-text: #334155;
   min-height: 100vh;
-  padding: 2rem 1.5rem 3rem;
+  padding: 3rem 1.5rem 4rem;
   background: var(--bg);
   color: var(--text);
 }
@@ -57,9 +57,54 @@
 .main {
   margin: 0 auto;
   max-width: 1320px;
+  display: grid;
+  gap: 3rem;
+}
+
+.hero {
+  border-radius: 20px;
+  padding: 2.5rem 2.2rem;
+  background: radial-gradient(circle at top left, #dbeafe 0, #e5e7eb 32%, #f3f4f6 70%);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.16);
+}
+
+.pageDark .hero {
+  background: radial-gradient(circle at top left, #0f172a 0, #020617 65%);
+  border-color: #1f2937;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.65);
+}
+
+.heroContent {
+  max-width: 720px;
+}
+
+.heroTitle {
+  margin: 0 0 1rem;
+  font-size: clamp(2.3rem, 4vw, 3rem);
+  letter-spacing: -0.04em;
+}
+
+.heroSubtitle {
+  margin: 0;
+  font-size: 1.01rem;
+  line-height: 1.7;
+  color: var(--muted-text);
+  max-width: 60ch;
+}
+
+.heroActions {
+  margin-top: 1.75rem;
   display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.heroMeta {
+  margin-top: 1.5rem;
+  font-size: 0.96rem;
+  color: var(--subtle-text);
+  max-width: 58ch;
 }
 
 .headerCard {
@@ -91,6 +136,170 @@
 .headerCard h1 {
   margin: 0;
   font-size: clamp(1.35rem, 2vw, 1.85rem);
+}
+
+.section {
+  border-radius: 18px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  padding: 1.8rem 1.7rem 1.9rem;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.sectionHeader {
+  max-width: 660px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.sectionLead {
+  margin: 0.55rem 0 0;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: var(--muted-text);
+}
+
+.benefitsGrid {
+  display: grid;
+  gap: 1.2rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.card {
+  border-radius: 14px;
+  border: 1px solid var(--panel-border);
+  background: color-mix(in srgb, var(--panel-bg) 85%, var(--bg) 15%);
+  padding: 1.1rem 1rem 1.15rem;
+}
+
+.cardTitle {
+  margin: 0 0 0.55rem;
+  font-size: 1rem;
+}
+
+.cardText {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: var(--subtle-text);
+}
+
+.stepsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.stepItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.stepBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.stepTitle {
+  margin: 0 0 0.35rem;
+  font-size: 0.98rem;
+}
+
+.stepText {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--subtle-text);
+}
+
+.techGrid {
+  display: grid;
+  gap: 1.2rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.techCard {
+  border-radius: 14px;
+  border: 1px solid var(--panel-border);
+  background: color-mix(in srgb, var(--panel-bg) 92%, var(--bg) 8%);
+  padding: 1.1rem 1rem 1.15rem;
+}
+
+.aboutLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.1fr);
+  gap: 1.6rem;
+  align-items: flex-start;
+}
+
+.aboutText {
+  margin: 0 0 0.8rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--subtle-text);
+}
+
+.contactLinks {
+  border-radius: 14px;
+  border: 1px solid var(--panel-border);
+  background: color-mix(in srgb, var(--panel-bg) 90%, var(--bg) 10%);
+  padding: 1rem 1rem 1.1rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.contactTitle {
+  margin: 0;
+  font-size: 0.92rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--subtle-text);
+}
+
+.contactLinks ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.94rem;
+}
+
+.contactLink {
+  color: var(--secondary-text);
+  text-decoration: none;
+}
+
+.contactLink:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.ghostLink {
+  font-size: 0.9rem;
+  color: var(--subtle-text);
+  text-decoration: none;
+  padding: 0.58rem 0.7rem;
+}
+
+.ghostLink:hover {
+  color: var(--primary);
 }
 
 .topGrid {
@@ -723,7 +932,23 @@
 
 @media (max-width: 860px) {
   .page {
-    padding: 0.9rem;
+    padding: 1.4rem 1rem 2.4rem;
+  }
+
+  .hero {
+    padding: 1.8rem 1.3rem;
+  }
+
+  .benefitsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .techGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .aboutLayout {
+    grid-template-columns: 1fr;
   }
 
   .headerCard {
