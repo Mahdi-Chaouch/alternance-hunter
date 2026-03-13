@@ -17,6 +17,9 @@ function splitName(fullName: string | null | undefined): { firstName: string; la
   };
 }
 
+const ALLOWED_MODES = new Set(["pipeline", "hunter", "generate", "drafts"]);
+const ALLOWED_ZONES = new Set(["all", "paris", "cannes", "auxerre", "fontainebleau"]);
+
 export async function GET(): Promise<NextResponse> {
   const authResult = await requireApiAuthorizedSession();
   if (!authResult.ok) {
@@ -39,6 +42,14 @@ export async function GET(): Promise<NextResponse> {
         linkedin_url: "",
         subject_template: "",
         body_template: "",
+        run_mode: "pipeline",
+        run_zone: "all",
+        run_dry_run: false,
+        run_max_minutes: 30,
+        run_max_sites: 1500,
+        run_target_found: 100,
+        run_workers: 20,
+        run_use_ai: false,
       },
       profile_completed: name.firstName.length > 0 && name.lastName.length > 0,
       email: userEmail,
@@ -71,6 +82,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     linkedin_url?: string;
     subject_template?: string;
     body_template?: string;
+    run_mode?: string;
+    run_zone?: string;
+    run_dry_run?: boolean;
+    run_max_minutes?: number;
+    run_max_sites?: number;
+    run_target_found?: number;
+    run_workers?: number;
+    run_use_ai?: boolean;
   };
 
   const firstName = (payload.first_name ?? "").trim();
@@ -85,6 +104,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const linkedinUrl = (payload.linkedin_url ?? "").trim();
   const subjectTemplate = payload.subject_template ?? "";
   const bodyTemplate = payload.body_template ?? "";
+  const runMode = (payload.run_mode ?? "pipeline").toLowerCase();
+  const runZone = (payload.run_zone ?? "all").toLowerCase();
+  const runDryRun = payload.run_dry_run === true;
+  const runMaxMinutes = Number(payload.run_max_minutes ?? 30);
+  const runMaxSites = Number(payload.run_max_sites ?? 1500);
+  const runTargetFound = Number(payload.run_target_found ?? 100);
+  const runWorkers = Number(payload.run_workers ?? 20);
+  const runUseAi = payload.run_use_ai === true;
+
+  if (!ALLOWED_MODES.has(runMode)) {
+    return NextResponse.json({ detail: "Mode pipeline invalide." }, { status: 400 });
+  }
+  if (!ALLOWED_ZONES.has(runZone)) {
+    return NextResponse.json({ detail: "Zone invalide." }, { status: 400 });
+  }
+  if (
+    Number.isNaN(runMaxMinutes) ||
+    Number.isNaN(runMaxSites) ||
+    Number.isNaN(runTargetFound) ||
+    Number.isNaN(runWorkers)
+  ) {
+    return NextResponse.json({ detail: "Parametres numeriques invalides." }, { status: 400 });
+  }
   if (subjectTemplate.length > 300 || bodyTemplate.length > 8000) {
     return NextResponse.json(
       { detail: "Template trop long. Reduisez le sujet ou le corps du mail." },
@@ -98,6 +140,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     linkedinUrl,
     subjectTemplate,
     bodyTemplate,
+    runMode,
+    runZone,
+    runDryRun,
+    runMaxMinutes,
+    runMaxSites,
+    runTargetFound,
+    runWorkers,
+    runUseAi,
   });
   return NextResponse.json({
     ok: true,

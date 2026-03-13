@@ -327,6 +327,14 @@ export default function Home() {
             linkedin_url?: string;
             subject_template?: string;
             body_template?: string;
+            run_mode?: RunMode;
+            run_zone?: Zone;
+            run_dry_run?: boolean;
+            run_max_minutes?: number;
+            run_max_sites?: number;
+            run_target_found?: number;
+            run_workers?: number;
+            run_use_ai?: boolean;
           };
         }>(response)) as {
           detail?: string;
@@ -336,6 +344,14 @@ export default function Home() {
             linkedin_url?: string;
             subject_template?: string;
             body_template?: string;
+            run_mode?: RunMode;
+            run_zone?: Zone;
+            run_dry_run?: boolean;
+            run_max_minutes?: number;
+            run_max_sites?: number;
+            run_target_found?: number;
+            run_workers?: number;
+            run_use_ai?: boolean;
           };
         };
         if (!response.ok) {
@@ -349,6 +365,18 @@ export default function Home() {
         setLinkedinUrl(data.profile?.linkedin_url ?? "");
         setMailSubjectTemplate(data.profile?.subject_template ?? "");
         setMailBodyTemplate(data.profile?.body_template ?? "");
+        if (data.profile?.run_mode) {
+          setMode(data.profile.run_mode);
+        }
+        if (data.profile?.run_zone) {
+          setZone(data.profile.run_zone);
+        }
+        setDryRun(Boolean(data.profile?.run_dry_run));
+        setMaxMinutes(Number(data.profile?.run_max_minutes ?? 30));
+        setMaxSites(Number(data.profile?.run_max_sites ?? 1500));
+        setTargetFound(Number(data.profile?.run_target_found ?? 100));
+        setWorkers(Number(data.profile?.run_workers ?? 20));
+        setUseAi(Boolean(data.profile?.run_use_ai));
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : "Erreur de chargement du profil.";
@@ -362,6 +390,45 @@ export default function Home() {
     }
 
     void loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessState]);
+
+  useEffect(() => {
+    if (accessState !== "granted") {
+      return;
+    }
+    let cancelled = false;
+
+    async function loadUploadStatus() {
+      try {
+        const response = await fetch("/api/uploads", { method: "GET", cache: "no-store" });
+        const data = (await safeJson<{
+          ok?: boolean;
+          cv_uploaded?: boolean;
+          template_uploaded?: boolean;
+        }>(response)) as {
+          ok?: boolean;
+          cv_uploaded?: boolean;
+          template_uploaded?: boolean;
+        };
+        if (!response.ok || !data.ok || cancelled) {
+          return;
+        }
+        if (data.cv_uploaded && data.template_uploaded) {
+          setAssetInfo("CV et template LM deja enregistres pour ce compte.");
+        } else if (data.cv_uploaded) {
+          setAssetInfo("CV deja enregistre pour ce compte.");
+        } else if (data.template_uploaded) {
+          setAssetInfo("Template LM deja enregistre pour ce compte.");
+        }
+      } catch {
+        // Ignore upload status failures to avoid blocking the dashboard.
+      }
+    }
+
+    void loadUploadStatus();
     return () => {
       cancelled = true;
     };
@@ -628,6 +695,14 @@ export default function Home() {
           linkedin_url: linkedinUrl,
           subject_template: mailSubjectTemplate,
           body_template: mailBodyTemplate,
+          run_mode: mode,
+          run_zone: zone,
+          run_dry_run: dryRun,
+          run_max_minutes: maxMinutes,
+          run_max_sites: maxSites,
+          run_target_found: targetFound,
+          run_workers: workers,
+          run_use_ai: useAi,
         }),
       });
       const data = (await safeJson<{ ok?: boolean; detail?: string }>(response)) as {
@@ -690,6 +765,50 @@ export default function Home() {
       setError("Impossible de se deconnecter pour le moment. Reessayez.");
     } finally {
       setIsSigningOut(false);
+    }
+  }
+
+  async function onSaveWorkInProgress() {
+    try {
+      const normalizedFirstName = firstName.trim();
+      const normalizedLastName = lastName.trim();
+      if (!normalizedFirstName || !normalizedLastName) {
+        throw new Error("Renseignez d'abord votre prenom et nom pour sauvegarder ce compte.");
+      }
+
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          first_name: normalizedFirstName,
+          last_name: normalizedLastName,
+          linkedin_url: linkedinUrl,
+          subject_template: mailSubjectTemplate,
+          body_template: mailBodyTemplate,
+          run_mode: mode,
+          run_zone: zone,
+          run_dry_run: dryRun,
+          run_max_minutes: maxMinutes,
+          run_max_sites: maxSites,
+          run_target_found: targetFound,
+          run_workers: workers,
+          run_use_ai: useAi,
+        }),
+      });
+      const data = (await safeJson<{ ok?: boolean; detail?: string }>(response)) as {
+        ok?: boolean;
+        detail?: string;
+      };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.detail ?? "Impossible d'enregistrer le travail en cours.");
+      }
+
+      setInfo("Travail en cours enregistre pour ce compte.");
+      setError("");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Impossible d'enregistrer le travail en cours.";
+      setError(message);
     }
   }
 
@@ -774,6 +893,9 @@ export default function Home() {
               onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
             >
               {theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
+            </button>
+            <button className={styles.secondaryBtn} type="button" onClick={onSaveWorkInProgress}>
+              Enregistrer le travail
             </button>
             <button
               className={styles.secondaryBtn}
@@ -1195,9 +1317,6 @@ export default function Home() {
                   <dd>{runDetails.zone ?? "-"}</dd>
                 </div>
               </dl>
-              <p className={styles.command}>
-                Commande executee : <code>{runDetails.command.join(" ")}</code>
-              </p>
               {isTerminalFullscreen ? (
                 <div
                   className={styles.terminalBackdrop}
