@@ -267,28 +267,44 @@ export default function Home() {
     }
   }, [activeRunId]);
 
-  const refreshRunDetails = useCallback(async (runId?: string | null) => {
-    const runIdToLoad = runId ?? activeRunId;
-    if (!runIdToLoad) {
-      setRunDetails(null);
-      return;
-    }
-    setIsRefreshingDetails(true);
-    try {
-      const response = await fetch(`/api/runs/${runIdToLoad}?tail=400`, {
-        cache: "no-store",
-      });
-      const data = (await safeJson<RunStatusResponse & { detail?: string }>(
-        response,
-      )) as Partial<RunStatusResponse> & { detail?: string };
-      if (!response.ok) {
-        throw new Error(data.detail ?? `Impossible de recuperer le run ${runIdToLoad}.`);
+  const refreshRunDetails = useCallback(
+    async (runId?: string | null) => {
+      const runIdToLoad = runId ?? activeRunId;
+      if (!runIdToLoad) {
+        setRunDetails(null);
+        return;
       }
-      setRunDetails(data as RunStatusResponse);
-    } finally {
-      setIsRefreshingDetails(false);
-    }
-  }, [activeRunId]);
+      setIsRefreshingDetails(true);
+      try {
+        const response = await fetch(`/api/runs/${runIdToLoad}?tail=400`, {
+          cache: "no-store",
+        });
+        const data = (await safeJson<RunStatusResponse & { detail?: string }>(
+          response,
+        )) as Partial<RunStatusResponse> & { detail?: string };
+
+        if (!response.ok) {
+          if (
+            response.status === 404 &&
+            typeof data.detail === "string" &&
+            data.detail.includes("Run '") &&
+            data.detail.includes("not found")
+          ) {
+            // Cas transitoire / instance backend differente : ne pas afficher d'erreur bloquante.
+            setRunDetails(null);
+            setActiveRunId(null);
+            return;
+          }
+          throw new Error(data.detail ?? `Impossible de recuperer le run ${runIdToLoad}.`);
+        }
+
+        setRunDetails(data as RunStatusResponse);
+      } finally {
+        setIsRefreshingDetails(false);
+      }
+    },
+    [activeRunId],
+  );
 
   const refreshAll = useCallback(async () => {
     setError("");
