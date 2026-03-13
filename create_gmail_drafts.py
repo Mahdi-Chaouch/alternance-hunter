@@ -24,6 +24,7 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.compose"]
 
 BLOCK_SPLIT = "=============================="
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+EMAIL_EXTRACT_REGEX = re.compile(r"[A-Za-z0-9._%+\-']+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
 
 def safe_filename(name: str) -> str:
@@ -31,6 +32,23 @@ def safe_filename(name: str) -> str:
     name = re.sub(r'[<>:"/\\|?*\n\r\t]', " ", name)
     name = re.sub(r"\s+", " ", name).strip()
     return name[:120] if len(name) > 120 else name
+
+
+def normalize_email(raw: str) -> str:
+    value = (raw or "").strip()
+    if not value:
+        return ""
+
+    # Common noise from scraped content.
+    value = value.replace("mailto:", "").strip()
+    value = value.strip(" \t\r\n<>()[]{}\"'")
+
+    # If wrappers or punctuation remain, extract first plausible email.
+    match = EMAIL_EXTRACT_REGEX.search(value)
+    if match:
+        value = match.group(0)
+
+    return value.strip(" \t\r\n<>()[]{}\"'")
 
 
 def parse_blocks(text: str):
@@ -60,7 +78,7 @@ def parse_blocks(text: str):
             continue
 
         company = m_company.group(1).strip()
-        to_email = m_email.group(1).strip()
+        to_email = normalize_email(m_email.group(1))
         subject = m_subject.group(1).strip()
 
         if not EMAIL_REGEX.match(to_email):
