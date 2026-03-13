@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Alternance Pipeline Control",
-  description: "Launch and monitor alternance pipeline runs from the web UI.",
+  title: "Dashboard Pipeline Alternance",
+  description: "Configurez, lancez et suivez les executions du pipeline alternance.",
 };
 
 export default function RootLayout({
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="fr">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         {children}
       </body>

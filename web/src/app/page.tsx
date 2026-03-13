@@ -16,6 +16,12 @@ type RunListItem = {
   pid: number | null;
   cancel_requested: boolean;
   log_file: string;
+  zone?: string | null;
+  duration_seconds?: number | null;
+  targets_found?: number | null;
+  target_found?: number | null;
+  emails_generated?: number | null;
+  drafts_generated?: number | null;
 };
 
 type RunStatusResponse = {
@@ -30,10 +36,30 @@ type RunStatusResponse = {
   cancel_requested: boolean;
   log_file: string;
   logs_tail: string[];
+  zone?: string | null;
+  duration_seconds?: number | null;
+  targets_found?: number | null;
+  target_found?: number | null;
+  emails_generated?: number | null;
+  drafts_generated?: number | null;
 };
 
 const END_STATUSES = new Set(["succeeded", "failed", "cancelled"]);
 type ThemeMode = "light" | "dark";
+const MODE_LABELS: Record<RunMode, string> = {
+  pipeline: "Pipeline complet",
+  hunter: "Recherche d'entreprises",
+  generate: "Generation des emails",
+  drafts: "Creation des brouillons Gmail",
+};
+
+const ZONE_LABELS: Record<Zone, string> = {
+  all: "Toutes les zones",
+  paris: "Paris",
+  cannes: "Cannes",
+  auxerre: "Auxerre",
+  fontainebleau: "Fontainebleau",
+};
 
 async function safeJson<T>(response: Response): Promise<T | Record<string, unknown>> {
   const rawBody = await response.text();
@@ -47,6 +73,66 @@ async function safeJson<T>(response: Response): Promise<T | Record<string, unkno
   }
 }
 
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  return new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "short",
+    timeStyle: "medium",
+  }).format(date);
+}
+
+function formatDuration(
+  startedAt: string | null,
+  finishedAt: string | null,
+  explicitSeconds?: number | null,
+): string {
+  if (typeof explicitSeconds === "number" && explicitSeconds >= 0) {
+    const minutes = Math.floor(explicitSeconds / 60);
+    const seconds = explicitSeconds % 60;
+    return `${minutes} min ${seconds.toString().padStart(2, "0")} s`;
+  }
+  if (!startedAt) {
+    return "-";
+  }
+  const startMs = new Date(startedAt).getTime();
+  const endMs = finishedAt ? new Date(finishedAt).getTime() : Date.now();
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs < startMs) {
+    return "-";
+  }
+  const deltaSeconds = Math.floor((endMs - startMs) / 1000);
+  const hours = Math.floor(deltaSeconds / 3600);
+  const minutes = Math.floor((deltaSeconds % 3600) / 60);
+  const seconds = deltaSeconds % 60;
+  if (hours > 0) {
+    return `${hours} h ${minutes.toString().padStart(2, "0")} min`;
+  }
+  return `${minutes} min ${seconds.toString().padStart(2, "0")} s`;
+}
+
+function formatOptionalNumber(value: number | null | undefined): string {
+  return typeof value === "number" ? String(value) : "-";
+}
+
+function getStatusTone(status: string): "running" | "success" | "failed" | "neutral" {
+  const normalized = status.toLowerCase();
+  if (normalized === "succeeded" || normalized === "success") {
+    return "success";
+  }
+  if (normalized === "failed" || normalized === "error") {
+    return "failed";
+  }
+  if (normalized === "cancelled") {
+    return "neutral";
+  }
+  return "running";
+}
+
 export default function Home() {
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [mode, setMode] = useState<RunMode>("pipeline");
@@ -57,7 +143,10 @@ export default function Home() {
   const [targetFound, setTargetFound] = useState(100);
   const [workers, setWorkers] = useState(20);
   const [useAi, setUseAi] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [isLaunchingRun, setIsLaunchingRun] = useState(false);
+  const [isRefreshingRuns, setIsRefreshingRuns] = useState(false);
+  const [isRefreshingDetails, setIsRefreshingDetails] = useState(false);
+  const [isCancellingRun, setIsCancellingRun] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [runs, setRuns] = useState<RunListItem[]>([]);
@@ -83,48 +172,61 @@ export default function Home() {
     window.localStorage.setItem("alternance-ui-theme", theme);
   }, [theme]);
 
-  const refreshRuns = useCallback(async () => {
-    const response = await fetch("/api/runs?limit=30", { cache: "no-store" });
-    const data = (await safeJson<{ runs: RunListItem[]; detail?: string }>(
-      response,
-    )) as { runs?: RunListItem[]; detail?: string };
-    if (!response.ok) {
-      throw new Error(data.detail ?? "Impossible de recuperer la liste des runs.");
-    }
-    const nextRuns = [...(data.runs ?? [])].reverse();
-    setRuns(nextRuns);
-    if (!activeRunId && nextRuns[0]?.run_id) {
-      setActiveRunId(nextRuns[0].run_id);
+  const refreshRuns = useCallback(async (): Promise<RunListItem[]> => {
+    setIsRefreshingRuns(true);
+    try {
+      const response = await fetch("/api/runs?limit=30", { cache: "no-store" });
+      const data = (await safeJson<{ runs: RunListItem[]; detail?: string }>(
+        response,
+      )) as { runs?: RunListItem[]; detail?: string };
+      if (!response.ok) {
+        throw new Error(data.detail ?? "Impossible de recuperer la liste des executions.");
+      }
+      const nextRuns = [...(data.runs ?? [])].reverse();
+      setRuns(nextRuns);
+      if (!activeRunId && nextRuns[0]?.run_id) {
+        setActiveRunId(nextRuns[0].run_id);
+      }
+      return nextRuns;
+    } finally {
+      setIsRefreshingRuns(false);
     }
   }, [activeRunId]);
 
-  const refreshRunDetails = useCallback(async () => {
-    if (!activeRunId) {
+  const refreshRunDetails = useCallback(async (runId?: string | null) => {
+    const runIdToLoad = runId ?? activeRunId;
+    if (!runIdToLoad) {
       setRunDetails(null);
       return;
     }
-    const response = await fetch(`/api/runs/${activeRunId}?tail=400`, {
-      cache: "no-store",
-    });
-    const data = (await safeJson<RunStatusResponse & { detail?: string }>(
-      response,
-    )) as Partial<RunStatusResponse> & { detail?: string };
-    if (!response.ok) {
-      throw new Error(data.detail ?? `Impossible de recuperer le run ${activeRunId}.`);
+    setIsRefreshingDetails(true);
+    try {
+      const response = await fetch(`/api/runs/${runIdToLoad}?tail=400`, {
+        cache: "no-store",
+      });
+      const data = (await safeJson<RunStatusResponse & { detail?: string }>(
+        response,
+      )) as Partial<RunStatusResponse> & { detail?: string };
+      if (!response.ok) {
+        throw new Error(data.detail ?? `Impossible de recuperer le run ${runIdToLoad}.`);
+      }
+      setRunDetails(data as RunStatusResponse);
+    } finally {
+      setIsRefreshingDetails(false);
     }
-    setRunDetails(data as RunStatusResponse);
   }, [activeRunId]);
 
   const refreshAll = useCallback(async () => {
     setError("");
     try {
-      await refreshRuns();
-      await refreshRunDetails();
+      const latestRuns = await refreshRuns();
+      const runIdToLoad = activeRunId ?? latestRuns[0]?.run_id ?? null;
+      await refreshRunDetails(runIdToLoad);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur inconnue.";
       setError(message);
     }
-  }, [refreshRuns, refreshRunDetails]);
+  }, [activeRunId, refreshRuns, refreshRunDetails]);
 
   useEffect(() => {
     void refreshAll();
@@ -234,7 +336,7 @@ export default function Home() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitting(true);
+    setIsLaunchingRun(true);
     setError("");
     setInfo("");
     try {
@@ -261,14 +363,14 @@ export default function Home() {
         throw new Error(data.detail ?? data.message ?? "Echec du lancement du run.");
       }
 
-      setInfo(`Run lance: ${data.run_id}`);
+      setInfo(`Execution lancee : ${data.run_id}`);
       setActiveRunId(data.run_id);
       await refreshAll();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur inconnue.";
       setError(message);
     } finally {
-      setSubmitting(false);
+      setIsLaunchingRun(false);
     }
   }
 
@@ -276,6 +378,7 @@ export default function Home() {
     if (!activeRunId) {
       return;
     }
+    setIsCancellingRun(true);
     setError("");
     setInfo("");
     try {
@@ -297,159 +400,270 @@ export default function Home() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur inconnue.";
       setError(message);
+    } finally {
+      setIsCancellingRun(false);
     }
+  }
+
+  function onSelectRun(runId: string) {
+    setActiveRunId(runId);
+    void refreshRunDetails(runId);
   }
 
   return (
     <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
       <main className={styles.main}>
-        <section className={styles.topbar}>
-          <p>Interface de pilotage du pipeline</p>
+        {/* Header global orientee produit (titre + proposition de valeur). */}
+        <header className={styles.headerCard}>
+          <div>
+            <p className={styles.eyebrow}>Tableau de bord</p>
+            <h1>Pilotage du pipeline alternance</h1>
+            <p className={styles.panelHint}>
+              Configurez le pipeline, lancez une execution et suivez les resultats en temps reel.
+            </p>
+          </div>
           <button
             className={styles.secondaryBtn}
             type="button"
             onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
           >
-            {theme === "light" ? "Mode sombre" : "Mode clair"}
+            {theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
           </button>
-        </section>
+        </header>
+
+        <div className={styles.topGrid}>
+          <section className={styles.panel}>
+            <h2>Configuration du pipeline</h2>
+            <p className={styles.sectionHint}>
+              Definissez les parametres principaux avant de lancer une execution.
+            </p>
+            <form id="pipeline-config-form" className={styles.form} onSubmit={onSubmit}>
+              <div className={styles.inputGrid}>
+                <label>
+                  Mode du pipeline
+                  <select value={mode} onChange={(e) => setMode(e.target.value as RunMode)}>
+                    {(Object.keys(MODE_LABELS) as RunMode[]).map((option) => (
+                      <option key={option} value={option}>
+                        {MODE_LABELS[option]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Zone geographique
+                  <select value={zone} onChange={(e) => setZone(e.target.value as Zone)}>
+                    {(Object.keys(ZONE_LABELS) as Zone[]).map((option) => (
+                      <option key={option} value={option}>
+                        {ZONE_LABELS[option]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Duree maximale (minutes)
+                  <input
+                    type="number"
+                    min={1}
+                    value={maxMinutes}
+                    onChange={(e) => setMaxMinutes(Number(e.target.value))}
+                  />
+                </label>
+
+                <label>
+                  Nombre maximal de sites
+                  <input
+                    type="number"
+                    min={1}
+                    value={maxSites}
+                    onChange={(e) => setMaxSites(Number(e.target.value))}
+                  />
+                </label>
+
+                <label>
+                  Objectif de cibles trouvees
+                  <input
+                    type="number"
+                    min={1}
+                    value={targetFound}
+                    onChange={(e) => setTargetFound(Number(e.target.value))}
+                  />
+                </label>
+
+                <label>
+                  Nombre de workers
+                  <input
+                    type="number"
+                    min={1}
+                    value={workers}
+                    onChange={(e) => setWorkers(Number(e.target.value))}
+                  />
+                </label>
+              </div>
+
+              <fieldset className={styles.switchGroup}>
+                <legend>Options</legend>
+                <label className={styles.switchField}>
+                  <span>Execution simulee (dry run)</span>
+                  <span className={styles.switchControl}>
+                    <input
+                      type="checkbox"
+                      checked={dryRun}
+                      onChange={(e) => setDryRun(e.target.checked)}
+                    />
+                    <span className={styles.switchTrack} aria-hidden="true" />
+                  </span>
+                </label>
+                <label className={styles.switchField}>
+                  <span>Utiliser IA pour enrichir les resultats</span>
+                  <span className={styles.switchControl}>
+                    <input
+                      type="checkbox"
+                      checked={useAi}
+                      onChange={(e) => setUseAi(e.target.checked)}
+                    />
+                    <span className={styles.switchTrack} aria-hidden="true" />
+                  </span>
+                </label>
+              </fieldset>
+            </form>
+          </section>
+
+          <section className={styles.panel}>
+            <h2>Controles du pipeline</h2>
+            <p className={styles.sectionHint}>
+              Lancez un nouveau pipeline ou rechargez la liste et les details des executions.
+            </p>
+            <div className={styles.controls}>
+              <button
+                className={styles.primaryBtn}
+                form="pipeline-config-form"
+                type="submit"
+                disabled={isLaunchingRun}
+              >
+                {isLaunchingRun ? "Lancement en cours..." : "Lancer le pipeline"}
+              </button>
+              <button
+                className={styles.secondaryBtn}
+                type="button"
+                onClick={() => void refreshAll()}
+                disabled={isRefreshingRuns || isRefreshingDetails}
+              >
+                {isRefreshingRuns || isRefreshingDetails
+                  ? "Rafraichissement..."
+                  : "Rafraichir"}
+              </button>
+            </div>
+
+            {info ? (
+              <p className={styles.info} role="status">
+                {info}
+              </p>
+            ) : null}
+            {error ? (
+              <p className={styles.error} role="alert">
+                {error}
+              </p>
+            ) : null}
+          </section>
+        </div>
 
         <section className={styles.panel}>
-          <h1>Alternance Pipeline Dashboard</h1>
-          <p className={styles.panelHint}>
-            Lance un run du pipeline puis suis son execution et ses logs en direct.
-          </p>
-          <form className={styles.form} onSubmit={onSubmit}>
-            <label>
-              Mode
-              <select value={mode} onChange={(e) => setMode(e.target.value as RunMode)}>
-                <option value="pipeline">pipeline</option>
-                <option value="hunter">hunter</option>
-                <option value="generate">generate</option>
-                <option value="drafts">drafts</option>
-              </select>
-            </label>
-            <label>
-              Zone
-              <select value={zone} onChange={(e) => setZone(e.target.value as Zone)}>
-                <option value="all">all</option>
-                <option value="paris">paris</option>
-                <option value="cannes">cannes</option>
-                <option value="auxerre">auxerre</option>
-                <option value="fontainebleau">fontainebleau</option>
-              </select>
-            </label>
-            <div className={styles.row}>
-              <label>
-                Max minutes
-                <input
-                  type="number"
-                  min={1}
-                  value={maxMinutes}
-                  onChange={(e) => setMaxMinutes(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Max sites
-                <input
-                  type="number"
-                  min={1}
-                  value={maxSites}
-                  onChange={(e) => setMaxSites(Number(e.target.value))}
-                />
-              </label>
+          <div className={styles.panelHeader}>
+            <h2>Executions recentes</h2>
+            {isRefreshingRuns ? <span className={styles.loadingText}>Mise a jour...</span> : null}
+          </div>
+          {runs.length === 0 ? (
+            <p className={styles.emptyState}>
+              Aucune execution pour le moment. Configurez les parametres puis lancez un pipeline.
+            </p>
+          ) : (
+            <div className={styles.tableWrap}>
+              <table className={styles.runTable}>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Statut</th>
+                    <th>Zone</th>
+                    <th>Duree</th>
+                    <th>Cibles trouvees</th>
+                    <th>Emails generes</th>
+                    <th>Debut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {runs.map((run) => {
+                    const statusTone = getStatusTone(run.status);
+                    const targetCount = run.targets_found ?? run.target_found;
+                    const generatedCount = run.emails_generated ?? run.drafts_generated;
+                    return (
+                      <tr
+                        key={run.run_id}
+                        className={
+                          activeRunId === run.run_id ? styles.tableRowActive : styles.tableRow
+                        }
+                      >
+                        <td>
+                          <button
+                            className={styles.rowSelectBtn}
+                            type="button"
+                            onClick={() => onSelectRun(run.run_id)}
+                          >
+                            {run.run_id.slice(0, 8)}...
+                          </button>
+                        </td>
+                        <td>
+                          <span
+                            className={`${styles.statusBadge} ${
+                              statusTone === "success"
+                                ? styles.badgeSuccess
+                                : statusTone === "failed"
+                                  ? styles.badgeFailed
+                                  : statusTone === "running"
+                                    ? styles.badgeRunning
+                                    : styles.badgeNeutral
+                            }`}
+                          >
+                            {run.status}
+                          </span>
+                        </td>
+                        <td>{run.zone ?? "-"}</td>
+                        <td>{formatDuration(run.started_at, run.finished_at, run.duration_seconds)}</td>
+                        <td>{formatOptionalNumber(targetCount)}</td>
+                        <td>{formatOptionalNumber(generatedCount)}</td>
+                        <td>{formatDateTime(run.started_at ?? run.created_at)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <div className={styles.row}>
-              <label>
-                Target found
-                <input
-                  type="number"
-                  min={1}
-                  value={targetFound}
-                  onChange={(e) => setTargetFound(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Workers
-                <input
-                  type="number"
-                  min={1}
-                  value={workers}
-                  onChange={(e) => setWorkers(Number(e.target.value))}
-                />
-              </label>
-            </div>
-            <div className={styles.toggles}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={dryRun}
-                  onChange={(e) => setDryRun(e.target.checked)}
-                />
-                Dry run
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={useAi}
-                  onChange={(e) => setUseAi(e.target.checked)}
-                />
-                Use AI
-              </label>
-            </div>
-            <button className={styles.primaryBtn} type="submit" disabled={submitting}>
-              {submitting ? "Lancement..." : "Lancer un run"}
-            </button>
-          </form>
-
-          {info ? <p className={styles.info}>{info}</p> : null}
-          {error ? <p className={styles.error}>{error}</p> : null}
+          )}
         </section>
 
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
-            <h2>Runs recents</h2>
+            <h2>Details de execution</h2>
             <button
-              className={styles.secondaryBtn}
-              type="button"
-              onClick={() => void refreshAll()}
-            >
-              Rafraichir
-            </button>
-          </div>
-          <div className={styles.runList}>
-            {runs.length === 0 ? (
-              <p>Aucun run pour le moment.</p>
-            ) : (
-              runs.map((run) => (
-                <button
-                  key={run.run_id}
-                  className={`${styles.runItem} ${activeRunId === run.run_id ? styles.activeRun : ""}`}
-                  type="button"
-                  onClick={() => setActiveRunId(run.run_id)}
-                >
-                  <span>{run.run_id.slice(0, 10)}...</span>
-                  <span>{run.status}</span>
-                </button>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <h2>Details du run</h2>
-            <button
-              className={styles.secondaryBtn}
+              className={styles.dangerBtn}
               type="button"
               onClick={onCancelRun}
-              disabled={!activeRun || END_STATUSES.has(activeRun.status)}
+              disabled={!activeRun || END_STATUSES.has(activeRun.status) || isCancellingRun}
             >
-              Annuler
+              {isCancellingRun ? "Annulation..." : "Annuler l'execution"}
             </button>
           </div>
-          {!runDetails ? (
-            <p>Selectionne un run pour afficher les details.</p>
+          {!activeRunId ? (
+            <p className={styles.emptyState}>
+              Selectionnez une execution dans le tableau pour afficher les details et les logs.
+            </p>
+          ) : isRefreshingDetails && !runDetails ? (
+            <p className={styles.loadingText}>Chargement des details...</p>
+          ) : !runDetails ? (
+            <p className={styles.emptyState}>
+              Les details sont indisponibles pour le moment. Relancez un rafraichissement.
+            </p>
           ) : (
             <>
               <dl className={styles.metaGrid}>
@@ -459,19 +673,55 @@ export default function Home() {
                 </div>
                 <div>
                   <dt>Statut</dt>
-                  <dd>{runDetails.status}</dd>
+                  <dd>
+                    <span
+                      className={`${styles.statusBadge} ${
+                        getStatusTone(runDetails.status) === "success"
+                          ? styles.badgeSuccess
+                          : getStatusTone(runDetails.status) === "failed"
+                            ? styles.badgeFailed
+                            : getStatusTone(runDetails.status) === "running"
+                              ? styles.badgeRunning
+                              : styles.badgeNeutral
+                      }`}
+                    >
+                      {runDetails.status}
+                    </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Demarrage</dt>
+                  <dd>{formatDateTime(runDetails.started_at ?? runDetails.created_at)}</dd>
+                </div>
+                <div>
+                  <dt>Fin</dt>
+                  <dd>{formatDateTime(runDetails.finished_at)}</dd>
+                </div>
+                <div>
+                  <dt>Duree</dt>
+                  <dd>
+                    {formatDuration(
+                      runDetails.started_at,
+                      runDetails.finished_at,
+                      runDetails.duration_seconds,
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt>PID</dt>
                   <dd>{runDetails.pid ?? "n/a"}</dd>
                 </div>
                 <div>
-                  <dt>Exit code</dt>
+                  <dt>Code de sortie</dt>
                   <dd>{runDetails.exit_code ?? "n/a"}</dd>
+                </div>
+                <div>
+                  <dt>Zone</dt>
+                  <dd>{runDetails.zone ?? "-"}</dd>
                 </div>
               </dl>
               <p className={styles.command}>
-                Commande: <code>{runDetails.command.join(" ")}</code>
+                Commande executee : <code>{runDetails.command.join(" ")}</code>
               </p>
               {isTerminalFullscreen ? (
                 <div
@@ -482,31 +732,29 @@ export default function Home() {
               <div
                 className={`${styles.terminalShell} ${terminalFlash ? styles.terminalFlash : ""} ${
                   isTypingLogs ? styles.terminalShellTyping : ""
-                } ${
-                  isTerminalFullscreen ? styles.terminalFullscreen : ""
-                }`}
+                } ${isTerminalFullscreen ? styles.terminalFullscreen : ""}`}
               >
                 <div className={styles.terminalHeader}>
                   <span className={styles.dotRed} />
                   <span className={styles.dotYellow} />
                   <span className={styles.dotGreen} />
-                  <strong>Terminal live</strong>
+                  <strong>Logs en direct</strong>
                   <span className={styles.terminalStatus}>
-                    {isRunning ? "en cours..." : "termine"}
+                    {isRunning ? "Execution en cours..." : "Execution terminee"}
                   </span>
                   <button
                     className={styles.secondaryBtn}
                     type="button"
                     onClick={() => setAutoScrollLogs((prev) => !prev)}
                   >
-                    {autoScrollLogs ? "Auto-scroll on" : "Auto-scroll off"}
+                    {autoScrollLogs ? "Defiler automatiquement: oui" : "Defiler automatiquement: non"}
                   </button>
                   <button
                     className={styles.secondaryBtn}
                     type="button"
                     onClick={() => setIsTerminalFullscreen((prev) => !prev)}
                   >
-                    {isTerminalFullscreen ? "Quitter plein ecran" : "Plein ecran"}
+                    {isTerminalFullscreen ? "Quitter le plein ecran" : "Plein ecran"}
                   </button>
                 </div>
                 <pre
@@ -515,7 +763,7 @@ export default function Home() {
                     isTypingLogs ? styles.logsTyping : ""
                   }`}
                 >
-                  {animatedLogs || "Pas de logs pour ce run."}
+                  {animatedLogs || "Aucun log disponible pour cette execution."}
                   {isRunning || isTypingLogs ? <span className={styles.cursor}>█</span> : null}
                 </pre>
               </div>
