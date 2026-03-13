@@ -950,7 +950,7 @@ export default function DashboardPage() {
             <p className={styles.eyebrow}>Tableau de bord</p>
             <h1>Pilotage du pipeline alternance</h1>
             <p className={styles.panelHint}>
-              Configurez le pipeline, lancez une execution et suivez les resultats en temps reel.
+              Suivez les etapes du flux : profil, documents, configuration, executions et logs temps reel.
             </p>
           </div>
           <div className={styles.headerActions}>
@@ -975,11 +975,47 @@ export default function DashboardPage() {
           </div>
         </header>
 
+        <nav className={styles.stepNav} aria-label="Navigation des etapes du dashboard">
+          <p className={styles.stepNavTitle}>Parcours du pipeline</p>
+          <ul className={styles.stepNavList}>
+            <li>
+              <a className={styles.stepNavItem} href="#step-profil">
+                <span className={styles.stepNavNumber}>1</span>
+                <span>Profil expediteur</span>
+              </a>
+            </li>
+            <li>
+              <a className={styles.stepNavItem} href="#step-documents">
+                <span className={styles.stepNavNumber}>2</span>
+                <span>Documents & templates</span>
+              </a>
+            </li>
+            <li>
+              <a className={styles.stepNavItem} href="#step-config">
+                <span className={styles.stepNavNumber}>3</span>
+                <span>Configuration du run</span>
+              </a>
+            </li>
+            <li>
+              <a className={styles.stepNavItem} href="#step-runs">
+                <span className={styles.stepNavNumber}>4</span>
+                <span>Executions recentes</span>
+              </a>
+            </li>
+            <li>
+              <a className={styles.stepNavItem} href="#step-logs">
+                <span className={styles.stepNavNumber}>5</span>
+                <span>Logs & terminal</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+
         <div className={styles.topGrid}>
-          <section className={styles.panel}>
-            <h2>Configuration du pipeline</h2>
+          <section className={styles.panel} id="step-profil">
+            <h2>Etape 1 – Profil & personnalisation</h2>
             <p className={styles.sectionHint}>
-              Definissez les parametres principaux avant de lancer une execution.
+              Renseignez votre profil expediteur et personnalisez vos emails avant de lancer une execution.
             </p>
             <form className={styles.profileCard} onSubmit={onSaveProfile}>
               <p className={styles.uploadTitle}>Profil expediteur</p>
@@ -1044,7 +1080,7 @@ export default function DashboardPage() {
               </button>
               {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
             </form>
-            <form className={styles.uploadCard} onSubmit={onUploadAssets}>
+            <form className={styles.uploadCard} onSubmit={onUploadAssets} id="step-documents">
               <p className={styles.uploadTitle}>Vos documents</p>
               <p className={styles.uploadHint}>
                 Importez votre CV (PDF) et votre template LM (.docx/.doc). Les runs utiliseront vos
@@ -1074,7 +1110,15 @@ export default function DashboardPage() {
               {assetInfo ? <p className={styles.uploadSuccess}>{assetInfo}</p> : null}
               {draftInfo ? <p className={styles.uploadHint}>{draftInfo}</p> : null}
             </form>
-            <form id="pipeline-config-form" className={styles.form} onSubmit={onSubmit}>
+            <form
+              id="pipeline-config-form"
+              className={styles.form}
+              onSubmit={onSubmit}
+              aria-label="Configuration du run"
+            >
+              <h3 id="step-config" className={styles.sectionTitle}>
+                Etape 3 – Configuration du run
+              </h3>
               <div className={styles.inputGrid}>
                 <label>
                   Mode du pipeline
@@ -1168,7 +1212,7 @@ export default function DashboardPage() {
           </section>
 
           <section className={styles.panel}>
-            <h2>Controles du pipeline</h2>
+            <h2>Etape 4 – Lancer et surveiller</h2>
             <p className={styles.sectionHint}>
               Lancez un nouveau pipeline ou rechargez la liste et les details des executions.
             </p>
@@ -1232,7 +1276,7 @@ export default function DashboardPage() {
           </section>
         </div>
 
-        <section className={styles.panel}>
+        <section className={styles.panel} id="step-runs">
           <div className={styles.panelHeader}>
             <h2>Executions recentes</h2>
             {isRefreshingRuns ? <span className={styles.loadingText}>Mise a jour...</span> : null}
@@ -1305,7 +1349,7 @@ export default function DashboardPage() {
           )}
         </section>
 
-        <section className={styles.panel}>
+        <section className={styles.panel} id="step-logs">
           <div className={styles.panelHeader}>
             <h2>Details de execution</h2>
             <div className={styles.panelHeaderActions}>
