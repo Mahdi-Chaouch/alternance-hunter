@@ -185,10 +185,11 @@ def get_gmail_service_from_oauth_tokens(
     )
     expiry = parse_iso_datetime(access_token_expires_at)
     if expiry is not None:
+        # On stocke l'expiration pour information, mais on laisse google-auth
+        # gerer le refresh automatiquement sans acceder a creds.expired ici,
+        # afin d'eviter tout TypeError de comparaison naive/aware.
         creds.expiry = expiry
-    if creds.expired and creds.refresh_token:
-        print("🔄 Refresh token utilisateur...")
-        creds.refresh(Request())
+
     return build("gmail", "v1", credentials=creds)
 
 
