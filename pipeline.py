@@ -22,6 +22,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import List
+import re
 
 
 ZONE_MAP = {
@@ -70,6 +71,30 @@ def _zone_to_hunter_filter(zone: str) -> str:
     return ZONE_MAP[normalized]
 
 
+def _sanitize_user_key(raw: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9._-]+", "-", (raw or "").strip().lower())
+    cleaned = cleaned.strip("-._")
+    return cleaned[:80] or "anonymous"
+
+
+def _apply_user_scoped_defaults(args: argparse.Namespace) -> None:
+    if not getattr(args, "user_key", ""):
+        return
+    user_key = _sanitize_user_key(args.user_key)
+    setattr(args, "user_key", user_key)
+
+    if args.targets_csv == "data/exports/targets_auto.csv":
+        args.targets_csv = f"data/exports/users/{user_key}/targets_auto.csv"
+    if args.emails_found_csv == "data/exports/emails_found.csv":
+        args.emails_found_csv = f"data/exports/users/{user_key}/emails_found.csv"
+    if args.draft_file == "data/exports/draft_emails.txt":
+        args.draft_file = f"data/exports/users/{user_key}/draft_emails.txt"
+    if args.out_dir == "outputs/letters":
+        args.out_dir = f"outputs/letters/{user_key}"
+    if args.resume_log == "outputs/logs/drafts_created_log.csv":
+        args.resume_log = f"outputs/logs/{user_key}/drafts_created_log.csv"
+
+
 def build_hunter_cmd(args: argparse.Namespace) -> List[str]:
     cmd = [
         *_python_cmd(args.python),
@@ -84,6 +109,12 @@ def build_hunter_cmd(args: argparse.Namespace) -> List[str]:
         str(args.workers),
         "--focus",
         args.focus,
+        "--targets-csv",
+        args.targets_csv,
+        "--emails-found-csv",
+        args.emails_found_csv,
+        "--drafts-txt",
+        args.draft_file,
     ]
 
     zone_filter = _zone_to_hunter_filter(args.zone)
@@ -191,6 +222,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Affiche les commandes sans les executer (et passe dry-run a l'etape drafts).",
     )
+    parser.add_argument(
+        "--user-key",
+        default="",
+        help="Identifiant stable utilisateur pour isoler les sorties (multi-user).",
+    )
 
     # Hunter
     parser.add_argument("--max-minutes", type=int, default=30)
@@ -204,6 +240,8 @@ def parse_args() -> argparse.Namespace:
 
     # Generate LM
     parser.add_argument("--draft-file", default="data/exports/draft_emails.txt")
+    parser.add_argument("--targets-csv", default="data/exports/targets_auto.csv")
+    parser.add_argument("--emails-found-csv", default="data/exports/emails_found.csv")
     parser.add_argument("--template", default="assets/template_LM.docx")
     parser.add_argument("--out-dir", default="outputs/letters")
     parser.add_argument("--use-ai", action="store_true")
@@ -234,6 +272,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    _apply_user_scoped_defaults(args)
 
     pipeline_steps = {
         "hunter": build_hunter_cmd(args),
