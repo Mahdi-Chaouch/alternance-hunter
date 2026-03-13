@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Deque, Dict, List, Literal, Optional
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 
 
@@ -26,6 +26,7 @@ PIPELINE_PATH = PROJECT_ROOT / "pipeline.py"
 RUN_LOG_DIR = PROJECT_ROOT / "outputs" / "logs" / "api_runs"
 RUN_LOG_DIR.mkdir(parents=True, exist_ok=True)
 MAX_IN_MEMORY_LOG_LINES = 500
+USER_ASSETS_DIR = PROJECT_ROOT / "data" / "user_assets"
 
 def _read_token_from_env_file(path: Path) -> Optional[str]:
     if not path.exists():
@@ -183,6 +184,13 @@ def build_pipeline_command(
     cmd = [payload.python or sys.executable, "-u", str(PIPELINE_PATH)]
     cmd += ["--mode", payload.mode, "--zone", payload.zone]
     user_key = sanitize_user_key(owner_user_id, owner_user_email)
+    cv_path = payload.cv
+    template_path = payload.template
+    user_cv, user_template = resolve_user_assets(user_key)
+    if payload.cv == "assets/CV.pdf" and user_cv:
+        cv_path = user_cv
+    if payload.template == "assets/template_LM.docx" and user_template:
+        template_path = user_template
     if user_key:
         cmd += ["--user-key", user_key]
     cmd += ["--max-minutes", str(payload.max_minutes)]
@@ -191,10 +199,10 @@ def build_pipeline_command(
     cmd += ["--workers", str(payload.workers)]
     cmd += ["--focus", payload.focus]
     cmd += ["--draft-file", payload.draft_file]
-    cmd += ["--template", payload.template]
+    cmd += ["--template", template_path]
     cmd += ["--out-dir", payload.out_dir]
     cmd += ["--ai-model", payload.ai_model]
-    cmd += ["--cv", payload.cv]
+    cmd += ["--cv", cv_path]
     cmd += ["--lm-suffix", payload.lm_suffix]
     if payload.oauth_access_token:
         cmd += ["--oauth-access-token", payload.oauth_access_token]
@@ -348,6 +356,28 @@ def sanitize_user_key(user_id: Optional[str], user_email: Optional[str]) -> Opti
     return cleaned[:80] or "anonymous"
 
 
+def resolve_user_assets(user_key: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    if not user_key:
+        return None, None
+    base_dir = USER_ASSETS_DIR / user_key
+    if not base_dir.exists():
+        return None, None
+
+    cv_path: Optional[str] = None
+    template_path: Optional[str] = None
+
+    for candidate in sorted(base_dir.glob("cv.*")):
+        if candidate.is_file():
+            cv_path = str(candidate.relative_to(PROJECT_ROOT))
+            break
+    for candidate in sorted(base_dir.glob("template_lm.*")):
+        if candidate.is_file():
+            template_path = str(candidate.relative_to(PROJECT_ROOT))
+            break
+
+    return cv_path, template_path
+
+
 def assert_run_access(run: RunState, actor_user_id: Optional[str]) -> None:
     if not run.owner_user_id:
         return
@@ -394,6 +424,48 @@ def create_run(
     thread.start()
 
     return RunCreateResponse(run_id=run_id, status="running")
+
+
+@app.post("/uploads", dependencies=[Depends(verify_token)])
+async def upload_user_assets(
+    cv: Optional[UploadFile] = File(default=None),
+    template: Optional[UploadFile] = File(default=None),
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    user_key = sanitize_user_key(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing user identity headers for upload.",
+        )
+    if cv is None and template is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No file provided. Upload cv and/or template.",
+        )
+
+    target_dir = USER_ASSETS_DIR / user_key
+    target_dir.mkdir(parents=True, exist_ok=True)
+    uploaded: dict[str, str] = {}
+
+    if cv is not None:
+        cv_suffix = Path((cv.filename or "").lower()).suffix or ".pdf"
+        if cv_suffix != ".pdf":
+            raise HTTPException(status_code=400, detail="CV must be a .pdf file.")
+        cv_path = target_dir / f"cv{cv_suffix}"
+        cv_path.write_bytes(await cv.read())
+        uploaded["cv"] = str(cv_path.relative_to(PROJECT_ROOT))
+
+    if template is not None:
+        template_suffix = Path((template.filename or "").lower()).suffix or ".docx"
+        if template_suffix not in {".docx", ".doc"}:
+            raise HTTPException(status_code=400, detail="Template must be .docx or .doc.")
+        template_path = target_dir / f"template_lm{template_suffix}"
+        template_path.write_bytes(await template.read())
+        uploaded["template"] = str(template_path.relative_to(PROJECT_ROOT))
+
+    return {"ok": True, "user_key": user_key, "uploaded": uploaded}
 
 
 @app.get(

@@ -145,6 +145,10 @@ export default function Home() {
   const [googleAccountLinked, setGoogleAccountLinked] = useState(false);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [cvFile, setCvFile] = useState<File | null>(null);
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [isUploadingAssets, setIsUploadingAssets] = useState(false);
+  const [assetInfo, setAssetInfo] = useState("");
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [mode, setMode] = useState<RunMode>("pipeline");
   const [zone, setZone] = useState<Zone>("all");
@@ -469,6 +473,66 @@ export default function Home() {
     }
   }
 
+  async function onUploadAssets(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!cvFile && !templateFile) {
+      setError("Ajoutez au moins un fichier (CV PDF et/ou template LM) avant l'upload.");
+      setAssetInfo("");
+      return;
+    }
+
+    setError("");
+    setInfo("");
+    setAssetInfo("");
+    setIsUploadingAssets(true);
+    try {
+      const formData = new FormData();
+      if (cvFile) {
+        formData.append("cv", cvFile);
+      }
+      if (templateFile) {
+        formData.append("template", templateFile);
+      }
+
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        body: formData,
+      });
+      const data = (await safeJson<{
+        ok?: boolean;
+        detail?: string;
+        uploaded?: { cv?: string; template?: string };
+      }>(response)) as {
+        ok?: boolean;
+        detail?: string;
+        uploaded?: { cv?: string; template?: string };
+      };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.detail ?? "Echec de l'upload des fichiers.");
+      }
+
+      const uploadedParts: string[] = [];
+      if (data.uploaded?.cv) {
+        uploadedParts.push("CV");
+      }
+      if (data.uploaded?.template) {
+        uploadedParts.push("template LM");
+      }
+      setAssetInfo(
+        uploadedParts.length > 0
+          ? `Fichiers enregistres: ${uploadedParts.join(" + ")}`
+          : "Upload termine.",
+      );
+      setCvFile(null);
+      setTemplateFile(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur inconnue lors de l'upload.";
+      setError(message);
+    } finally {
+      setIsUploadingAssets(false);
+    }
+  }
+
   async function onCancelRun() {
     if (!activeRunId) {
       return;
@@ -615,6 +679,35 @@ export default function Home() {
             <p className={styles.sectionHint}>
               Definissez les parametres principaux avant de lancer une execution.
             </p>
+            <form className={styles.uploadCard} onSubmit={onUploadAssets}>
+              <p className={styles.uploadTitle}>Vos documents</p>
+              <p className={styles.uploadHint}>
+                Importez votre CV (PDF) et votre template LM (.docx/.doc). Les runs utiliseront vos
+                fichiers automatiquement.
+              </p>
+              <div className={styles.uploadGrid}>
+                <label>
+                  CV (PDF)
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={(e) => setCvFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+                <label>
+                  Template LM (.docx/.doc)
+                  <input
+                    type="file"
+                    accept=".docx,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+                    onChange={(e) => setTemplateFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              </div>
+              <button className={styles.secondaryBtn} type="submit" disabled={isUploadingAssets}>
+                {isUploadingAssets ? "Upload en cours..." : "Uploader mes fichiers"}
+              </button>
+              {assetInfo ? <p className={styles.uploadSuccess}>{assetInfo}</p> : null}
+            </form>
             <form id="pipeline-config-form" className={styles.form} onSubmit={onSubmit}>
               <div className={styles.inputGrid}>
                 <label>

@@ -95,6 +95,34 @@ def _apply_user_scoped_defaults(args: argparse.Namespace) -> None:
         args.resume_log = f"outputs/logs/{user_key}/drafts_created_log.csv"
 
 
+def _has_any_letter(out_dir: str, suffix: str) -> bool:
+    base = Path(out_dir)
+    if not base.exists():
+        return False
+    pattern = f"*_LM.{suffix.lstrip('.')}"
+    return any(base.glob(pattern))
+
+
+def _expand_order_with_bootstrap(args: argparse.Namespace, order: List[str]) -> List[str]:
+    expanded = list(order)
+    draft_missing = not Path(args.draft_file).exists()
+
+    if "generate" in expanded and draft_missing and "hunter" not in expanded:
+        expanded.insert(expanded.index("generate"), "hunter")
+
+    if "drafts" in expanded:
+        draft_index = expanded.index("drafts")
+        if draft_missing and "hunter" not in expanded[:draft_index]:
+            expanded.insert(draft_index, "hunter")
+            draft_index = expanded.index("drafts")
+
+        letters_missing = (not args.no_lm) and (not _has_any_letter(args.out_dir, args.lm_suffix))
+        if letters_missing and "generate" not in expanded[:draft_index]:
+            expanded.insert(draft_index, "generate")
+
+    return expanded
+
+
 def build_hunter_cmd(args: argparse.Namespace) -> List[str]:
     cmd = [
         *_python_cmd(args.python),
@@ -284,6 +312,7 @@ def main() -> None:
         order = ["hunter", "generate", "drafts"]
     else:
         order = [args.mode]
+    order = _expand_order_with_bootstrap(args, order)
 
     for step in order:
         print(f"\n=== ETAPE: {step} ===", flush=True)
