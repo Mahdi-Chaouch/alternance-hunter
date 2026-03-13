@@ -19,6 +19,9 @@ export default function Home() {
               <Link href="/dashboard" className={styles.primaryBtn}>
                 Ouvrir le dashboard
               </Link>
+              <Link href="/dashboard?demo=1" className={styles.secondaryBtn}>
+                Voir le dashboard en démo
+              </Link>
               <Link href="/login" className={styles.secondaryBtn}>
                 Se connecter avec Google
               </Link>

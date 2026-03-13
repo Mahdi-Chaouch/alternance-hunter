@@ -45,6 +45,9 @@ export default function RootLayout({
                 <Link href="/dashboard" className="app-nav-link">
                   Dashboard
                 </Link>
+                <Link href="/dashboard?demo=1" className="app-nav-link">
+                  Voir en démo
+                </Link>
                 <Link href="/login" className="app-nav-link">
                   Connexion
                 </Link>
@@ -53,6 +56,9 @@ export default function RootLayout({
                 </a>
               </nav>
               <div className="app-header-cta">
+                <Link href="/dashboard?demo=1" className="app-nav-link" style={{ marginRight: "0.75rem" }}>
+                  Voir en démo
+                </Link>
                 <Link href="/dashboard" className="app-header-button">
                   Ouvrir le dashboard
                 </Link>

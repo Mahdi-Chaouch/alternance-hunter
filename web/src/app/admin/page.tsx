@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "@/lib/auth-session";
 import styles from "../page.module.css";
 
-const ADMIN_EMAIL = "mahdichaouch435@gmail.com";
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
 
 type SessionUser = {
   email?: string | null;
@@ -22,7 +22,8 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
-  if (email !== ADMIN_EMAIL) {
+  // Si ADMIN_EMAIL est défini, seuls les admins y ont accès; sinon tout utilisateur autorisé (AUTH_ALLOWED_EMAILS) peut accéder.
+  if (ADMIN_EMAIL && email !== ADMIN_EMAIL) {
     redirect("/dashboard");
   }
 
