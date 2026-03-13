@@ -155,8 +155,11 @@ def parse_iso_datetime(raw: str) -> datetime | None:
     try:
         normalized = value.replace("Z", "+00:00")
         parsed = datetime.fromisoformat(normalized)
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
+        # google-auth compare utcnow() (naive) avec creds.expiry.
+        # Pour eviter le TypeError offset-naive/offset-aware,
+        # on force ici un datetime naive en UTC.
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
         return parsed
     except ValueError:
         return None
