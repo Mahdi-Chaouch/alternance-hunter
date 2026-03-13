@@ -17,10 +17,13 @@ type SessionUser = {
 type GoogleLinkedAccount = {
   providerId?: string;
   accountId?: string;
-  accessToken?: string;
-  refreshToken?: string;
-  accessTokenExpiresAt?: Date | string | null;
   scope?: string | null;
+  scopes?: string[];
+};
+
+type GoogleAccessTokenPayload = {
+  accessToken?: string;
+  accessTokenExpiresAt?: Date | string | null;
   scopes?: string[];
 };
 
@@ -87,8 +90,29 @@ async function resolveGoogleOAuthRunContext(): Promise<
     };
   }
 
-  const accessToken = googleAccount.accessToken?.trim();
-  const refreshToken = googleAccount.refreshToken?.trim();
+  let accessTokenPayload: GoogleAccessTokenPayload | null = null;
+  try {
+    accessTokenPayload = (await auth.api.getAccessToken({
+      headers: await headers(),
+      body: {
+        providerId: "google",
+        ...(googleAccount.accountId ? { accountId: googleAccount.accountId } : {}),
+      },
+    })) as GoogleAccessTokenPayload;
+  } catch {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          detail:
+            "Impossible de recuperer un token OAuth Google valide. Reconnectez Google puis reessayez.",
+        },
+        { status: 400 },
+      ),
+    };
+  }
+
+  const accessToken = accessTokenPayload?.accessToken?.trim();
   if (!accessToken) {
     return {
       ok: false,
@@ -102,7 +126,12 @@ async function resolveGoogleOAuthRunContext(): Promise<
     };
   }
 
-  const expiresRaw = googleAccount.accessTokenExpiresAt;
+  const tokenScopes =
+    Array.isArray(accessTokenPayload?.scopes) && accessTokenPayload.scopes.length > 0
+      ? accessTokenPayload.scopes
+      : scopes;
+  const tokenScopesString = tokenScopes.join(" ");
+  const expiresRaw = accessTokenPayload?.accessTokenExpiresAt;
   const expiresAt =
     expiresRaw instanceof Date
       ? expiresRaw.toISOString()
@@ -114,11 +143,11 @@ async function resolveGoogleOAuthRunContext(): Promise<
     ok: true,
     payload: {
       oauth_access_token: accessToken,
-      oauth_refresh_token: refreshToken ?? "",
+      oauth_refresh_token: "",
       oauth_client_id: process.env.GOOGLE_CLIENT_ID?.trim() ?? "",
       oauth_client_secret: process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "",
       oauth_token_uri: process.env.GOOGLE_TOKEN_URI ?? "https://oauth2.googleapis.com/token",
-      oauth_scope: scopes.join(" "),
+      oauth_scope: tokenScopesString,
       oauth_account_id: googleAccount.accountId ?? "",
       oauth_access_token_expires_at: expiresAt,
     },
