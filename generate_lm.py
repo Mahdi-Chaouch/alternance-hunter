@@ -20,6 +20,7 @@ par entreprise (nécessite OPENAI_API_KEY).
 import argparse
 import os
 import re
+import sys
 from pathlib import Path
 from datetime import date
 from urllib.parse import urlparse
@@ -202,17 +203,17 @@ def main() -> None:
     outdir = Path(args.out_dir)
 
     if not draft.exists():
-        print("Fichier draft introuvable:", draft)
-        return
+        raise SystemExit(f"❌ Fichier draft introuvable: {draft} (cwd={Path.cwd()})")
 
     if not template.exists():
-        print("Template introuvable:", template)
-        return
+        raise SystemExit(f"❌ Template introuvable: {template} (cwd={Path.cwd()})")
 
     outdir.mkdir(parents=True, exist_ok=True)
 
     companies_info = extract_company_info(str(draft))
     print("Entreprises trouvées:", len(companies_info))
+    if not companies_info:
+        raise SystemExit("❌ Aucun bloc entreprise valide trouvé dans le fichier draft.")
 
     use_ai = args.use_ai
     api_key = os.environ.get("OPENAI_API_KEY", "").strip() if use_ai else ""
@@ -249,4 +250,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n⛔ Interrompu.")
+        sys.exit(1)
