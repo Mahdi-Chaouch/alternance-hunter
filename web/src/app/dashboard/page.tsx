@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import styles from "../page.module.css";
 import { authClient } from "@/lib/auth-client";
 
@@ -137,6 +138,8 @@ function getStatusTone(status: string): "running" | "success" | "failed" | "neut
 
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isDemoView = searchParams.get("demo") === "1";
   const [accessState, setAccessState] = useState<
     "checking" | "unauthenticated" | "granted" | "forbidden"
   >("checking");
@@ -186,6 +189,7 @@ export default function DashboardPage() {
   const logsRef = useRef<HTMLPreElement | null>(null);
   const typingTimerRef = useRef<number | null>(null);
   const animatedLogsRef = useRef("");
+  const showDemoBanner = accessState === "unauthenticated" && isDemoView;
 
   useEffect(() => {
     const saved = window.localStorage.getItem("alternance-ui-theme");
@@ -486,6 +490,8 @@ export default function DashboardPage() {
         : cvRequired && !cvUploaded
           ? "CV requis (onglet Vos documents)"
           : "Lancer le pipeline";
+  const demoLaunchDisabled = showDemoBanner || launchDisabled;
+  const demoLaunchLabel = showDemoBanner ? "Connectez-vous pour lancer le pipeline" : launchButtonLabel;
 
   useEffect(() => {
     animatedLogsRef.current = animatedLogs;
@@ -937,7 +943,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (accessState === "unauthenticated") {
+  if (accessState === "unauthenticated" && !isDemoView) {
     return (
       <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
         <main className={styles.main}>
@@ -952,6 +958,9 @@ export default function DashboardPage() {
               <button className={styles.primaryBtn} type="button" onClick={() => router.push("/login")}>
                 Se connecter
               </button>
+              <Link href="/dashboard?demo=1" className={styles.secondaryBtn} style={{ display: "inline-block", textDecoration: "none" }}>
+                Voir le dashboard en démo
+              </Link>
               <button
                 className={styles.secondaryBtn}
                 type="button"
@@ -969,6 +978,15 @@ export default function DashboardPage() {
   return (
     <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
       <main className={styles.main}>
+        {showDemoBanner ? (
+          <section className={styles.panel} style={{ marginBottom: "1rem", background: "var(--color-accent-subtle, #e8f4fc)", border: "1px solid var(--color-accent, #0a7ea4)" }}>
+            <p className={styles.panelHint} style={{ margin: 0 }}>
+              <strong>Mode démo</strong> — Vous consultez le dashboard sans connexion. Les données ne sont pas chargées.{" "}
+              <Link href="/login" style={{ fontWeight: 600 }}>Connectez-vous</Link>
+              {" "}pour enregistrer votre profil, uploader vos documents et lancer des runs.
+            </p>
+          </section>
+        ) : null}
         <header className={styles.headerCard}>
           <div>
             <p className={styles.eyebrow}>Tableau de bord</p>
@@ -985,17 +1003,25 @@ export default function DashboardPage() {
             >
               {theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
             </button>
-            <button className={styles.secondaryBtn} type="button" onClick={onSaveWorkInProgress}>
-              Enregistrer le travail
-            </button>
-            <button
-              className={styles.secondaryBtn}
-              type="button"
-              onClick={onSignOut}
-              disabled={isSigningOut}
-            >
-              {isSigningOut ? "Deconnexion..." : "Se deconnecter"}
-            </button>
+            {!showDemoBanner ? (
+              <>
+                <button className={styles.secondaryBtn} type="button" onClick={onSaveWorkInProgress}>
+                  Enregistrer le travail
+                </button>
+                <button
+                  className={styles.secondaryBtn}
+                  type="button"
+                  onClick={onSignOut}
+                  disabled={isSigningOut}
+                >
+                  {isSigningOut ? "Deconnexion..." : "Se deconnecter"}
+                </button>
+              </>
+            ) : (
+              <Link href="/login" className={styles.primaryBtn} style={{ display: "inline-block", textDecoration: "none" }}>
+                Connectez-vous pour utiliser
+              </Link>
+            )}
           </div>
         </header>
 
@@ -1095,12 +1121,14 @@ export default function DashboardPage() {
                   placeholder={"Ex: Bonjour,\nJe suis {{NOM_COMPLET}} et je candidate chez {{ENTREPRISE}}."}
                 />
               </label>
-              <button className={styles.secondaryBtn} type="submit" disabled={isSavingProfile}>
+              <button className={styles.secondaryBtn} type="submit" disabled={isSavingProfile || showDemoBanner}>
                 {isSavingProfile
                   ? "Sauvegarde..."
-                  : isProfileLoading
-                    ? "Chargement du profil..."
-                    : "Enregistrer mon profil"}
+                  : showDemoBanner
+                    ? "Connectez-vous pour enregistrer"
+                    : isProfileLoading
+                      ? "Chargement du profil..."
+                      : "Enregistrer mon profil"}
               </button>
               {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
             </form>
@@ -1128,8 +1156,8 @@ export default function DashboardPage() {
                   />
                 </label>
               </div>
-              <button className={styles.secondaryBtn} type="submit" disabled={isUploadingAssets}>
-                {isUploadingAssets ? "Upload en cours..." : "Uploader mes fichiers"}
+              <button className={styles.secondaryBtn} type="submit" disabled={isUploadingAssets || showDemoBanner}>
+                {isUploadingAssets ? "Upload en cours..." : showDemoBanner ? "Connectez-vous pour uploader" : "Uploader mes fichiers"}
               </button>
               {assetInfo ? <p className={styles.uploadSuccess}>{assetInfo}</p> : null}
               {draftInfo ? <p className={styles.uploadHint}>{draftInfo}</p> : null}
@@ -1258,9 +1286,9 @@ export default function DashboardPage() {
                   className={styles.secondaryBtn}
                   type="button"
                   onClick={onConnectGoogle}
-                  disabled={isConnectingGoogle}
+                  disabled={isConnectingGoogle || showDemoBanner}
                 >
-                  {isConnectingGoogle ? "Connexion Google..." : "Connecter Gmail"}
+                  {isConnectingGoogle ? "Connexion Google..." : showDemoBanner ? "Connectez-vous pour Gmail" : "Connecter Gmail"}
                 </button>
               ) : null}
             </div>
@@ -1269,9 +1297,9 @@ export default function DashboardPage() {
                 className={styles.primaryBtn}
                 form="pipeline-config-form"
                 type="submit"
-                disabled={launchDisabled}
+                disabled={demoLaunchDisabled}
               >
-                {launchButtonLabel}
+                {demoLaunchLabel}
               </button>
               <button
                 className={styles.secondaryBtn}
