@@ -157,6 +157,7 @@ export default function Home() {
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const [isUploadingAssets, setIsUploadingAssets] = useState(false);
   const [assetInfo, setAssetInfo] = useState("");
+  const [draftInfo, setDraftInfo] = useState("");
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [mode, setMode] = useState<RunMode>("pipeline");
   const [zone, setZone] = useState<Zone>("all");
@@ -424,10 +425,12 @@ export default function Home() {
           ok?: boolean;
           cv_uploaded?: boolean;
           template_uploaded?: boolean;
+          draft_uploaded?: boolean;
         }>(response)) as {
           ok?: boolean;
           cv_uploaded?: boolean;
           template_uploaded?: boolean;
+          draft_uploaded?: boolean;
         };
         if (!response.ok || !data.ok || cancelled) {
           return;
@@ -438,6 +441,11 @@ export default function Home() {
           setAssetInfo("CV deja enregistre pour ce compte.");
         } else if (data.template_uploaded) {
           setAssetInfo("Template LM deja enregistre pour ce compte.");
+        }
+        if (data.draft_uploaded) {
+          setDraftInfo("Un fichier draft_emails.txt existe deja pour ce compte.");
+        } else {
+          setDraftInfo("Aucun draft_emails.txt existant pour ce compte pour le moment.");
         }
       } catch {
         // Ignore upload status failures to avoid blocking the dashboard.
@@ -1064,6 +1072,7 @@ export default function Home() {
                 {isUploadingAssets ? "Upload en cours..." : "Uploader mes fichiers"}
               </button>
               {assetInfo ? <p className={styles.uploadSuccess}>{assetInfo}</p> : null}
+              {draftInfo ? <p className={styles.uploadHint}>{draftInfo}</p> : null}
             </form>
             <form id="pipeline-config-form" className={styles.form} onSubmit={onSubmit}>
               <div className={styles.inputGrid}>
