@@ -685,7 +685,43 @@ export default function Home() {
     setError("");
     setInfo("");
     setProfileInfo("");
+    const uploadedParts: string[] = [];
+
     try {
+      if (cvFile || templateFile) {
+        const formData = new FormData();
+        if (cvFile) {
+          formData.append("cv", cvFile);
+        }
+        if (templateFile) {
+          formData.append("template", templateFile);
+        }
+        const uploadResponse = await fetch("/api/uploads", {
+          method: "POST",
+          body: formData,
+        });
+        const uploadData = (await safeJson<{
+          ok?: boolean;
+          detail?: string;
+          uploaded?: { cv?: string; template?: string };
+        }>(uploadResponse)) as {
+          ok?: boolean;
+          detail?: string;
+          uploaded?: { cv?: string; template?: string };
+        };
+        if (!uploadResponse.ok || !uploadData.ok) {
+          throw new Error(uploadData.detail ?? "Echec de l'upload des fichiers.");
+        }
+        if (uploadData.uploaded?.cv) {
+          uploadedParts.push("CV");
+        }
+        if (uploadData.uploaded?.template) {
+          uploadedParts.push("template LM");
+        }
+        setCvFile(null);
+        setTemplateFile(null);
+      }
+
       const response = await fetch("/api/profile", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -712,7 +748,14 @@ export default function Home() {
       if (!response.ok || !data.ok) {
         throw new Error(data.detail ?? "Impossible de sauvegarder le profil.");
       }
-      setProfileInfo("Profil enregistre. Vos prochains mails utiliseront ces informations.");
+      const message =
+        uploadedParts.length > 0
+          ? `Profil, ${uploadedParts.join(" et ")} enregistres. Vos prochains mails utiliseront ces informations.`
+          : "Profil enregistre. Vos prochains mails utiliseront ces informations.";
+      setProfileInfo(message);
+      if (uploadedParts.length > 0) {
+        setAssetInfo(`Fichiers enregistres: ${uploadedParts.join(" + ")}`);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur inconnue lors de la sauvegarde.";
       setError(message);
