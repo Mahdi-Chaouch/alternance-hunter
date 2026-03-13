@@ -190,7 +190,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Génère des LM .docx à partir du draft et du template.")
     parser.add_argument("--draft-file", default="data/exports/draft_emails.txt", help="Fichier draft (blocs Entreprise/Zone/Site)")
-    parser.add_argument("--template", default="assets/template_LM.docx", help="Template Word avec placeholders")
+    parser.add_argument("--template", default="", help="Template Word avec placeholders (obligatoire; uploadez via l'UI ou --template /chemin)")
     parser.add_argument("--out-dir", default="outputs/letters", help="Dossier de sortie des LM")
     parser.add_argument("--use-ai", action="store_true",
                         help="Génère le paragraphe personnalisé via OpenAI (OPENAI_API_KEY requis)")
@@ -205,8 +205,11 @@ def main() -> None:
     if not draft.exists():
         raise SystemExit(f"❌ Fichier draft introuvable: {draft} (cwd={Path.cwd()})")
 
-    if not template.exists():
-        raise SystemExit(f"❌ Template introuvable: {template} (cwd={Path.cwd()})")
+    if not args.template.strip() or not template.exists():
+        raise SystemExit(
+            "❌ Template LM requis. Uploadez un template (.docx) depuis l'interface web "
+            "ou fournissez --template /chemin/vers/template.docx"
+        )
 
     outdir.mkdir(parents=True, exist_ok=True)
 

@@ -310,7 +310,7 @@ def main():
     ap.add_argument("--user-key", default="",
                     help="Identifiant stable utilisateur pour isoler les chemins d'entree/sortie.")
 
-    ap.add_argument("--cv", default="assets/CV.pdf", help="chemin vers ton CV.pdf")
+    ap.add_argument("--cv", default="", help="chemin vers le CV PDF (obligatoire sauf --no-lm; uploadez via l'UI ou --cv /chemin)")
 
     # Nouveau: LM auto depuis letters/
     ap.add_argument("--letters-dir", default="outputs/letters",
@@ -359,9 +359,13 @@ def main():
     if not draft_file.exists():
         raise SystemExit(f"❌ Fichier draft introuvable: {draft_file} (cwd={Path.cwd()})")
 
-    cv_path = Path(args.cv)
-    if not cv_path.exists():
-        print(f"⚠️ CV introuvable: {cv_path} (les drafts seront créés sans CV si tu continues)")
+    cv_path = Path(args.cv) if args.cv else None
+    if not args.no_lm:
+        if not args.cv or not cv_path or not cv_path.exists():
+            raise SystemExit(
+                "❌ CV requis pour créer les brouillons. Uploadez un CV (PDF) depuis l'interface web "
+                "ou fournissez --cv /chemin/vers/CV.pdf (ou utilisez --no-lm pour désactiver les pièces jointes LM)."
+            )
 
     letters_dir = Path(args.letters_dir)
 
@@ -424,7 +428,7 @@ def main():
 
             # Attachments: CV + LM (auto ou forcée)
             attachments = []
-            if cv_path.exists():
+            if cv_path and cv_path.exists():
                 attachments.append(cv_path)
 
             lm_attached = "NO"

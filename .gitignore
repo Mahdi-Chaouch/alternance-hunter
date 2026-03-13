@@ -15,9 +15,9 @@ venv/
 !.env.example
 
 
-# --- Sensitive personal assets ---
-assets/CV.pdf
-assets/CV_*.pdf
+# --- Sensitive personal assets (template/CV uploaded via web UI) ---
+assets/
+!assets/.gitkeep
 
 # --- Generated data and logs ---
 data/exports/*
@@ -33,6 +33,9 @@ secrets/*.json
 !secrets/.gitkeep
 token.json
 credentials.json
+
+# --- Removed from repo (history purged; do not re-add) ---
+scripts/legacy/
 
 # --- OS / editor ---
 .DS_Store

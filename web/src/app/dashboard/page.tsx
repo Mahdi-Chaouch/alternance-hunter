@@ -158,6 +158,8 @@ export default function DashboardPage() {
   const [isUploadingAssets, setIsUploadingAssets] = useState(false);
   const [assetInfo, setAssetInfo] = useState("");
   const [draftInfo, setDraftInfo] = useState("");
+  const [templateUploaded, setTemplateUploaded] = useState(false);
+  const [cvUploaded, setCvUploaded] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [mode, setMode] = useState<RunMode>("pipeline");
   const [zone, setZone] = useState<Zone>("all");
@@ -436,6 +438,8 @@ export default function DashboardPage() {
         if (!response.ok || !data.ok || cancelled) {
           return;
         }
+        setTemplateUploaded(Boolean(data.template_uploaded));
+        setCvUploaded(Boolean(data.cv_uploaded));
         if (data.cv_uploaded && data.template_uploaded) {
           setAssetInfo("CV et template LM deja enregistres pour ce compte.");
         } else if (data.cv_uploaded) {
@@ -466,6 +470,22 @@ export default function DashboardPage() {
   const isRunning = runDetails ? !END_STATUSES.has(runDetails.status) : false;
   const logsText = runDetails?.logs_tail.join("\n") ?? "";
   const draftsRequireGmail = mode === "drafts" && !gmailConnected;
+  const templateRequired = mode === "pipeline" || mode === "generate";
+  const cvRequired = mode === "pipeline" || mode === "drafts";
+  const launchDisabled =
+    isLaunchingRun ||
+    draftsRequireGmail ||
+    (templateRequired && !templateUploaded) ||
+    (cvRequired && !cvUploaded);
+  const launchButtonLabel = isLaunchingRun
+    ? "Lancement en cours..."
+    : draftsRequireGmail
+      ? "Connexion Gmail requise"
+      : templateRequired && !templateUploaded
+        ? "Template LM requis (onglet Vos documents)"
+        : cvRequired && !cvUploaded
+          ? "CV requis (onglet Vos documents)"
+          : "Lancer le pipeline";
 
   useEffect(() => {
     animatedLogsRef.current = animatedLogs;
@@ -677,9 +697,11 @@ export default function DashboardPage() {
       const uploadedParts: string[] = [];
       if (data.uploaded?.cv) {
         uploadedParts.push("CV");
+        setCvUploaded(true);
       }
       if (data.uploaded?.template) {
         uploadedParts.push("template LM");
+        setTemplateUploaded(true);
       }
       setAssetInfo(
         uploadedParts.length > 0
@@ -739,9 +761,11 @@ export default function DashboardPage() {
         }
         if (uploadData.uploaded?.cv) {
           uploadedParts.push("CV");
+          setCvUploaded(true);
         }
         if (uploadData.uploaded?.template) {
           uploadedParts.push("template LM");
+          setTemplateUploaded(true);
         }
         setCvFile(null);
         setTemplateFile(null);
@@ -1245,13 +1269,9 @@ export default function DashboardPage() {
                 className={styles.primaryBtn}
                 form="pipeline-config-form"
                 type="submit"
-                disabled={isLaunchingRun || draftsRequireGmail}
+                disabled={launchDisabled}
               >
-                {isLaunchingRun
-                  ? "Lancement en cours..."
-                  : draftsRequireGmail
-                    ? "Connexion Gmail requise"
-                    : "Lancer le pipeline"}
+                {launchButtonLabel}
               </button>
               <button
                 className={styles.secondaryBtn}
