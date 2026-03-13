@@ -1227,6 +1227,24 @@ export default function Home() {
                   <button
                     className={styles.secondaryBtn}
                     type="button"
+                    onClick={() => {
+                      setAnimatedLogs("");
+                      animatedLogsRef.current = "";
+                      setRunDetails((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              logs_tail: [],
+                            }
+                          : prev,
+                      );
+                    }}
+                  >
+                    Clear terminal
+                  </button>
+                  <button
+                    className={styles.secondaryBtn}
+                    type="button"
                     onClick={() => setIsTerminalFullscreen((prev) => !prev)}
                   >
                     {isTerminalFullscreen ? "Quitter le plein ecran" : "Plein ecran"}
