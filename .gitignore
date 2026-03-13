@@ -25,6 +25,14 @@ data/exports/*
 
 outputs/logs/*
 !outputs/logs/.gitkeep
+outputs/letters/*
+!outputs/letters/.gitkeep
+
+# --- OAuth/Gmail local secrets ---
+secrets/*.json
+!secrets/.gitkeep
+token.json
+credentials.json
 
 # --- OS / editor ---
 .DS_Store
