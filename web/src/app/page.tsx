@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
+import { authClient } from "@/lib/auth-client";
 
 type RunMode = "pipeline" | "hunter" | "generate" | "drafts";
 type Zone = "paris" | "cannes" | "auxerre" | "fontainebleau" | "all";
@@ -134,6 +136,14 @@ function getStatusTone(status: string): "running" | "success" | "failed" | "neut
 }
 
 export default function Home() {
+  const router = useRouter();
+  const [accessState, setAccessState] = useState<
+    "checking" | "unauthenticated" | "granted" | "forbidden"
+  >("checking");
+  const [accessError, setAccessError] = useState("");
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [googleAccountLinked, setGoogleAccountLinked] = useState(false);
+  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [mode, setMode] = useState<RunMode>("pipeline");
   const [zone, setZone] = useState<Zone>("all");
@@ -171,6 +181,57 @@ export default function Home() {
   useEffect(() => {
     window.localStorage.setItem("alternance-ui-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function verifyAccess() {
+      try {
+        const response = await fetch("/api/auth/authorized", { cache: "no-store" });
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (response.status === 401) {
+          setAccessState("unauthenticated");
+          return;
+        }
+
+        if (!response.ok) {
+          const data = (await safeJson<{ detail?: string }>(response)) as { detail?: string };
+          setAccessError(
+            data.detail ??
+              "Acces refuse. Votre session est absente ou votre email n'est pas autorise.",
+          );
+          setAccessState("forbidden");
+          return;
+        }
+
+        const data = (await safeJson<{
+          gmail_connected?: boolean;
+          google_account_linked?: boolean;
+        }>(response)) as {
+          gmail_connected?: boolean;
+          google_account_linked?: boolean;
+        };
+        setGmailConnected(Boolean(data.gmail_connected));
+        setGoogleAccountLinked(Boolean(data.google_account_linked));
+        setAccessState("granted");
+      } catch {
+        if (!isCancelled) {
+          setAccessError("Impossible de verifier votre session. Reessayez dans quelques instants.");
+          setAccessState("forbidden");
+        }
+      }
+    }
+
+    void verifyAccess();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [router]);
 
   const refreshRuns = useCallback(async (): Promise<RunListItem[]> => {
     setIsRefreshingRuns(true);
@@ -229,8 +290,11 @@ export default function Home() {
   }, [activeRunId, refreshRuns, refreshRunDetails]);
 
   useEffect(() => {
+    if (accessState !== "granted") {
+      return;
+    }
     void refreshAll();
-  }, [refreshAll]);
+  }, [accessState, refreshAll]);
 
   const activeRun = useMemo(
     () => runs.find((run) => run.run_id === activeRunId) ?? null,
@@ -238,18 +302,22 @@ export default function Home() {
   );
   const isRunning = runDetails ? !END_STATUSES.has(runDetails.status) : false;
   const logsText = runDetails?.logs_tail.join("\n") ?? "";
+  const draftsRequireGmail = mode === "drafts" && !gmailConnected;
 
   useEffect(() => {
     animatedLogsRef.current = animatedLogs;
   }, [animatedLogs]);
 
   useEffect(() => {
+    if (accessState !== "granted") {
+      return;
+    }
     const intervalMs = isRunning ? 2000 : 5000;
     const intervalId = window.setInterval(() => {
       void refreshAll();
     }, intervalMs);
     return () => window.clearInterval(intervalId);
-  }, [isRunning, refreshAll]);
+  }, [accessState, isRunning, refreshAll]);
 
   useEffect(() => {
     if (typingTimerRef.current) {
@@ -336,6 +404,13 @@ export default function Home() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (draftsRequireGmail) {
+      setError(
+        "Connexion Gmail requise pour le mode brouillons. Connectez votre compte Google puis reessayez.",
+      );
+      setInfo("");
+      return;
+    }
     setIsLaunchingRun(true);
     setError("");
     setInfo("");
@@ -374,6 +449,25 @@ export default function Home() {
     }
   }
 
+  async function onConnectGoogle() {
+    setError("");
+    setInfo("");
+    setIsConnectingGoogle(true);
+    try {
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: "/",
+      });
+      if (result?.error?.message) {
+        setError(result.error.message);
+      }
+    } catch {
+      setError("Impossible de demarrer la connexion Google.");
+    } finally {
+      setIsConnectingGoogle(false);
+    }
+  }
+
   async function onCancelRun() {
     if (!activeRunId) {
       return;
@@ -408,6 +502,63 @@ export default function Home() {
   function onSelectRun(runId: string) {
     setActiveRunId(runId);
     void refreshRunDetails(runId);
+  }
+
+  if (accessState === "checking") {
+    return (
+      <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
+        <main className={styles.main}>
+          <section className={styles.panel}>
+            <h2>Verification de la session...</h2>
+            <p className={styles.sectionHint}>Chargement du dashboard securise.</p>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (accessState === "forbidden") {
+    return (
+      <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
+        <main className={styles.main}>
+          <section className={styles.panel}>
+            <h2>Acces refuse</h2>
+            <p className={styles.error} role="alert">
+              {accessError || "Votre compte n'est pas autorise pour ce dashboard."}
+            </p>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (accessState === "unauthenticated") {
+    return (
+      <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
+        <main className={styles.main}>
+          <section className={styles.panel}>
+            <p className={styles.eyebrow}>Alternance Pipeline</p>
+            <h1>Bienvenue</h1>
+            <p className={styles.panelHint}>
+              Connectez-vous avec votre compte Google invite pour acceder au dashboard et lancer
+              vos executions.
+            </p>
+            <div className={styles.controls}>
+              <button className={styles.primaryBtn} type="button" onClick={() => router.push("/login")}>
+                Se connecter
+              </button>
+              <button
+                className={styles.secondaryBtn}
+                type="button"
+                onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+              >
+                {theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
+              </button>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -535,14 +686,42 @@ export default function Home() {
             <p className={styles.sectionHint}>
               Lancez un nouveau pipeline ou rechargez la liste et les details des executions.
             </p>
+            <div className={styles.gmailStatusCard}>
+              <p className={styles.gmailStatusTitle}>Connexion Gmail</p>
+              <p
+                className={`${styles.gmailStatusText} ${
+                  gmailConnected ? styles.gmailStatusConnected : styles.gmailStatusMissing
+                }`}
+              >
+                {gmailConnected
+                  ? "Connecte: les brouillons seront crees avec votre compte Google."
+                  : googleAccountLinked
+                    ? "Compte Google lie, mais les permissions Gmail manquent."
+                    : "Non connecte: reliez votre compte Google pour le mode brouillons."}
+              </p>
+              {!gmailConnected ? (
+                <button
+                  className={styles.secondaryBtn}
+                  type="button"
+                  onClick={onConnectGoogle}
+                  disabled={isConnectingGoogle}
+                >
+                  {isConnectingGoogle ? "Connexion Google..." : "Connecter Gmail"}
+                </button>
+              ) : null}
+            </div>
             <div className={styles.controls}>
               <button
                 className={styles.primaryBtn}
                 form="pipeline-config-form"
                 type="submit"
-                disabled={isLaunchingRun}
+                disabled={isLaunchingRun || draftsRequireGmail}
               >
-                {isLaunchingRun ? "Lancement en cours..." : "Lancer le pipeline"}
+                {isLaunchingRun
+                  ? "Lancement en cours..."
+                  : draftsRequireGmail
+                    ? "Connexion Gmail requise"
+                    : "Lancer le pipeline"}
               </button>
               <button
                 className={styles.secondaryBtn}

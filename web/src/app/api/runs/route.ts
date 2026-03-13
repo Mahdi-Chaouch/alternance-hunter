@@ -1,13 +1,140 @@
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { getAuthHeaders, getBackendConfig } from "@/lib/backend";
+import { requireApiAuthorizedSession } from "@/lib/auth-guard";
+import { auth } from "@/lib/auth";
 import { readJsonSafely } from "@/lib/http";
 
 type RequestInitWithJson = RequestInit & {
   body?: string;
 };
 
+type SessionUser = {
+  id?: string;
+  email?: string | null;
+};
+
+type GoogleLinkedAccount = {
+  providerId?: string;
+  accountId?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  accessTokenExpiresAt?: Date | string | null;
+  scope?: string | null;
+  scopes?: string[];
+};
+
+const REQUIRED_GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.compose"] as const;
+const MODES_REQUIRING_GMAIL_CONTEXT = new Set(["pipeline", "drafts"]);
+
+function buildUserScopedHeaders(user: SessionUser): HeadersInit {
+  const scopedHeaders: Record<string, string> = {};
+  if (user.id?.trim()) {
+    scopedHeaders["x-run-user-id"] = user.id.trim();
+  }
+  if (user.email?.trim()) {
+    scopedHeaders["x-run-user-email"] = user.email.trim().toLowerCase();
+  }
+  return scopedHeaders;
+}
+
+function normalizeScopeList(account: GoogleLinkedAccount): string[] {
+  if (Array.isArray(account.scopes) && account.scopes.length > 0) {
+    return account.scopes;
+  }
+  if (!account.scope) {
+    return [];
+  }
+  return account.scope
+    .split(" ")
+    .map((scope) => scope.trim())
+    .filter((scope) => scope.length > 0);
+}
+
+function hasRequiredGmailScopes(scopes: string[]): boolean {
+  return REQUIRED_GMAIL_SCOPES.every((requiredScope) => scopes.includes(requiredScope));
+}
+
+async function resolveGoogleOAuthRunContext(): Promise<
+  | { ok: true; payload: Record<string, string> }
+  | { ok: false; response: NextResponse<{ detail: string }> }
+> {
+  const linkedAccounts = (await auth.api.listUserAccounts({
+    headers: await headers(),
+  })) as GoogleLinkedAccount[];
+  const googleAccount = linkedAccounts.find((account) => account.providerId === "google");
+  if (!googleAccount) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { detail: "Compte Google non connecte. Connectez Google avant de lancer un run." },
+        { status: 400 },
+      ),
+    };
+  }
+
+  const scopes = normalizeScopeList(googleAccount);
+  if (!hasRequiredGmailScopes(scopes)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          detail:
+            "Scopes Gmail manquants. Reconnectez Google avec les permissions de creation de drafts.",
+        },
+        { status: 400 },
+      ),
+    };
+  }
+
+  const accessToken = googleAccount.accessToken?.trim();
+  const refreshToken = googleAccount.refreshToken?.trim();
+  if (!accessToken) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          detail:
+            "Contexte OAuth Google incomplet. Reconnectez Google pour recuperer un access token valide.",
+        },
+        { status: 400 },
+      ),
+    };
+  }
+
+  const expiresRaw = googleAccount.accessTokenExpiresAt;
+  const expiresAt =
+    expiresRaw instanceof Date
+      ? expiresRaw.toISOString()
+      : typeof expiresRaw === "string"
+        ? expiresRaw
+        : "";
+
+  return {
+    ok: true,
+    payload: {
+      oauth_access_token: accessToken,
+      oauth_refresh_token: refreshToken ?? "",
+      oauth_client_id: process.env.GOOGLE_CLIENT_ID?.trim() ?? "",
+      oauth_client_secret: process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "",
+      oauth_token_uri: process.env.GOOGLE_TOKEN_URI ?? "https://oauth2.googleapis.com/token",
+      oauth_scope: scopes.join(" "),
+      oauth_account_id: googleAccount.accountId ?? "",
+      oauth_access_token_expires_at: expiresAt,
+    },
+  };
+}
+
+function shouldRequireGmailContext(payload: Record<string, unknown>): boolean {
+  const modeRaw = payload.mode;
+  const mode = typeof modeRaw === "string" ? modeRaw.toLowerCase() : "pipeline";
+  const dryRun = payload.dry_run === true;
+  return MODES_REQUIRING_GMAIL_CONTEXT.has(mode) && !dryRun;
+}
+
 async function forward(
   path: string,
+  user: SessionUser,
   init: RequestInitWithJson = {},
 ): Promise<NextResponse> {
   try {
@@ -18,6 +145,7 @@ async function forward(
       headers: {
         "content-type": "application/json",
         ...getAuthHeaders(token),
+        ...buildUserScopedHeaders(user),
         ...(init.headers ?? {}),
       },
     });
@@ -35,12 +163,42 @@ async function forward(
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const payload = await request.text();
-  return forward("/runs", { method: "POST", body: payload });
+  const authResult = await requireApiAuthorizedSession();
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ detail: "Payload JSON invalide." }, { status: 400 });
+  }
+
+  let bodyPayload: Record<string, unknown> = payload;
+  if (shouldRequireGmailContext(payload)) {
+    const oauthContext = await resolveGoogleOAuthRunContext();
+    if (!oauthContext.ok) {
+      return oauthContext.response;
+    }
+    bodyPayload = {
+      ...payload,
+      ...oauthContext.payload,
+    };
+  }
+
+  const body = JSON.stringify(bodyPayload);
+  return forward("/runs", authResult.value.user, { method: "POST", body });
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const authResult = await requireApiAuthorizedSession();
+  if (!authResult.ok) {
+    return authResult.response;
+  }
   const { searchParams } = new URL(request.url);
   const limit = searchParams.get("limit") ?? "20";
-  return forward(`/runs?limit=${encodeURIComponent(limit)}`, { method: "GET" });
+  return forward(`/runs?limit=${encodeURIComponent(limit)}`, authResult.value.user, {
+    method: "GET",
+  });
 }

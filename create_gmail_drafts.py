@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 from email.message import EmailMessage
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Dict, Tuple
 
 from google.auth.transport.requests import Request
@@ -139,6 +139,47 @@ def get_gmail_service(credentials_json: Path, token_json: Path, prefer_console: 
         token_json.parent.mkdir(parents=True, exist_ok=True)
         token_json.write_text(creds.to_json(), encoding="utf-8")
 
+    return build("gmail", "v1", credentials=creds)
+
+
+def parse_iso_datetime(raw: str) -> datetime | None:
+    value = (raw or "").strip()
+    if not value:
+        return None
+    try:
+        normalized = value.replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
+    except ValueError:
+        return None
+
+
+def get_gmail_service_from_oauth_tokens(
+    access_token: str,
+    refresh_token: str,
+    client_id: str,
+    client_secret: str,
+    token_uri: str,
+    scope: str,
+    access_token_expires_at: str,
+):
+    scopes = [s for s in scope.split(" ") if s.strip()] if scope else SCOPES
+    creds = Credentials(
+        token=access_token,
+        refresh_token=refresh_token or None,
+        token_uri=token_uri,
+        client_id=client_id or None,
+        client_secret=client_secret or None,
+        scopes=scopes,
+    )
+    expiry = parse_iso_datetime(access_token_expires_at)
+    if expiry is not None:
+        creds.expiry = expiry
+    if creds.expired and creds.refresh_token:
+        print("🔄 Refresh token utilisateur...")
+        creds.refresh(Request())
     return build("gmail", "v1", credentials=creds)
 
 
@@ -273,6 +314,14 @@ def main():
 
     ap.add_argument("--credentials", default="secrets/credentials.json", help="OAuth client json")
     ap.add_argument("--token", default="secrets/token.json", help="token cache")
+    ap.add_argument("--oauth-access-token", default="", help="OAuth access token utilisateur")
+    ap.add_argument("--oauth-refresh-token", default="", help="OAuth refresh token utilisateur")
+    ap.add_argument("--oauth-client-id", default="", help="OAuth client id")
+    ap.add_argument("--oauth-client-secret", default="", help="OAuth client secret")
+    ap.add_argument("--oauth-token-uri", default="https://oauth2.googleapis.com/token", help="OAuth token uri")
+    ap.add_argument("--oauth-scope", default="", help="OAuth scopes separes par espaces")
+    ap.add_argument("--oauth-access-token-expires-at", default="", help="Expiration ISO access token")
+    ap.add_argument("--oauth-account-id", default="", help="Identifiant du compte OAuth")
     ap.add_argument("--sleep", type=float, default=1.0, help="pause entre drafts (sec)")
     ap.add_argument("--max", type=int, default=999999, help="max drafts à créer")
     ap.add_argument("--dry-run", action="store_true", help="ne crée rien, affiche juste")
@@ -315,8 +364,21 @@ def main():
         print("🧪 (Aucun draft créé)")
         return
 
-    service = get_gmail_service(Path(args.credentials), Path(args.token),
-                               prefer_console=args.console_auth)
+    if args.oauth_access_token.strip():
+        service = get_gmail_service_from_oauth_tokens(
+            access_token=args.oauth_access_token.strip(),
+            refresh_token=args.oauth_refresh_token.strip(),
+            client_id=args.oauth_client_id.strip(),
+            client_secret=args.oauth_client_secret.strip(),
+            token_uri=args.oauth_token_uri.strip() or "https://oauth2.googleapis.com/token",
+            scope=args.oauth_scope.strip(),
+            access_token_expires_at=args.oauth_access_token_expires_at.strip(),
+        )
+        if args.oauth_account_id.strip():
+            print(f"👤 Compte OAuth utilisateur: {args.oauth_account_id.strip()}")
+    else:
+        service = get_gmail_service(Path(args.credentials), Path(args.token),
+                                   prefer_console=args.console_auth)
 
     created = 0
     skipped = 0

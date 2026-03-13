@@ -12,6 +12,13 @@ This repository now ignores runtime data, personal files, and secrets by default
    - `assets/CV.pdf`
    - generated outputs and logs
    - exported contact data
+4. Ensure web secrets are never committed:
+   - `web/.env.local`
+   - `BETTER_AUTH_SECRET`
+   - `GOOGLE_CLIENT_SECRET`
+   - `PIPELINE_API_TOKEN`
+5. Confirm invite-only access list is explicit and minimal:
+   - `AUTH_ALLOWED_EMAILS` contains only approved addresses
 
 ## If secrets were committed in old commits
 
@@ -26,3 +33,4 @@ Ignoring files prevents future leaks, but does not erase past history.
 - `git status --short`
 - `git ls-files | rg -i "(\.env|credentials|token|secret|outputs/|data/exports/)"`
 - `rg -i "(api[_-]?key|token|secret|password)" .`
+- `rg -i "(BETTER_AUTH_SECRET|GOOGLE_CLIENT_SECRET|AUTH_ALLOWED_EMAILS|PIPELINE_API_TOKEN)" web/ README.md docs/`

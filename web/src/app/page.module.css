@@ -228,6 +228,45 @@
   gap: 0.75rem;
 }
 
+.gmailStatusCard {
+  margin-bottom: 1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 0.8rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.gmailStatusTitle {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--subtle-text);
+  font-weight: 700;
+}
+
+.gmailStatusText {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.gmailStatusConnected {
+  color: #166534;
+}
+
+.gmailStatusMissing {
+  color: #b45309;
+}
+
+.pageDark .gmailStatusConnected {
+  color: #bbf7d0;
+}
+
+.pageDark .gmailStatusMissing {
+  color: #fcd34d;
+}
+
 .primaryBtn,
 .secondaryBtn,
 .dangerBtn {

@@ -6,15 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "auth:generate": "npx auth@latest generate --config ./src/lib/auth.ts --output ./db/auth-schema.sql --yes",
+    "auth:migrate": "npx auth@latest migrate --config ./src/lib/auth.ts --yes"
   },
   "dependencies": {
+    "better-auth": "^1.5.5",
     "next": "16.1.6",
+    "pg": "^8.20.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/pg": "^8.18.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
