@@ -23,14 +23,10 @@ assets/
 data/exports/*
 !data/exports/.gitkeep
 
-outputs/logs/*
-!outputs/logs/.gitkeep
-outputs/letters/*
-!outputs/letters/.gitkeep
+outputs/
 
 # --- OAuth/Gmail local secrets ---
-secrets/*.json
-!secrets/.gitkeep
+secrets/
 token.json
 credentials.json
 
