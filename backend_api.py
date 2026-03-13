@@ -135,9 +135,9 @@ class RunRequest(BaseModel):
     insecure: bool = False
     rh_only: bool = False
 
-    # generate
+    # generate (template: upload via web UI or pass explicit path)
     draft_file: str = "data/exports/draft_emails.txt"
-    template: str = "assets/template_LM.docx"
+    template: str = ""
     out_dir: str = "outputs/letters"
     use_ai: bool = False
     ai_model: str = "gpt-4o-mini"
@@ -147,8 +147,8 @@ class RunRequest(BaseModel):
     mail_subject_template: str = ""
     mail_body_template: str = ""
 
-    # drafts
-    cv: str = "assets/CV.pdf"
+    # drafts (cv: upload via web UI or pass explicit path)
+    cv: str = ""
     lm_suffix: str = "docx"
     no_lm: bool = False
     lm: str = ""
@@ -254,13 +254,9 @@ def build_pipeline_command(
     cmd = [payload.python or sys.executable, "-u", str(PIPELINE_PATH)]
     cmd += ["--mode", payload.mode, "--zone", payload.zone]
     user_key = sanitize_user_key(owner_user_id, owner_user_email)
-    cv_path = payload.cv
-    template_path = payload.template
     user_cv, user_template = resolve_user_assets(user_key)
-    if payload.cv == "assets/CV.pdf" and user_cv:
-        cv_path = user_cv
-    if payload.template == "assets/template_LM.docx" and user_template:
-        template_path = user_template
+    template_path = (payload.template or user_template or "").strip()
+    cv_path = (payload.cv or user_cv or "").strip()
     if user_key:
         cmd += ["--user-key", user_key]
     cmd += ["--max-minutes", str(payload.max_minutes)]
@@ -487,6 +483,22 @@ def create_run(
 ) -> RunCreateResponse:
     owner_user_id = normalize_user_identifier(x_run_user_id)
     owner_user_email = normalize_user_identifier(x_run_user_email)
+    user_key = sanitize_user_key(owner_user_id, owner_user_email)
+    user_cv, user_template = resolve_user_assets(user_key)
+    template_path = (payload.template or user_template or "").strip()
+    cv_path = (payload.cv or user_cv or "").strip()
+
+    if payload.mode in ("pipeline", "generate") and not template_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Template LM requis. Uploadez un template (.docx) depuis l'onglet « Vos documents ».",
+        )
+    if payload.mode in ("pipeline", "drafts") and not payload.no_lm and not cv_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CV requis pour créer les brouillons. Uploadez un CV (PDF) depuis l'onglet « Vos documents ».",
+        )
+
     run_id = uuid4().hex
     command = build_pipeline_command(payload, owner_user_id, owner_user_email)
     log_file = RUN_LOG_DIR / f"{run_id}.log"

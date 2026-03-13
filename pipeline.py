@@ -280,7 +280,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--draft-file", default="data/exports/draft_emails.txt")
     parser.add_argument("--targets-csv", default="data/exports/targets_auto.csv")
     parser.add_argument("--emails-found-csv", default="data/exports/emails_found.csv")
-    parser.add_argument("--template", default="assets/template_LM.docx")
+    parser.add_argument("--template", default="", help="Template LM .docx (obligatoire pour generate; uploadez via l'UI ou --template /chemin)")
     parser.add_argument("--out-dir", default="outputs/letters")
     parser.add_argument("--use-ai", action="store_true")
     parser.add_argument("--ai-model", default="gpt-4o-mini")
@@ -291,7 +291,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mail-body-template", default="")
 
     # Drafts Gmail
-    parser.add_argument("--cv", default="assets/CV.pdf")
+    parser.add_argument("--cv", default="", help="CV PDF (obligatoire pour drafts sauf --no-lm; uploadez via l'UI ou --cv /chemin)")
     parser.add_argument("--lm-suffix", default="docx")
     parser.add_argument("--no-lm", action="store_true")
     parser.add_argument("--lm", default="")
