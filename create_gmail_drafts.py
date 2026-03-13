@@ -27,6 +27,12 @@ EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 EMAIL_EXTRACT_REGEX = re.compile(r"[A-Za-z0-9._%+\-']+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
 
+def sanitize_user_key(raw: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9._-]+", "-", (raw or "").strip().lower())
+    cleaned = cleaned.strip("-._")
+    return cleaned[:80] or "anonymous"
+
+
 def safe_filename(name: str) -> str:
     name = name.strip()
     name = re.sub(r'[<>:"/\\|?*\n\r\t]', " ", name)
@@ -297,6 +303,8 @@ def main():
 
     ap.add_argument("--draft-file", default="data/exports/draft_emails.txt",
                     help="ex: data/exports/draft_emails.txt")
+    ap.add_argument("--user-key", default="",
+                    help="Identifiant stable utilisateur pour isoler les chemins d'entree/sortie.")
 
     ap.add_argument("--cv", default="assets/CV.pdf", help="chemin vers ton CV.pdf")
 
@@ -333,6 +341,15 @@ def main():
                     help="affiche une progression toutes les N entrées analysées")
 
     args = ap.parse_args()
+
+    if args.user_key.strip():
+        user_key = sanitize_user_key(args.user_key)
+        if args.draft_file == "data/exports/draft_emails.txt":
+            args.draft_file = f"data/exports/users/{user_key}/draft_emails.txt"
+        if args.letters_dir == "outputs/letters":
+            args.letters_dir = f"outputs/letters/{user_key}"
+        if args.resume_log == "outputs/logs/drafts_created_log.csv":
+            args.resume_log = f"outputs/logs/{user_key}/drafts_created_log.csv"
 
     draft_file = Path(args.draft_file)
     if not draft_file.exists():

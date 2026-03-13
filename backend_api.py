@@ -9,6 +9,7 @@ import subprocess
 import sys
 import threading
 import time
+import re
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -174,9 +175,16 @@ def verify_token(
         )
 
 
-def build_pipeline_command(payload: RunRequest) -> List[str]:
+def build_pipeline_command(
+    payload: RunRequest,
+    owner_user_id: Optional[str] = None,
+    owner_user_email: Optional[str] = None,
+) -> List[str]:
     cmd = [payload.python or sys.executable, "-u", str(PIPELINE_PATH)]
     cmd += ["--mode", payload.mode, "--zone", payload.zone]
+    user_key = sanitize_user_key(owner_user_id, owner_user_email)
+    if user_key:
+        cmd += ["--user-key", user_key]
     cmd += ["--max-minutes", str(payload.max_minutes)]
     cmd += ["--max-sites", str(payload.max_sites)]
     cmd += ["--target-found", str(payload.target_found)]
@@ -331,6 +339,15 @@ def normalize_user_identifier(value: Optional[str]) -> Optional[str]:
     return normalized or None
 
 
+def sanitize_user_key(user_id: Optional[str], user_email: Optional[str]) -> Optional[str]:
+    source = normalize_user_identifier(user_id) or normalize_user_identifier(user_email)
+    if not source:
+        return None
+    lowered = source.lower()
+    cleaned = re.sub(r"[^a-z0-9._-]+", "-", lowered).strip("-._")
+    return cleaned[:80] or "anonymous"
+
+
 def assert_run_access(run: RunState, actor_user_id: Optional[str]) -> None:
     if not run.owner_user_id:
         return
@@ -360,7 +377,7 @@ def create_run(
     owner_user_id = normalize_user_identifier(x_run_user_id)
     owner_user_email = normalize_user_identifier(x_run_user_email)
     run_id = uuid4().hex
-    command = build_pipeline_command(payload)
+    command = build_pipeline_command(payload, owner_user_id, owner_user_email)
     log_file = RUN_LOG_DIR / f"{run_id}.log"
     run = RunState(
         run_id=run_id,

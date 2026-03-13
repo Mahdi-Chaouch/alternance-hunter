@@ -62,9 +62,9 @@ configure_safe_stdio()
 # ============================================================
 LINKEDIN = "https://www.linkedin.com/in/mahdi-chaouch-3a27263a0/"
 
-TARGETS_AUTO_CSV = "data/exports/targets_auto.csv"
-EMAILS_FOUND_CSV = "data/exports/emails_found.csv"
-DRAFT_EMAILS_TXT = "data/exports/draft_emails.txt"
+DEFAULT_TARGETS_AUTO_CSV = "data/exports/targets_auto.csv"
+DEFAULT_EMAILS_FOUND_CSV = "data/exports/emails_found.csv"
+DEFAULT_DRAFT_EMAILS_TXT = "data/exports/draft_emails.txt"
 
 SEP = "=============================="
 
@@ -488,11 +488,11 @@ def build_targets(max_sites: int, focus: str, zones_filter: str = "") -> List[Ta
     return targets[:max_sites]
 
 
-def write_targets_csv(targets: List[Target]) -> None:
-    parent = os.path.dirname(TARGETS_AUTO_CSV)
+def write_targets_csv(targets: List[Target], targets_csv: str) -> None:
+    parent = os.path.dirname(targets_csv)
     if parent:
         os.makedirs(parent, exist_ok=True)
-    with open(TARGETS_AUTO_CSV, "w", newline="", encoding="utf-8") as f:
+    with open(targets_csv, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["entreprise", "site", "zone", "ville", "score"])
         w.writeheader()
         for t in targets:
@@ -855,6 +855,8 @@ def try_urls_for_site(site: str, enable_sitemap: bool = False) -> Tuple[Optional
 # ============================================================
 def run_email_finder(
     targets: List[Target],
+    emails_found_csv: str,
+    drafts_txt: str,
     max_minutes: int,
     enable_sitemap: bool,
     workers: int,
@@ -864,17 +866,17 @@ def run_email_finder(
 ) -> None:
     fieldnames = ["entreprise", "zone", "ville", "site", "score", "status", "email", "source_url", "contact_urls", "reason"]
 
-    done_sites = load_done_sites(EMAILS_FOUND_CSV)
+    done_sites = load_done_sites(emails_found_csv)
     if done_sites:
-        print(f"\n⏩ RESUME: {len(done_sites)} sites déjà présents dans {EMAILS_FOUND_CSV} -> skip")
+        print(f"\n⏩ RESUME: {len(done_sites)} sites déjà présents dans {emails_found_csv} -> skip")
 
-    ensure_csv_header(EMAILS_FOUND_CSV, fieldnames)
+    ensure_csv_header(emails_found_csv, fieldnames)
 
-    if not os.path.exists(DRAFT_EMAILS_TXT):
-        parent = os.path.dirname(DRAFT_EMAILS_TXT)
+    if not os.path.exists(drafts_txt):
+        parent = os.path.dirname(drafts_txt)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        with open(DRAFT_EMAILS_TXT, "w", encoding="utf-8") as f:
+        with open(drafts_txt, "w", encoding="utf-8") as f:
             f.write("")
 
     deadline = time.time() + max_minutes * 60
@@ -898,8 +900,8 @@ def run_email_finder(
             email, source_url, contact_urls, reason = None, None, [], "ERROR"
         return t, email, source_url, contact_urls, reason
 
-    with open(EMAILS_FOUND_CSV, "a", newline="", encoding="utf-8") as fcsv, \
-         open(DRAFT_EMAILS_TXT, "a", encoding="utf-8") as fdraft:
+    with open(emails_found_csv, "a", newline="", encoding="utf-8") as fcsv, \
+         open(drafts_txt, "a", encoding="utf-8") as fdraft:
 
         writer = csv.DictWriter(fcsv, fieldnames=fieldnames)
 
@@ -1023,6 +1025,12 @@ def parse_args():
                    help="N'écrire un brouillon que si l'email trouvé est RH/recrutement (recrut@, rh@, jobs@, etc.)")
     p.add_argument("--zones", type=str, default="",
                    help="Limiter aux zones voulues, séparées par des virgules (ex: Lyon, Marseille, Toulouse). Vide = toutes les zones.")
+    p.add_argument("--targets-csv", type=str, default=DEFAULT_TARGETS_AUTO_CSV,
+                   help="Chemin du CSV de cibles collectées.")
+    p.add_argument("--emails-found-csv", type=str, default=DEFAULT_EMAILS_FOUND_CSV,
+                   help="Chemin du CSV des emails trouvés.")
+    p.add_argument("--drafts-txt", type=str, default=DEFAULT_DRAFT_EMAILS_TXT,
+                   help="Chemin du fichier de brouillons générés.")
     return p.parse_args()
 
 def main():
@@ -1039,13 +1047,15 @@ def main():
 
     print("==> 1) Génération des entreprises (OSM Overpass) [WEB FOCUS]")
     targets = build_targets(max_sites=args.max_sites, focus=args.focus, zones_filter=args.zones)
-    write_targets_csv(targets)
-    print(f"✅ targets: {TARGETS_AUTO_CSV} ({len(targets)} lignes)")
+    write_targets_csv(targets, args.targets_csv)
+    print(f"✅ targets: {args.targets_csv} ({len(targets)} lignes)")
 
     print("\n==> 2) Recherche emails (FAST + RESUME + cap temps + anti-faux emails, priorité RH)")
     print(f"    max_minutes={args.max_minutes} | workers={args.workers} | target_found={args.target_found} | sitemap={args.enable_sitemap} | focus={args.focus} | rh_only={args.rh_only}")
     run_email_finder(
         targets=targets,
+        emails_found_csv=args.emails_found_csv,
+        drafts_txt=args.drafts_txt,
         max_minutes=args.max_minutes,
         enable_sitemap=args.enable_sitemap,
         workers=args.workers,
@@ -1054,8 +1064,8 @@ def main():
         rh_only=args.rh_only,
     )
 
-    print(f"\n✅ emails: {EMAILS_FOUND_CSV}")
-    print(f"✅ drafts: {DRAFT_EMAILS_TXT}")
+    print(f"\n✅ emails: {args.emails_found_csv}")
+    print(f"✅ drafts: {args.drafts_txt}")
     print("\n🎯 Terminé.")
 
 if __name__ == "__main__":
