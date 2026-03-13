@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "../page.module.css";
@@ -136,7 +136,7 @@ function getStatusTone(status: string): "running" | "success" | "failed" | "neut
   return "running";
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isDemoView = searchParams.get("demo") === "1";
@@ -1563,3 +1563,23 @@ export default function DashboardPage() {
   );
 }
 
+function DashboardFallback() {
+  return (
+    <div className={styles.page}>
+      <main className={styles.main}>
+        <section className={styles.panel}>
+          <h2>Chargement du dashboard...</h2>
+          <p className={styles.sectionHint}>Verification de la session.</p>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardFallback />}>
+      <DashboardContent />
+    </Suspense>
+  );
+}
