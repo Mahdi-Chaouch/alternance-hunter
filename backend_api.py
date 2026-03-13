@@ -91,6 +91,14 @@ class RunRequest(BaseModel):
     max: int = 999999
     console_auth: bool = False
     resume_log: str = "outputs/logs/drafts_created_log.csv"
+    oauth_access_token: Optional[str] = None
+    oauth_refresh_token: Optional[str] = None
+    oauth_client_id: Optional[str] = None
+    oauth_client_secret: Optional[str] = None
+    oauth_token_uri: Optional[str] = None
+    oauth_scope: Optional[str] = None
+    oauth_access_token_expires_at: Optional[str] = None
+    oauth_account_id: Optional[str] = None
 
 
 class RunCreateResponse(BaseModel):
@@ -108,6 +116,8 @@ class RunStatusResponse(BaseModel):
     command: List[str]
     pid: Optional[int]
     cancel_requested: bool
+    owner_user_id: Optional[str]
+    owner_user_email: Optional[str]
     log_file: str
     logs_tail: List[str]
 
@@ -126,6 +136,8 @@ class RunState:
     pid: Optional[int] = None
     cancel_requested: bool = False
     process: Optional[subprocess.Popen[str]] = None
+    owner_user_id: Optional[str] = None
+    owner_user_email: Optional[str] = None
     logs_tail: Deque[str] = field(
         default_factory=lambda: deque(maxlen=MAX_IN_MEMORY_LOG_LINES)
     )
@@ -176,8 +188,25 @@ def build_pipeline_command(payload: RunRequest) -> List[str]:
     cmd += ["--ai-model", payload.ai_model]
     cmd += ["--cv", payload.cv]
     cmd += ["--lm-suffix", payload.lm_suffix]
-    cmd += ["--credentials", payload.credentials]
-    cmd += ["--token", payload.token]
+    if payload.oauth_access_token:
+        cmd += ["--oauth-access-token", payload.oauth_access_token]
+        if payload.oauth_refresh_token:
+            cmd += ["--oauth-refresh-token", payload.oauth_refresh_token]
+        if payload.oauth_client_id:
+            cmd += ["--oauth-client-id", payload.oauth_client_id]
+        if payload.oauth_client_secret:
+            cmd += ["--oauth-client-secret", payload.oauth_client_secret]
+        if payload.oauth_token_uri:
+            cmd += ["--oauth-token-uri", payload.oauth_token_uri]
+        if payload.oauth_scope:
+            cmd += ["--oauth-scope", payload.oauth_scope]
+        if payload.oauth_access_token_expires_at:
+            cmd += ["--oauth-access-token-expires-at", payload.oauth_access_token_expires_at]
+        if payload.oauth_account_id:
+            cmd += ["--oauth-account-id", payload.oauth_account_id]
+    else:
+        cmd += ["--credentials", payload.credentials]
+        cmd += ["--token", payload.token]
     cmd += ["--sleep", str(payload.sleep)]
     cmd += ["--max", str(payload.max)]
     cmd += ["--resume-log", payload.resume_log]
@@ -295,6 +324,23 @@ def get_run_or_404(run_id: str) -> RunState:
         return run
 
 
+def normalize_user_identifier(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def assert_run_access(run: RunState, actor_user_id: Optional[str]) -> None:
+    if not run.owner_user_id:
+        return
+    if not actor_user_id or actor_user_id != run.owner_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden. This run belongs to another user.",
+        )
+
+
 @app.get("/healthz")
 def healthcheck() -> dict:
     return {"ok": True}
@@ -306,11 +352,23 @@ def healthcheck() -> dict:
     status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(verify_token)],
 )
-def create_run(payload: RunRequest) -> RunCreateResponse:
+def create_run(
+    payload: RunRequest,
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> RunCreateResponse:
+    owner_user_id = normalize_user_identifier(x_run_user_id)
+    owner_user_email = normalize_user_identifier(x_run_user_email)
     run_id = uuid4().hex
     command = build_pipeline_command(payload)
     log_file = RUN_LOG_DIR / f"{run_id}.log"
-    run = RunState(run_id=run_id, command=command, log_file=log_file)
+    run = RunState(
+        run_id=run_id,
+        command=command,
+        log_file=log_file,
+        owner_user_id=owner_user_id,
+        owner_user_email=owner_user_email,
+    )
 
     with RUNS_LOCK:
         RUNS[run_id] = run
@@ -329,8 +387,11 @@ def create_run(payload: RunRequest) -> RunCreateResponse:
 def get_run_status(
     run_id: str,
     tail: int = Query(default=200, ge=1, le=2000),
+    x_run_user_id: Optional[str] = Header(default=None),
 ) -> RunStatusResponse:
+    actor_user_id = normalize_user_identifier(x_run_user_id)
     run = get_run_or_404(run_id)
+    assert_run_access(run, actor_user_id)
     logs = list(run.logs_tail)[-tail:]
     return RunStatusResponse(
         run_id=run.run_id,
@@ -342,6 +403,8 @@ def get_run_status(
         command=run.command,
         pid=run.pid,
         cancel_requested=run.cancel_requested,
+        owner_user_id=run.owner_user_id,
+        owner_user_email=run.owner_user_email,
         log_file=str(run.log_file),
         logs_tail=logs,
     )
@@ -351,8 +414,13 @@ def get_run_status(
     "/runs/{run_id}/cancel",
     dependencies=[Depends(verify_token)],
 )
-def cancel_run(run_id: str) -> dict:
+def cancel_run(
+    run_id: str,
+    x_run_user_id: Optional[str] = Header(default=None),
+) -> dict:
+    actor_user_id = normalize_user_identifier(x_run_user_id)
     run = get_run_or_404(run_id)
+    assert_run_access(run, actor_user_id)
     with RUNS_LOCK:
         if run.status in {"succeeded", "failed", "cancelled"}:
             return {"run_id": run_id, "status": run.status, "message": "Run already ended."}
@@ -368,9 +436,16 @@ def cancel_run(run_id: str) -> dict:
 
 
 @app.get("/runs", dependencies=[Depends(verify_token)])
-def list_runs(limit: int = Query(default=20, ge=1, le=200)) -> dict:
+def list_runs(
+    limit: int = Query(default=20, ge=1, le=200),
+    x_run_user_id: Optional[str] = Header(default=None),
+) -> dict:
+    actor_user_id = normalize_user_identifier(x_run_user_id)
     with RUNS_LOCK:
-        items = list(RUNS.values())[-limit:]
+        items = list(RUNS.values())
+        if actor_user_id:
+            items = [run for run in items if run.owner_user_id == actor_user_id]
+        items = items[-limit:]
     serialized = [
         {
             "run_id": run.run_id,
@@ -381,6 +456,8 @@ def list_runs(limit: int = Query(default=20, ge=1, le=200)) -> dict:
             "exit_code": run.exit_code,
             "pid": run.pid,
             "cancel_requested": run.cancel_requested,
+            "owner_user_id": run.owner_user_id,
+            "owner_user_email": run.owner_user_email,
             "log_file": str(run.log_file),
         }
         for run in items

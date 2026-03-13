@@ -41,6 +41,7 @@ Variables principales:
 - `PIPELINE_API_TOKEN` (ou `API_TOKEN`): token de securite pour l'API
 - `OPENAI_API_KEY`: requis uniquement si `--use-ai` est active
 - `PIPELINE_API_BASE_URL`: URL du backend (utile pour tooling local)
+- `AUTH_ALLOWED_EMAILS`: allowlist invite-only des emails autorises sur le dashboard web
 
 ## Lancement local
 
@@ -64,6 +65,7 @@ Voir `web/README.md` pour le detail.
 
 - Frontend (`web/`) -> Vercel
 - Backend Python -> service separe (free tier choisi actuellement, migration VPS des que les seuils de charge/fiabilite sont depasses)
+- PostgreSQL -> requis pour Better Auth (sessions + comptes OAuth)
 
 Guide public/prive: `docs/PUBLIC_PRIVATE_SETUP.md`.
 Decision backend: `docs/BACKEND_HOSTING_DECISION.md`.
@@ -72,4 +74,8 @@ Decision backend: `docs/BACKEND_HOSTING_DECISION.md`.
 
 - Les secrets et donnees generees sont ignores via `.gitignore`
 - Fichiers sensibles typiques: `secrets/credentials.json`, `secrets/token.json`, `assets/CV.pdf`
+- Le frontend est en mode **invite-only**: seuls les emails listes dans `AUTH_ALLOWED_EMAILS` peuvent se connecter
+- Les brouillons Gmail utilises par le web sont lies au compte Google de chaque utilisateur (pas de token partage)
+- En production, forcer HTTPS pour proteger les cookies de session Better Auth
+- Mettre en rotation reguliere: `PIPELINE_API_TOKEN`, `BETTER_AUTH_SECRET`, credentials OAuth Google
 - Checklist de publication: `PUBLICATION_CHECKLIST.md`

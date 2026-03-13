@@ -1,0 +1,36 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.card {
+  width: min(420px, 100%);
+  border: 1px solid #d9dde5;
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: #fff;
+}
+
+.title {
+  margin-top: 0;
+}
+
+.button {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.buttonDisabled {
+  cursor: not-allowed;
+}
+
+.error {
+  color: #b42318;
+  margin-bottom: 0;
+}

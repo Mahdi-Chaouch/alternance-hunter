@@ -128,10 +128,6 @@ def build_drafts_cmd(args: argparse.Namespace) -> List[str]:
         args.out_dir,
         "--lm-suffix",
         args.lm_suffix,
-        "--credentials",
-        args.credentials,
-        "--token",
-        args.token,
         "--sleep",
         str(args.sleep),
         "--max",
@@ -139,6 +135,24 @@ def build_drafts_cmd(args: argparse.Namespace) -> List[str]:
         "--resume-log",
         args.resume_log,
     ]
+    if args.oauth_access_token:
+        cmd.extend(["--oauth-access-token", args.oauth_access_token])
+        if args.oauth_refresh_token:
+            cmd.extend(["--oauth-refresh-token", args.oauth_refresh_token])
+        if args.oauth_client_id:
+            cmd.extend(["--oauth-client-id", args.oauth_client_id])
+        if args.oauth_client_secret:
+            cmd.extend(["--oauth-client-secret", args.oauth_client_secret])
+        if args.oauth_token_uri:
+            cmd.extend(["--oauth-token-uri", args.oauth_token_uri])
+        if args.oauth_scope:
+            cmd.extend(["--oauth-scope", args.oauth_scope])
+        if args.oauth_access_token_expires_at:
+            cmd.extend(["--oauth-access-token-expires-at", args.oauth_access_token_expires_at])
+        if args.oauth_account_id:
+            cmd.extend(["--oauth-account-id", args.oauth_account_id])
+    else:
+        cmd.extend(["--credentials", args.credentials, "--token", args.token])
     if args.no_lm:
         cmd.append("--no-lm")
     if args.lm:
@@ -202,6 +216,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lm", default="")
     parser.add_argument("--credentials", default="secrets/credentials.json")
     parser.add_argument("--token", default="secrets/token.json")
+    parser.add_argument("--oauth-access-token", default="")
+    parser.add_argument("--oauth-refresh-token", default="")
+    parser.add_argument("--oauth-client-id", default="")
+    parser.add_argument("--oauth-client-secret", default="")
+    parser.add_argument("--oauth-token-uri", default="https://oauth2.googleapis.com/token")
+    parser.add_argument("--oauth-scope", default="")
+    parser.add_argument("--oauth-access-token-expires-at", default="")
+    parser.add_argument("--oauth-account-id", default="")
     parser.add_argument("--sleep", type=float, default=1.0)
     parser.add_argument("--max", type=int, default=999999)
     parser.add_argument("--console-auth", action="store_true")
