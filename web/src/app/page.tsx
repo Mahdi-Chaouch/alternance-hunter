@@ -144,6 +144,7 @@ export default function Home() {
   const [gmailConnected, setGmailConnected] = useState(false);
   const [googleAccountLinked, setGoogleAccountLinked] = useState(false);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [mode, setMode] = useState<RunMode>("pipeline");
   const [zone, setZone] = useState<Zone>("all");
@@ -499,6 +500,22 @@ export default function Home() {
     }
   }
 
+  async function onSignOut() {
+    setError("");
+    setInfo("");
+    setIsSigningOut(true);
+    try {
+      await authClient.signOut();
+      setAccessState("unauthenticated");
+      router.push("/login");
+      router.refresh();
+    } catch {
+      setError("Impossible de se deconnecter pour le moment. Reessayez.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
+
   function onSelectRun(runId: string) {
     setActiveRunId(runId);
     void refreshRunDetails(runId);
@@ -573,13 +590,23 @@ export default function Home() {
               Configurez le pipeline, lancez une execution et suivez les resultats en temps reel.
             </p>
           </div>
-          <button
-            className={styles.secondaryBtn}
-            type="button"
-            onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
-          >
-            {theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
-          </button>
+          <div className={styles.headerActions}>
+            <button
+              className={styles.secondaryBtn}
+              type="button"
+              onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+            >
+              {theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
+            </button>
+            <button
+              className={styles.secondaryBtn}
+              type="button"
+              onClick={onSignOut}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? "Deconnexion..." : "Se deconnecter"}
+            </button>
+          </div>
         </header>
 
         <div className={styles.topGrid}>
