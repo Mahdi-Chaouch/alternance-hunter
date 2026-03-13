@@ -44,3 +44,32 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 }
+
+export async function GET(): Promise<NextResponse> {
+  const authResult = await requireApiAuthorizedSession();
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+
+  try {
+    const { baseUrl, token } = getBackendConfig();
+    const response = await fetch(`${baseUrl}/uploads/status`, {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        ...getAuthHeaders(token),
+        ...buildUserScopedHeaders(authResult.value.user),
+      },
+    });
+    const body = await readJsonSafely(response);
+    return NextResponse.json(body, { status: response.status });
+  } catch {
+    return NextResponse.json(
+      {
+        detail:
+          "Backend Python inaccessible. Verifie PIPELINE_API_BASE_URL et demarre backend_api.py.",
+      },
+      { status: 503 },
+    );
+  }
+}

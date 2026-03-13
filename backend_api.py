@@ -27,6 +27,21 @@ RUN_LOG_DIR = PROJECT_ROOT / "outputs" / "logs" / "api_runs"
 RUN_LOG_DIR.mkdir(parents=True, exist_ok=True)
 MAX_IN_MEMORY_LOG_LINES = 500
 USER_ASSETS_DIR = PROJECT_ROOT / "data" / "user_assets"
+REDACTED_VALUE = "[REDACTED]"
+SENSITIVE_CLI_FLAGS = {
+    "--oauth-access-token",
+    "--oauth-refresh-token",
+    "--oauth-client-secret",
+}
+SENSITIVE_LOG_PATTERNS = [
+    re.compile(r'("access_token"\s*:\s*")[^"]+(")', flags=re.IGNORECASE),
+    re.compile(r'("refresh_token"\s*:\s*")[^"]+(")', flags=re.IGNORECASE),
+    re.compile(r'("client_secret"\s*:\s*")[^"]+(")', flags=re.IGNORECASE),
+    re.compile(r"(authorization\s*:\s*bearer\s+)(\S+)", flags=re.IGNORECASE),
+    re.compile(r"(oauth_access_token\s*[=:]\s*)(\S+)", flags=re.IGNORECASE),
+    re.compile(r"(oauth_refresh_token\s*[=:]\s*)(\S+)", flags=re.IGNORECASE),
+    re.compile(r"(oauth_client_secret\s*[=:]\s*)(\S+)", flags=re.IGNORECASE),
+]
 
 def _read_token_from_env_file(path: Path) -> Optional[str]:
     if not path.exists():
@@ -57,6 +72,51 @@ if not API_TOKEN:
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def redact_command(command: List[str]) -> List[str]:
+    redacted: List[str] = []
+    idx = 0
+    while idx < len(command):
+        part = command[idx]
+        if "=" in part:
+            maybe_flag, value = part.split("=", 1)
+            if maybe_flag in SENSITIVE_CLI_FLAGS and value:
+                redacted.append(f"{maybe_flag}={REDACTED_VALUE}")
+                idx += 1
+                continue
+        redacted.append(part)
+        if part in SENSITIVE_CLI_FLAGS and idx + 1 < len(command):
+            redacted.append(REDACTED_VALUE)
+            idx += 2
+            continue
+        idx += 1
+    return redacted
+
+
+def extract_command_secrets(command: List[str]) -> List[str]:
+    secrets: List[str] = []
+    for idx, part in enumerate(command):
+        if "=" in part:
+            maybe_flag, value = part.split("=", 1)
+            if maybe_flag in SENSITIVE_CLI_FLAGS and value:
+                secrets.append(value)
+            continue
+        if part in SENSITIVE_CLI_FLAGS and idx + 1 < len(command):
+            value = command[idx + 1]
+            if value:
+                secrets.append(value)
+    return secrets
+
+
+def sanitize_log_line(line: str, secrets: List[str]) -> str:
+    masked = line
+    for secret in secrets:
+        if secret:
+            masked = masked.replace(secret, REDACTED_VALUE)
+    for pattern in SENSITIVE_LOG_PATTERNS:
+        masked = pattern.sub(rf"\1{REDACTED_VALUE}\2", masked)
+    return masked
 
 
 class RunRequest(BaseModel):
@@ -133,7 +193,9 @@ class RunStatusResponse(BaseModel):
 class RunState:
     run_id: str
     command: List[str]
+    display_command: List[str]
     log_file: Path
+    redaction_secrets: List[str] = field(default_factory=list)
     status: str = "queued"
     created_at: str = field(default_factory=utc_now_iso)
     started_monotonic: Optional[float] = None
@@ -151,7 +213,7 @@ class RunState:
     last_output_monotonic: float = field(default_factory=time.monotonic)
 
     def append_log(self, line: str) -> None:
-        clean = line.rstrip("\n")
+        clean = sanitize_log_line(line.rstrip("\n"), self.redaction_secrets)
         self.logs_tail.append(clean)
         self.last_output_monotonic = time.monotonic()
         with self.log_file.open("a", encoding="utf-8") as fh:
@@ -284,7 +346,8 @@ def run_in_background(run_id: str) -> None:
         run.started_at = utc_now_iso()
         run.started_monotonic = time.monotonic()
 
-    run.append_log(f"[{utc_now_iso()}] Starting command: {' '.join(run.command)}")
+    # Avoid leaking sensitive CLI arguments (OAuth tokens/secrets) into run logs.
+    run.append_log(f"[{utc_now_iso()}] Starting run.")
 
     popen_kwargs = {
         "cwd": str(PROJECT_ROOT),
@@ -427,7 +490,9 @@ def create_run(
     run = RunState(
         run_id=run_id,
         command=command,
+        display_command=redact_command(command),
         log_file=log_file,
+        redaction_secrets=extract_command_secrets(command),
         owner_user_id=owner_user_id,
         owner_user_email=owner_user_email,
     )
@@ -483,6 +548,31 @@ async def upload_user_assets(
     return {"ok": True, "user_key": user_key, "uploaded": uploaded}
 
 
+@app.get("/uploads/status", dependencies=[Depends(verify_token)])
+def get_upload_status(
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    user_key = sanitize_user_key(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing user identity headers.",
+        )
+
+    target_dir = USER_ASSETS_DIR / user_key
+    cv_path, template_path = resolve_user_assets(user_key)
+    return {
+        "ok": True,
+        "user_key": user_key,
+        "assets_dir_exists": target_dir.exists(),
+        "cv_uploaded": bool(cv_path),
+        "template_uploaded": bool(template_path),
+        "cv_path": cv_path,
+        "template_path": template_path,
+    }
+
+
 @app.get(
     "/runs/{run_id}",
     response_model=RunStatusResponse,
@@ -504,7 +594,7 @@ def get_run_status(
         started_at=run.started_at,
         finished_at=run.finished_at,
         exit_code=run.exit_code,
-        command=run.command,
+        command=run.display_command,
         pid=run.pid,
         cancel_requested=run.cancel_requested,
         owner_user_id=run.owner_user_id,
