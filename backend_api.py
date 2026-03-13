@@ -167,6 +167,9 @@ class RunRequest(BaseModel):
     oauth_access_token_expires_at: Optional[str] = None
     oauth_account_id: Optional[str] = None
 
+    class Config:
+        extra = "forbid"
+
 
 class RunCreateResponse(BaseModel):
     run_id: str

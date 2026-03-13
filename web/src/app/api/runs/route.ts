@@ -30,6 +30,75 @@ type GoogleAccessTokenPayload = {
 
 const REQUIRED_GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.compose"] as const;
 const MODES_REQUIRING_GMAIL_CONTEXT = new Set(["pipeline", "drafts"]);
+const ACCEPTED_RUN_REQUEST_FIELDS = new Set([
+  "mode",
+  "zone",
+  "dry_run",
+  "python",
+  "max_minutes",
+  "max_sites",
+  "target_found",
+  "workers",
+  "focus",
+  "enable_sitemap",
+  "insecure",
+  "rh_only",
+  "draft_file",
+  "template",
+  "out_dir",
+  "use_ai",
+  "ai_model",
+  "sender_first_name",
+  "sender_last_name",
+  "sender_linkedin_url",
+  "mail_subject_template",
+  "mail_body_template",
+  "cv",
+  "lm_suffix",
+  "no_lm",
+  "lm",
+  "credentials",
+  "token",
+  "sleep",
+  "max",
+  "console_auth",
+  "resume_log",
+]);
+const BACKEND_RUN_FIELDS = new Set([
+  ...ACCEPTED_RUN_REQUEST_FIELDS,
+  "oauth_access_token",
+  "oauth_refresh_token",
+  "oauth_client_id",
+  "oauth_client_secret",
+  "oauth_token_uri",
+  "oauth_scope",
+  "oauth_access_token_expires_at",
+  "oauth_account_id",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getUnknownFields(
+  payload: Record<string, unknown>,
+  allowedFields: ReadonlySet<string>,
+): string[] {
+  return Object.keys(payload).filter((key) => !allowedFields.has(key));
+}
+
+function pickAllowedFields(
+  payload: Record<string, unknown>,
+  allowedFields: ReadonlySet<string>,
+): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (allowedFields.has(key)) {
+      filtered[key] = value;
+    }
+  }
+  return filtered;
+}
 
 function buildUserScopedHeaders(user: SessionUser): HeadersInit {
   const scopedHeaders: Record<string, string> = {};
@@ -200,12 +269,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let payload: Record<string, unknown>;
   try {
-    payload = (await request.json()) as Record<string, unknown>;
+    const parsed = (await request.json()) as unknown;
+    if (!isRecord(parsed)) {
+      return NextResponse.json(
+        { detail: "Payload JSON invalide. Objet JSON attendu." },
+        { status: 400 },
+      );
+    }
+    payload = parsed;
   } catch {
     return NextResponse.json({ detail: "Payload JSON invalide." }, { status: 400 });
   }
 
-  let bodyPayload: Record<string, unknown> = payload;
+  const unknownFields = getUnknownFields(payload, ACCEPTED_RUN_REQUEST_FIELDS);
+  if (unknownFields.length > 0) {
+    return NextResponse.json(
+      {
+        detail: `Champs non autorises pour /api/runs: ${unknownFields.sort().join(", ")}`,
+      },
+      { status: 400 },
+    );
+  }
+
+  let bodyPayload: Record<string, unknown> = pickAllowedFields(payload, BACKEND_RUN_FIELDS);
 
   const userId = authResult.value.user.id?.trim();
   if (userId) {
@@ -226,18 +312,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  if (shouldRequireGmailContext(payload)) {
+  if (shouldRequireGmailContext(bodyPayload)) {
     const oauthContext = await resolveGoogleOAuthRunContext();
     if (!oauthContext.ok) {
       return oauthContext.response;
     }
     bodyPayload = {
-      ...payload,
+      ...bodyPayload,
       ...oauthContext.payload,
     };
   }
 
-  const body = JSON.stringify(bodyPayload);
+  const body = JSON.stringify(pickAllowedFields(bodyPayload, BACKEND_RUN_FIELDS));
   return forward("/runs", authResult.value.user, { method: "POST", body });
 }
 
