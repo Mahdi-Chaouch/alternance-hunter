@@ -144,6 +144,16 @@ def build_hunter_cmd(args: argparse.Namespace) -> List[str]:
         "--drafts-txt",
         args.draft_file,
     ]
+    if args.sender_first_name:
+        cmd.extend(["--sender-first-name", args.sender_first_name])
+    if args.sender_last_name:
+        cmd.extend(["--sender-last-name", args.sender_last_name])
+    if args.sender_linkedin_url:
+        cmd.extend(["--sender-linkedin-url", args.sender_linkedin_url])
+    if args.mail_subject_template:
+        cmd.extend(["--mail-subject-template", args.mail_subject_template])
+    if args.mail_body_template:
+        cmd.extend(["--mail-body-template", args.mail_body_template])
 
     zone_filter = _zone_to_hunter_filter(args.zone)
     if zone_filter:
@@ -274,6 +284,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", default="outputs/letters")
     parser.add_argument("--use-ai", action="store_true")
     parser.add_argument("--ai-model", default="gpt-4o-mini")
+    parser.add_argument("--sender-first-name", default="")
+    parser.add_argument("--sender-last-name", default="")
+    parser.add_argument("--sender-linkedin-url", default="")
+    parser.add_argument("--mail-subject-template", default="")
+    parser.add_argument("--mail-body-template", default="")
 
     # Drafts Gmail
     parser.add_argument("--cv", default="assets/CV.pdf")

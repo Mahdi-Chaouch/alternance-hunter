@@ -4,6 +4,7 @@ import { getAuthHeaders, getBackendConfig } from "@/lib/backend";
 import { requireApiAuthorizedSession } from "@/lib/auth-guard";
 import { auth } from "@/lib/auth";
 import { readJsonSafely } from "@/lib/http";
+import { getUserProfile } from "@/lib/user-profile";
 
 type RequestInitWithJson = RequestInit & {
   body?: string;
@@ -205,6 +206,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   let bodyPayload: Record<string, unknown> = payload;
+
+  const userId = authResult.value.user.id?.trim();
+  if (userId) {
+    try {
+      const profile = await getUserProfile(userId);
+      if (profile) {
+        bodyPayload = {
+          ...bodyPayload,
+          sender_first_name: profile.first_name,
+          sender_last_name: profile.last_name,
+          sender_linkedin_url: profile.linkedin_url,
+          mail_subject_template: profile.subject_template,
+          mail_body_template: profile.body_template,
+        };
+      }
+    } catch {
+      // Non-blocking: runs can continue without custom profile data.
+    }
+  }
+
   if (shouldRequireGmailContext(payload)) {
     const oauthContext = await resolveGoogleOAuthRunContext();
     if (!oauthContext.ok) {

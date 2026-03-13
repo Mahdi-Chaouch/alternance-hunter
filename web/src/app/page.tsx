@@ -145,6 +145,14 @@ export default function Home() {
   const [googleAccountLinked, setGoogleAccountLinked] = useState(false);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [mailSubjectTemplate, setMailSubjectTemplate] = useState("");
+  const [mailBodyTemplate, setMailBodyTemplate] = useState("");
+  const [profileInfo, setProfileInfo] = useState("");
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const [isUploadingAssets, setIsUploadingAssets] = useState(false);
@@ -301,6 +309,64 @@ export default function Home() {
     void refreshAll();
   }, [accessState, refreshAll]);
 
+  useEffect(() => {
+    if (accessState !== "granted") {
+      return;
+    }
+    let cancelled = false;
+
+    async function loadProfile() {
+      setIsProfileLoading(true);
+      try {
+        const response = await fetch("/api/profile", { cache: "no-store" });
+        const data = (await safeJson<{
+          detail?: string;
+          profile?: {
+            first_name?: string;
+            last_name?: string;
+            linkedin_url?: string;
+            subject_template?: string;
+            body_template?: string;
+          };
+        }>(response)) as {
+          detail?: string;
+          profile?: {
+            first_name?: string;
+            last_name?: string;
+            linkedin_url?: string;
+            subject_template?: string;
+            body_template?: string;
+          };
+        };
+        if (!response.ok) {
+          throw new Error(data.detail ?? "Impossible de charger votre profil.");
+        }
+        if (cancelled) {
+          return;
+        }
+        setFirstName(data.profile?.first_name ?? "");
+        setLastName(data.profile?.last_name ?? "");
+        setLinkedinUrl(data.profile?.linkedin_url ?? "");
+        setMailSubjectTemplate(data.profile?.subject_template ?? "");
+        setMailBodyTemplate(data.profile?.body_template ?? "");
+      } catch (err) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : "Erreur de chargement du profil.";
+          setError(message);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsProfileLoading(false);
+        }
+      }
+    }
+
+    void loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessState]);
+
   const activeRun = useMemo(
     () => runs.find((run) => run.run_id === activeRunId) ?? null,
     [runs, activeRunId],
@@ -409,6 +475,11 @@ export default function Home() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("Renseignez votre prenom et nom dans 'Profil expediteur' avant de lancer.");
+      setInfo("");
+      return;
+    }
     if (draftsRequireGmail) {
       setError(
         "Connexion Gmail requise pour le mode brouillons. Connectez votre compte Google puis reessayez.",
@@ -530,6 +601,48 @@ export default function Home() {
       setError(message);
     } finally {
       setIsUploadingAssets(false);
+    }
+  }
+
+  async function onSaveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedFirstName = firstName.trim();
+    const normalizedLastName = lastName.trim();
+    if (!normalizedFirstName || !normalizedLastName) {
+      setError("Le prenom et le nom sont obligatoires.");
+      setProfileInfo("");
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setError("");
+    setInfo("");
+    setProfileInfo("");
+    try {
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          first_name: normalizedFirstName,
+          last_name: normalizedLastName,
+          linkedin_url: linkedinUrl,
+          subject_template: mailSubjectTemplate,
+          body_template: mailBodyTemplate,
+        }),
+      });
+      const data = (await safeJson<{ ok?: boolean; detail?: string }>(response)) as {
+        ok?: boolean;
+        detail?: string;
+      };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.detail ?? "Impossible de sauvegarder le profil.");
+      }
+      setProfileInfo("Profil enregistre. Vos prochains mails utiliseront ces informations.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur inconnue lors de la sauvegarde.";
+      setError(message);
+    } finally {
+      setIsSavingProfile(false);
     }
   }
 
@@ -679,6 +792,69 @@ export default function Home() {
             <p className={styles.sectionHint}>
               Definissez les parametres principaux avant de lancer une execution.
             </p>
+            <form className={styles.profileCard} onSubmit={onSaveProfile}>
+              <p className={styles.uploadTitle}>Profil expediteur</p>
+              <p className={styles.uploadHint}>
+                Premiere connexion: renseignez votre prenom/nom. Vous pouvez personnaliser le sujet
+                et le corps complet du mail avec des placeholders ({`{{ENTREPRISE}}`},{" "}
+                {`{{NOM_COMPLET}}`}, {`{{PRENOM}}`}, {`{{NOM}}`}, {`{{LINKEDIN}}`}).
+              </p>
+              <div className={styles.uploadGrid}>
+                <label>
+                  Prenom
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Nom
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
+                </label>
+              </div>
+              <label>
+                LinkedIn (optionnel)
+                <input
+                  type="url"
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                  placeholder="https://www.linkedin.com/in/votre-profil"
+                />
+              </label>
+              <label>
+                Sujet personnalise (optionnel)
+                <input
+                  type="text"
+                  value={mailSubjectTemplate}
+                  onChange={(e) => setMailSubjectTemplate(e.target.value)}
+                  placeholder="Ex: Candidature alternance - {{ENTREPRISE}} - {{NOM_COMPLET}}"
+                />
+              </label>
+              <label>
+                Corps du mail personnalise (optionnel)
+                <textarea
+                  value={mailBodyTemplate}
+                  onChange={(e) => setMailBodyTemplate(e.target.value)}
+                  rows={8}
+                  placeholder={"Ex: Bonjour,\nJe suis {{NOM_COMPLET}} et je candidate chez {{ENTREPRISE}}."}
+                />
+              </label>
+              <button className={styles.secondaryBtn} type="submit" disabled={isSavingProfile}>
+                {isSavingProfile
+                  ? "Sauvegarde..."
+                  : isProfileLoading
+                    ? "Chargement du profil..."
+                    : "Enregistrer mon profil"}
+              </button>
+              {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
+            </form>
             <form className={styles.uploadCard} onSubmit={onUploadAssets}>
               <p className={styles.uploadTitle}>Vos documents</p>
               <p className={styles.uploadHint}>
