@@ -1242,15 +1242,33 @@ export default function Home() {
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
             <h2>Details de execution</h2>
-            <button
-              className={styles.dangerBtn}
-              type="button"
-              onClick={onCancelRun}
-              disabled={!activeRun || END_STATUSES.has(activeRun.status) || isCancellingRun}
-            >
-              {isCancellingRun ? "Annulation..." : "Annuler l'execution"}
-            </button>
+            <div className={styles.panelHeaderActions}>
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                disabled={!activeRun || !isRunning}
+                onClick={() =>
+                  setInfo(
+                    "Les donnees sont deja enregistrees au fur et a mesure. En annulant, tout le travail deja effectue restera sauvegarde (entreprises, brouillons, lettres de motivation).",
+                  )
+                }
+              >
+                Sauvegarder l'etat actuel
+              </button>
+              <button
+                className={styles.dangerBtn}
+                type="button"
+                onClick={onCancelRun}
+                disabled={!activeRun || END_STATUSES.has(activeRun.status) || isCancellingRun}
+              >
+                {isCancellingRun ? "Annulation..." : "Annuler l'execution"}
+              </button>
+            </div>
           </div>
+          <p className={styles.runSaveNote}>
+            L'annulation conserve les donnees deja enregistrees (entreprises trouvees, brouillons,
+            lettres de motivation).
+          </p>
           {!activeRunId ? (
             <p className={styles.emptyState}>
               Selectionnez une execution dans le tableau pour afficher les details et les logs.
