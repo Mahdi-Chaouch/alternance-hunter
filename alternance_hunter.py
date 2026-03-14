@@ -772,6 +772,7 @@ def build_email_draft(
     sender_first_name: str,
     sender_last_name: str,
     sender_linkedin_url: str,
+    sender_portfolio_url: str,
     custom_subject_template: str,
     custom_body_template: str,
 ) -> Tuple[str, str]:
@@ -783,11 +784,24 @@ def build_email_draft(
         "NOM": sender_last_name.strip(),
         "NOM_COMPLET": display_name,
         "LINKEDIN": sender_linkedin_url.strip(),
+        "PORTFOLIO": sender_portfolio_url.strip(),
         "DATE": "Septembre 2026",
     }
 
     default_subject = "Candidature spontanee - Alternance Developpeur Web - {{DATE}} - {{ENTREPRISE}}"
-    default_body = """Madame, Monsieur,
+
+    footer_lines = [
+        "Cordialement,",
+        "{{NOM_COMPLET}}",
+    ]
+    if variables["LINKEDIN"]:
+        footer_lines.append("LinkedIn : {{LINKEDIN}}")
+    if variables["PORTFOLIO"]:
+        footer_lines.append("Portfolio : {{PORTFOLIO}}")
+
+    footer = "\n".join(footer_lines)
+
+    default_body = f"""Madame, Monsieur,
 
 Je suis a la recherche d'une alternance en developpement web a partir de {{DATE}}.
 
@@ -795,9 +809,7 @@ Je souhaite rejoindre {{ENTREPRISE}} afin de contribuer a des projets concrets e
 
 Je vous joins mon CV et ma lettre de motivation en pieces jointes.
 
-Cordialement,
-{{NOM_COMPLET}}
-LinkedIn : {{LINKEDIN}}
+{footer}
 """
     subject_template = custom_subject_template.strip() or default_subject
     body_template = custom_body_template.strip() or default_body
@@ -894,6 +906,7 @@ def run_email_finder(
     sender_linkedin_url: str,
     mail_subject_template: str,
     mail_body_template: str,
+    sender_portfolio_url: str,
     rh_only: bool = False,
 ) -> None:
     fieldnames = ["entreprise", "zone", "ville", "site", "score", "status", "email", "source_url", "contact_urls", "reason"]
@@ -980,6 +993,7 @@ def run_email_finder(
                                     sender_first_name=sender_first_name,
                                     sender_last_name=sender_last_name,
                                     sender_linkedin_url=sender_linkedin_url,
+                                    sender_portfolio_url=sender_portfolio_url,
                                     custom_subject_template=mail_subject_template,
                                     custom_body_template=mail_body_template,
                                 )
@@ -1073,6 +1087,7 @@ def parse_args():
     p.add_argument("--sender-first-name", type=str, default="", help="Prenom du candidat.")
     p.add_argument("--sender-last-name", type=str, default="", help="Nom du candidat.")
     p.add_argument("--sender-linkedin-url", type=str, default="", help="Profil LinkedIn du candidat.")
+    p.add_argument("--sender-portfolio-url", type=str, default="", help="URL de portfolio du candidat (optionnel).")
     p.add_argument("--mail-subject-template", type=str, default="",
                    help="Template de sujet avec placeholders (ex: {{ENTREPRISE}}, {{NOM_COMPLET}}).")
     p.add_argument("--mail-body-template", type=str, default="",
@@ -1110,6 +1125,7 @@ def main():
         sender_first_name=args.sender_first_name,
         sender_last_name=args.sender_last_name,
         sender_linkedin_url=args.sender_linkedin_url or LINKEDIN,
+        sender_portfolio_url=args.sender_portfolio_url,
         mail_subject_template=args.mail_subject_template,
         mail_body_template=args.mail_body_template,
         rh_only=args.rh_only,

@@ -25,15 +25,6 @@ from typing import List
 import re
 
 
-ZONE_MAP = {
-    "paris": "Paris",
-    "cannes": "Cannes",
-    "auxerre": "Auxerre",
-    "fontainebleau": "Fontainebleau",
-    "all": "",
-}
-
-
 def _project_root() -> Path:
     return Path(__file__).resolve().parent
 
@@ -70,11 +61,12 @@ def _python_cmd(python_executable: str) -> List[str]:
 
 
 def _zone_to_hunter_filter(zone: str) -> str:
-    normalized = (zone or "all").strip().lower()
-    if normalized not in ZONE_MAP:
-        valid = ", ".join(ZONE_MAP.keys())
-        raise SystemExit(f"Zone invalide '{zone}'. Zones supportees: {valid}")
-    return ZONE_MAP[normalized]
+    """
+    Transforme la zone libre en filtre pour alternance_hunter:
+    - chaine vide => toutes les zones
+    - sinon: renvoyee telle quelle (ex: 'Paris, Lyon, Lille')
+    """
+    return (zone or "").strip()
 
 
 def _sanitize_user_key(raw: str) -> str:
@@ -156,6 +148,8 @@ def build_hunter_cmd(args: argparse.Namespace) -> List[str]:
         cmd.extend(["--sender-last-name", args.sender_last_name])
     if args.sender_linkedin_url:
         cmd.extend(["--sender-linkedin-url", args.sender_linkedin_url])
+    if getattr(args, "sender_portfolio_url", ""):
+        cmd.extend(["--sender-portfolio-url", args.sender_portfolio_url])
     if args.mail_subject_template:
         cmd.extend(["--mail-subject-template", args.mail_subject_template])
     if args.mail_body_template:
@@ -293,6 +287,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sender-first-name", default="")
     parser.add_argument("--sender-last-name", default="")
     parser.add_argument("--sender-linkedin-url", default="")
+    parser.add_argument("--sender-portfolio-url", default="")
     parser.add_argument("--mail-subject-template", default="")
     parser.add_argument("--mail-body-template", default="")
 

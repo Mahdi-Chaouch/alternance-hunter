@@ -6,6 +6,7 @@ type StoredUserProfile = {
   first_name: string;
   last_name: string;
   linkedin_url: string;
+  portfolio_url: string;
   subject_template: string;
   body_template: string;
   run_mode: string;
@@ -23,6 +24,7 @@ type UserProfileInput = {
   firstName: string;
   lastName: string;
   linkedinUrl: string;
+  portfolioUrl: string;
   subjectTemplate: string;
   bodyTemplate: string;
   runMode: string;
@@ -64,6 +66,7 @@ async function ensureUserProfileTable(): Promise<void> {
       first_name TEXT NOT NULL DEFAULT '',
       last_name TEXT NOT NULL DEFAULT '',
       linkedin_url TEXT NOT NULL DEFAULT '',
+      portfolio_url TEXT NOT NULL DEFAULT '',
       subject_template TEXT NOT NULL DEFAULT '',
       body_template TEXT NOT NULL DEFAULT '',
       run_mode TEXT NOT NULL DEFAULT 'pipeline',
@@ -86,6 +89,7 @@ async function ensureUserProfileTable(): Promise<void> {
       ADD COLUMN IF NOT EXISTS run_max_sites INTEGER NOT NULL DEFAULT 1500,
       ADD COLUMN IF NOT EXISTS run_target_found INTEGER NOT NULL DEFAULT 100,
       ADD COLUMN IF NOT EXISTS run_workers INTEGER NOT NULL DEFAULT 20,
+      ADD COLUMN IF NOT EXISTS portfolio_url TEXT NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS run_use_ai BOOLEAN NOT NULL DEFAULT FALSE;
   `);
   profileTableReady = true;
@@ -95,8 +99,8 @@ export async function getUserProfile(userId: string): Promise<StoredUserProfile 
   await ensureUserProfileTable();
   const result = await userProfilePool.query<StoredUserProfile>(
     `SELECT user_id, email, first_name, last_name, linkedin_url, subject_template, body_template,
-            run_mode, run_zone, run_dry_run, run_max_minutes, run_max_sites, run_target_found,
-            run_workers, run_use_ai, updated_at
+            portfolio_url, run_mode, run_zone, run_dry_run, run_max_minutes, run_max_sites,
+            run_target_found, run_workers, run_use_ai, updated_at
      FROM run_user_profiles
      WHERE user_id = $1`,
     [userId],
@@ -112,16 +116,17 @@ export async function upsertUserProfile(
   await ensureUserProfileTable();
   const result = await userProfilePool.query<StoredUserProfile>(
     `INSERT INTO run_user_profiles
-      (user_id, email, first_name, last_name, linkedin_url, subject_template, body_template,
+      (user_id, email, first_name, last_name, linkedin_url, portfolio_url, subject_template, body_template,
        run_mode, run_zone, run_dry_run, run_max_minutes, run_max_sites, run_target_found, run_workers,
        run_use_ai, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
      ON CONFLICT (user_id)
      DO UPDATE SET
        email = EXCLUDED.email,
        first_name = EXCLUDED.first_name,
        last_name = EXCLUDED.last_name,
        linkedin_url = EXCLUDED.linkedin_url,
+       portfolio_url = EXCLUDED.portfolio_url,
        subject_template = EXCLUDED.subject_template,
        body_template = EXCLUDED.body_template,
        run_mode = EXCLUDED.run_mode,
@@ -133,15 +138,17 @@ export async function upsertUserProfile(
        run_workers = EXCLUDED.run_workers,
        run_use_ai = EXCLUDED.run_use_ai,
        updated_at = NOW()
-     RETURNING user_id, email, first_name, last_name, linkedin_url, subject_template, body_template,
-               run_mode, run_zone, run_dry_run, run_max_minutes, run_max_sites, run_target_found,
-               run_workers, run_use_ai, updated_at`,
+     RETURNING user_id, email, first_name, last_name, linkedin_url, portfolio_url,
+               subject_template, body_template, run_mode, run_zone, run_dry_run,
+               run_max_minutes, run_max_sites, run_target_found, run_workers, run_use_ai,
+               updated_at`,
     [
       userId,
       email,
       input.firstName.trim(),
       input.lastName.trim(),
       input.linkedinUrl.trim(),
+      input.portfolioUrl.trim(),
       input.subjectTemplate,
       input.bodyTemplate,
       input.runMode,
