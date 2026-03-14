@@ -5,7 +5,11 @@ import { Pool } from "pg";
 const DATABASE_URL =
   process.env.DATABASE_URL ??
   "postgres://postgres:postgres@127.0.0.1:5432/alternance_mails";
-const BETTER_AUTH_URL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+const rawAuthUrl = process.env.BETTER_AUTH_URL ?? process.env.VERCEL_URL ?? "http://localhost:3000";
+const BETTER_AUTH_URL =
+  rawAuthUrl.startsWith("http://") || rawAuthUrl.startsWith("https://")
+    ? rawAuthUrl
+    : `https://${rawAuthUrl}`;
 const BETTER_AUTH_SECRET =
   process.env.BETTER_AUTH_SECRET ??
   "6e336476a781adb941ad19e299ed7d34761f794d13a6078ff367c040923184af";
