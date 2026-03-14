@@ -476,6 +476,7 @@ function DashboardContent() {
             first_name?: string;
             last_name?: string;
             linkedin_url?: string;
+            portfolio_url?: string;
             subject_template?: string;
             body_template?: string;
             run_mode?: RunMode;
@@ -493,6 +494,7 @@ function DashboardContent() {
             first_name?: string;
             last_name?: string;
             linkedin_url?: string;
+            portfolio_url?: string;
             subject_template?: string;
             body_template?: string;
             run_mode?: RunMode;
