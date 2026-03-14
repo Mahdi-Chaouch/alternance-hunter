@@ -449,6 +449,55 @@
   gap: 0.65rem;
 }
 
+.zoneField {
+  position: relative;
+}
+
+.zoneSuggestions {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  border-radius: 0.6rem;
+  background: var(--panel);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.zoneSuggestionItem {
+  width: 100%;
+  padding: 0.35rem 0.7rem;
+  text-align: left;
+  border: none;
+  background: transparent;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.zoneSuggestionItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fieldError {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: #ff4d4f;
+}
+
+.profileSaveBlock {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .uploadTitle {
   margin: 0;
   font-weight: 700;

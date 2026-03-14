@@ -60,6 +60,21 @@ const MODE_LABELS: Record<RunMode, string> = {
 const ZONE_PLACEHOLDER =
   "Ex: Paris, Lyon, Lille (laissez vide pour toute la France)";
 
+const KNOWN_ZONES: readonly Zone[] = [
+  "all",
+  "Paris",
+  "Lyon",
+  "Lille",
+  "Marseille",
+  "Toulouse",
+  "Bordeaux",
+  "Nantes",
+  "Rennes",
+  "Nice",
+  "Strasbourg",
+  "Montpellier",
+];
+
 async function safeJson<T>(response: Response): Promise<T | Record<string, unknown>> {
   const rawBody = await response.text();
   if (!rawBody) {
@@ -258,6 +273,10 @@ function DashboardContent() {
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [mode, setMode] = useState<RunMode>("pipeline");
   const [zone, setZone] = useState<Zone>("all");
+  const [zoneQuery, setZoneQuery] = useState("");
+  const [zoneSuggestions, setZoneSuggestions] = useState<Zone[]>([]);
+  const [zoneError, setZoneError] = useState("");
+  const [isZoneFocused, setIsZoneFocused] = useState(false);
   const [dryRun, setDryRun] = useState(false);
   const [maxMinutes, setMaxMinutes] = useState(30);
   const [maxSites, setMaxSites] = useState(1500);
@@ -524,6 +543,7 @@ function DashboardContent() {
         }
         if (data.profile?.run_zone) {
           setZone(data.profile.run_zone);
+          setZoneQuery(data.profile.run_zone);
         }
         setDryRun(Boolean(data.profile?.run_dry_run));
         setMaxMinutes(Number(data.profile?.run_max_minutes ?? 30));
@@ -731,6 +751,18 @@ function DashboardContent() {
       setError(
         "Connexion Gmail requise pour le mode brouillons. Connectez votre compte Google puis reessayez.",
       );
+      setInfo("");
+      return;
+    }
+    const trimmedZone = zone.trim();
+    if (
+      trimmedZone &&
+      !KNOWN_ZONES.some((z) => z.toLowerCase() === trimmedZone.toLowerCase())
+    ) {
+      const message =
+        "Zone geographique invalide. Choisissez une suggestion ou laissez vide pour toute la France.";
+      setZoneError(message);
+      setError(message);
       setInfo("");
       return;
     }
@@ -1198,7 +1230,7 @@ function DashboardContent() {
             <p className={styles.sectionHint}>
               Renseignez votre profil et personnalisez vos emails avant de lancer une recherche.
             </p>
-            <form className={styles.profileCard} onSubmit={onSaveProfile}>
+            <form id="profile-form" className={styles.profileCard} onSubmit={onSaveProfile}>
               <p className={styles.uploadTitle}>👤 Profil expediteur</p>
               <p className={styles.uploadHint}>
                 Premiere connexion: renseignez votre prenom/nom. Vous pouvez personnaliser le sujet et
@@ -1262,21 +1294,12 @@ function DashboardContent() {
                   placeholder={"Ex: Bonjour,\nJe suis à la recherche d'une alternance en {{DATE}}.\nJe candidate chez {{ENTREPRISE}}."}
                 />
               </label>
-              <button className={styles.secondaryBtn} type="submit" disabled={isSavingProfile || showDemoBanner}>
-                {isSavingProfile
-                  ? "Sauvegarde..."
-                  : showDemoBanner
-                    ? "Connectez-vous pour enregistrer"
-                    : isProfileLoading
-                      ? "Chargement du profil..."
-                      : "💾 Enregistrer mon profil"}
-              </button>
-              {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
             </form>
             <form className={styles.uploadCard} onSubmit={onUploadAssets} id="step-documents">
               <p className={styles.uploadTitle}>📁 Vos documents</p>
               <p className={styles.uploadHint}>
                 Déposez votre <strong>CV (PDF, obligatoire)</strong> et votre <strong>template de lettre de motivation</strong> (.docx). Sans CV, vous ne pourrez pas lancer de recherche.
+                {cvUploaded || templateUploaded ? " Vos documents sont enregistrés et conservés pour vos prochaines visites. Vous pouvez en déposer de nouveaux pour les remplacer." : ""}
               </p>
               <div
                 className={`${styles.dropZone} ${isDraggingDocs ? styles.dropZoneActive : ""} ${(cvFile || templateFile) ? styles.dropZoneHasFiles : ""}`}
@@ -1320,6 +1343,18 @@ function DashboardContent() {
               {assetInfo ? <p className={styles.uploadSuccess}>{assetInfo}</p> : null}
               {draftInfo ? <p className={styles.uploadHint}>{draftInfo}</p> : null}
             </form>
+            <div className={styles.profileSaveBlock}>
+              <button form="profile-form" className={styles.secondaryBtn} type="submit" disabled={isSavingProfile || showDemoBanner}>
+                {isSavingProfile
+                  ? "Sauvegarde..."
+                  : showDemoBanner
+                    ? "Connectez-vous pour enregistrer"
+                    : isProfileLoading
+                      ? "Chargement du profil..."
+                      : "💾 Enregistrer mon profil"}
+              </button>
+              {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
+            </div>
             <form
               id="pipeline-config-form"
               className={styles.form}
@@ -1341,14 +1376,70 @@ function DashboardContent() {
                   </select>
                 </label>
 
-                <label>
+                <label className={styles.zoneField}>
                   Zone geographique (optionnel)
                   <input
                     type="text"
-                    value={zone}
-                    onChange={(e) => setZone(e.target.value)}
+                    value={zoneQuery}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setZoneQuery(value);
+                      setZone(value);
+                      setZoneError("");
+                      const trimmed = value.trim().toLowerCase();
+                      if (!trimmed) {
+                        setZoneSuggestions([]);
+                        return;
+                      }
+                      setZoneSuggestions(
+                        KNOWN_ZONES.filter(
+                          (z) => z !== "all" && z.toLowerCase().includes(trimmed),
+                        ).slice(0, 8),
+                      );
+                    }}
                     placeholder={ZONE_PLACEHOLDER}
+                    onFocus={() => {
+                      setIsZoneFocused(true);
+                      const trimmed = zoneQuery.trim().toLowerCase();
+                      if (!trimmed) {
+                        setZoneSuggestions([]);
+                        return;
+                      }
+                      setZoneSuggestions(
+                        KNOWN_ZONES.filter(
+                          (z) => z !== "all" && z.toLowerCase().includes(trimmed),
+                        ).slice(0, 8),
+                      );
+                    }}
+                    onBlur={() => {
+                      window.setTimeout(() => {
+                        setIsZoneFocused(false);
+                      }, 100);
+                    }}
+                    autoComplete="off"
                   />
+                  {isZoneFocused && zoneSuggestions.length > 0 ? (
+                    <ul className={styles.zoneSuggestions}>
+                      {zoneSuggestions.map((suggestion) => (
+                        <li key={suggestion}>
+                          <button
+                            type="button"
+                            className={styles.zoneSuggestionItem}
+                            onClick={() => {
+                              setZone(suggestion);
+                              setZoneQuery(suggestion);
+                              setZoneSuggestions([]);
+                              setIsZoneFocused(false);
+                              setZoneError("");
+                            }}
+                          >
+                            {suggestion}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {zoneError ? <p className={styles.fieldError}>{zoneError}</p> : null}
                 </label>
 
                 <label>
