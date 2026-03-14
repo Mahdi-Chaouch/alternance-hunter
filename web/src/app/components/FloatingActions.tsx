@@ -7,11 +7,11 @@ type Theme = "light" | "dark";
 
 export function FloatingActions() {
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
     const saved = window.localStorage.getItem(THEME_KEY);
-    const initial: Theme = saved === "dark" || saved === "light" ? saved : "light";
+    const initial: Theme = saved === "dark" || saved === "light" ? saved : "dark";
     setTheme(initial);
     document.documentElement.dataset.theme = initial;
   }, []);
