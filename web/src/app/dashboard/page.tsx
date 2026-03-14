@@ -275,8 +275,8 @@ function DashboardContent() {
   const [zone, setZone] = useState<Zone>("all");
   const [zoneQuery, setZoneQuery] = useState("");
   const [zoneSuggestions, setZoneSuggestions] = useState<Zone[]>([]);
-  const [zoneError, setZoneError] = useState("");
   const [isZoneFocused, setIsZoneFocused] = useState(false);
+  const [zoneValid, setZoneValid] = useState(false);
   const [dryRun, setDryRun] = useState(false);
   const [maxMinutes, setMaxMinutes] = useState(30);
   const [maxSites, setMaxSites] = useState(1500);
@@ -544,6 +544,14 @@ function DashboardContent() {
         if (data.profile?.run_zone) {
           setZone(data.profile.run_zone);
           setZoneQuery(data.profile.run_zone);
+          const trimmedZone = data.profile.run_zone.trim().toLowerCase();
+          if (
+            trimmedZone &&
+            KNOWN_ZONES.some((z) => z.toLowerCase() === trimmedZone) &&
+            trimmedZone !== "all"
+          ) {
+            setZoneValid(true);
+          }
         }
         setDryRun(Boolean(data.profile?.run_dry_run));
         setMaxMinutes(Number(data.profile?.run_max_minutes ?? 30));
@@ -754,18 +762,6 @@ function DashboardContent() {
       setInfo("");
       return;
     }
-    const trimmedZone = zone.trim();
-    if (
-      trimmedZone &&
-      !KNOWN_ZONES.some((z) => z.toLowerCase() === trimmedZone.toLowerCase())
-    ) {
-      const message =
-        "Zone geographique invalide. Choisissez une suggestion ou laissez vide pour toute la France.";
-      setZoneError(message);
-      setError(message);
-      setInfo("");
-      return;
-    }
     setIsLaunchingRun(true);
     setError("");
     setInfo("");
@@ -786,11 +782,24 @@ function DashboardContent() {
         body: JSON.stringify(payload),
       });
 
-      const data = (await safeJson<{ run_id?: string; detail?: string; message?: string }>(
-        response,
-      )) as { run_id?: string; detail?: string; message?: string };
+      const data = (await safeJson<{
+        run_id?: string;
+        detail?: unknown;
+        message?: unknown;
+      }>(response)) as { run_id?: string; detail?: unknown; message?: unknown };
       if (!response.ok || !data.run_id) {
-        throw new Error(data.detail ?? data.message ?? "Échec du lancement de la recherche.");
+        const rawDetail = data.detail ?? data.message;
+        let friendlyMessage = "Échec du lancement de la recherche.";
+        if (typeof rawDetail === "string" && rawDetail.trim()) {
+          friendlyMessage = rawDetail.trim();
+        } else if (rawDetail && typeof rawDetail === "object") {
+          try {
+            friendlyMessage = JSON.stringify(rawDetail);
+          } catch {
+            // ignore, keep default message
+          }
+        }
+        throw new Error(friendlyMessage);
       }
 
       setInfo(`Recherche lancée.`);
@@ -1355,37 +1364,28 @@ function DashboardContent() {
               </button>
               {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
             </div>
-            <form
-              id="pipeline-config-form"
-              className={styles.form}
-              onSubmit={onSubmit}
-              aria-label="Paramètres de la recherche"
-            >
-              <h3 id="step-config" className={styles.sectionTitle}>
-                ⚙️ Etape 3 – Options de recherche
+            <section className={styles.zoneCard} aria-labelledby="step-zone">
+              <h3 id="step-zone" className={styles.sectionTitle}>
+                🗺️ Etape 3 – Zone geographique
               </h3>
-              <div className={styles.inputGrid}>
-                <label>
-                  Type de recherche
-                  <select value={mode} onChange={(e) => setMode(e.target.value as RunMode)}>
-                    {(Object.keys(MODE_LABELS) as RunMode[]).map((option) => (
-                      <option key={option} value={option}>
-                        {MODE_LABELS[option]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
+              <p className={styles.sectionHint}>
+                Choisissez une zone geographique pour affiner la recherche. Vous pouvez taper une
+                ville et selectionner une suggestion, ou laisser vide pour toute la France.
+              </p>
+              <div className={styles.zoneFieldRow}>
                 <label className={styles.zoneField}>
                   Zone geographique (optionnel)
                   <input
                     type="text"
+                    className={`${styles.zoneFieldInput} ${
+                      zoneValid ? styles.zoneFieldInputValid : ""
+                    }`}
                     value={zoneQuery}
                     onChange={(e) => {
                       const value = e.target.value;
                       setZoneQuery(value);
                       setZone(value);
-                      setZoneError("");
+                      setZoneValid(false);
                       const trimmed = value.trim().toLowerCase();
                       if (!trimmed) {
                         setZoneSuggestions([]);
@@ -1430,7 +1430,7 @@ function DashboardContent() {
                               setZoneQuery(suggestion);
                               setZoneSuggestions([]);
                               setIsZoneFocused(false);
-                              setZoneError("");
+                              setZoneValid(true);
                             }}
                           >
                             {suggestion}
@@ -1439,7 +1439,34 @@ function DashboardContent() {
                       ))}
                     </ul>
                   ) : null}
-                  {zoneError ? <p className={styles.fieldError}>{zoneError}</p> : null}
+                </label>
+                {zoneValid ? (
+                  <div className={styles.zoneValidBadge} aria-live="polite">
+                    ✅ Zone reconnue
+                  </div>
+                ) : null}
+              </div>
+            </section>
+
+            <form
+              id="pipeline-config-form"
+              className={styles.form}
+              onSubmit={onSubmit}
+              aria-label="Paramètres de la recherche"
+            >
+              <h3 id="step-config" className={styles.sectionTitle}>
+                ⚙️ Etape 4 – Options de recherche
+              </h3>
+              <div className={styles.inputGrid}>
+                <label>
+                  Type de recherche
+                  <select value={mode} onChange={(e) => setMode(e.target.value as RunMode)}>
+                    {(Object.keys(MODE_LABELS) as RunMode[]).map((option) => (
+                      <option key={option} value={option}>
+                        {MODE_LABELS[option]}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label>
