@@ -27,6 +27,14 @@
   --foreground: var(--color-fg);
 }
 
+:root[data-theme="light"] {
+  --color-header-bg: rgba(191, 219, 254, 0.95);
+  --color-header-border: rgba(147, 197, 253, 0.6);
+  --color-header-fg: #1e3a5f;
+  --color-footer-bg: #1e3a5f;
+  --color-footer-fg: #64748b;
+}
+
 :root[data-theme="dark"] {
   --color-bg: #020617;
   --color-bg-elevated: #020617;
@@ -83,6 +91,10 @@ a {
     linear-gradient(to right, var(--color-header-bg), rgba(15, 23, 42, 0.95));
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
+}
+
+:root[data-theme="light"] .app-header {
+  background: linear-gradient(to right, var(--color-header-bg), rgba(191, 219, 254, 0.9));
 }
 
 .app-header-inner {
@@ -223,6 +235,11 @@ a {
   border-top: 1px solid rgba(15, 23, 42, 0.8);
   background: radial-gradient(circle at bottom, rgba(15, 23, 42, 0.95), var(--color-footer-bg));
   color: var(--color-footer-fg);
+}
+
+:root[data-theme="light"] .app-footer {
+  border-top-color: rgba(147, 197, 253, 0.5);
+  background: linear-gradient(to top, var(--color-footer-bg), rgba(191, 219, 254, 0.4));
 }
 
 .app-footer-inner {
