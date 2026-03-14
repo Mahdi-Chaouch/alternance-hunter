@@ -1046,7 +1046,7 @@ function DashboardContent() {
       <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
         <main className={styles.main}>
           <section className={styles.panel}>
-            <p className={styles.eyebrow}>Alternance Pipeline</p>
+            <p className={styles.eyebrow}>Alternance Hunter</p>
             <h1>Bienvenue</h1>
             <p className={styles.panelHint}>
               Connectez-vous avec votre compte Google invite pour acceder au dashboard et lancer vos
@@ -1088,7 +1088,7 @@ function DashboardContent() {
         <header className={styles.headerCard}>
           <div>
             <p className={styles.eyebrow}>Tableau de bord</p>
-            <h1>Tableau de bord alternance</h1>
+            <h1>Tableau de bord Alternance Hunter</h1>
             <p className={styles.panelHint}>
               Suivez les étapes : profil, documents, paramètres, puis lancez une recherche et suivez l’avancement.
             </p>

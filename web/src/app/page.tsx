@@ -7,7 +7,7 @@ export default function Home() {
       <main className={styles.main}>
         <section className={styles.hero}>
           <div className={styles.heroContent}>
-            <p className={styles.eyebrow}>Alternance Automation</p>
+            <p className={styles.eyebrow}>Alternance Hunter</p>
             <h1 className={styles.heroTitle}>
               Automatise tes candidatures d&apos;alternance, garde le contrôle.
             </h1>
@@ -45,7 +45,7 @@ export default function Home() {
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>Ce que fait l&apos;app</h2>
             <p className={styles.sectionLead}>
-              Alternance-mails automatise la partie répétitive de tes candidatures tout en gardant
+              Alternance Hunter automatise la partie répétitive de tes candidatures tout en gardant
               un contrôle fin sur le contenu envoyé.
             </p>
           </div>
@@ -171,7 +171,7 @@ export default function Home() {
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>À propos & contact</h2>
             <p className={styles.sectionLead}>
-              Alternance-mails est un projet personnel de Mahdi, pensé comme un vrai outil produit
+              Alternance Hunter est un projet personnel de Mahdi, pensé comme un vrai outil produit
               pour valoriser son profil de développeur.
             </p>
           </div>
