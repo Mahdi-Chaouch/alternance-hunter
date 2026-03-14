@@ -50,10 +50,10 @@ type RunStatusResponse = {
 const END_STATUSES = new Set(["succeeded", "failed", "cancelled"]);
 type ThemeMode = "light" | "dark";
 const MODE_LABELS: Record<RunMode, string> = {
-  pipeline: "Pipeline complet",
+  pipeline: "Recherche complète",
   hunter: "Recherche d'entreprises",
-  generate: "Generation des emails",
-  drafts: "Creation des brouillons Gmail",
+  generate: "Génération des lettres",
+  drafts: "Création des brouillons Gmail",
 };
 
 const ZONE_LABELS: Record<Zone, string> = {
@@ -316,7 +316,7 @@ function DashboardContent() {
         response,
       )) as { runs?: RunListItem[]; detail?: string };
       if (!response.ok) {
-        throw new Error(data.detail ?? "Impossible de recuperer la liste des executions.");
+        throw new Error(data.detail ?? "Impossible de récupérer la liste des recherches.");
       }
       const nextRuns = [...(data.runs ?? [])].reverse();
       setRuns(nextRuns);
@@ -357,7 +357,7 @@ function DashboardContent() {
             setActiveRunId(null);
             return;
           }
-          throw new Error(data.detail ?? `Impossible de recuperer le run ${runIdToLoad}.`);
+          throw new Error(data.detail ?? `Impossible de récupérer cette recherche.`);
         }
 
         setRunDetails(data as RunStatusResponse);
@@ -542,9 +542,9 @@ function DashboardContent() {
         ? "Template LM requis (onglet Vos documents)"
         : cvRequired && !cvUploaded
           ? "CV requis (onglet Vos documents)"
-          : "Lancer le pipeline";
+          : "Lancer la recherche";
   const demoLaunchDisabled = showDemoBanner || launchDisabled;
-  const demoLaunchLabel = showDemoBanner ? "Connectez-vous pour lancer le pipeline" : launchButtonLabel;
+  const demoLaunchLabel = showDemoBanner ? "Connectez-vous pour lancer une recherche" : launchButtonLabel;
 
   useEffect(() => {
     animatedLogsRef.current = animatedLogs;
@@ -682,10 +682,10 @@ function DashboardContent() {
         response,
       )) as { run_id?: string; detail?: string; message?: string };
       if (!response.ok || !data.run_id) {
-        throw new Error(data.detail ?? data.message ?? "Echec du lancement du run.");
+        throw new Error(data.detail ?? data.message ?? "Échec du lancement de la recherche.");
       }
 
-      setInfo(`Execution lancee : ${data.run_id}`);
+      setInfo(`Recherche lancée.`);
       setActiveRunId(data.run_id);
       await refreshAll();
     } catch (err) {
@@ -887,7 +887,7 @@ function DashboardContent() {
         response,
       )) as { status?: string; message?: string; detail?: string };
       if (!response.ok) {
-        throw new Error(data.detail ?? data.message ?? "Impossible d'annuler ce run.");
+        throw new Error(data.detail ?? data.message ?? "Impossible d'annuler cette recherche.");
       }
       setInfo(
         data.message
@@ -1043,9 +1043,9 @@ function DashboardContent() {
         <header className={styles.headerCard}>
           <div>
             <p className={styles.eyebrow}>Tableau de bord</p>
-            <h1>Pilotage du pipeline alternance</h1>
+            <h1>Tableau de bord alternance</h1>
             <p className={styles.panelHint}>
-              Suivez les etapes du flux : profil, documents, configuration, executions et logs temps reel.
+              Suivez les étapes : profil, documents, paramètres, puis lancez une recherche et suivez l’avancement.
             </p>
           </div>
           <div className={styles.headerActions}>
@@ -1096,13 +1096,13 @@ function DashboardContent() {
             <li>
               <a className={styles.stepNavItem} href="#step-config">
                 <span className={styles.stepNavNumber}>3</span>
-                <span>Configuration du run</span>
+                <span>Paramètres de la recherche</span>
               </a>
             </li>
             <li>
               <a className={styles.stepNavItem} href="#step-runs">
                 <span className={styles.stepNavNumber}>4</span>
-                <span>Executions recentes</span>
+                <span>Recherches récentes</span>
               </a>
             </li>
             <li>
@@ -1118,7 +1118,7 @@ function DashboardContent() {
           <section className={styles.panel} id="step-profil">
             <h2>Etape 1 – Profil & personnalisation</h2>
             <p className={styles.sectionHint}>
-              Renseignez votre profil expediteur et personnalisez vos emails avant de lancer une execution.
+              Renseignez votre profil et personnalisez vos emails avant de lancer une recherche.
             </p>
             <form className={styles.profileCard} onSubmit={onSaveProfile}>
               <p className={styles.uploadTitle}>Profil expediteur</p>
@@ -1254,14 +1254,14 @@ function DashboardContent() {
               id="pipeline-config-form"
               className={styles.form}
               onSubmit={onSubmit}
-              aria-label="Configuration du run"
+              aria-label="Paramètres de la recherche"
             >
               <h3 id="step-config" className={styles.sectionTitle}>
                 Etape 3 – Configuration du run
               </h3>
               <div className={styles.inputGrid}>
                 <label>
-                  Mode du pipeline
+                  Type de recherche
                   <select value={mode} onChange={(e) => setMode(e.target.value as RunMode)}>
                     {(Object.keys(MODE_LABELS) as RunMode[]).map((option) => (
                       <option key={option} value={option}>
@@ -1326,7 +1326,7 @@ function DashboardContent() {
               <fieldset className={styles.switchGroup}>
                 <legend>Options</legend>
                 <label className={styles.switchField}>
-                  <span>Execution simulee (dry run)</span>
+                  <span>Mode test (aucun envoi réel)</span>
                   <span className={styles.switchControl}>
                     <input
                       type="checkbox"
@@ -1337,13 +1337,25 @@ function DashboardContent() {
                   </span>
                 </label>
               </fieldset>
+              <div className={styles.launchBlock}>
+                <button
+                  className={styles.primaryBtn}
+                  type="submit"
+                  disabled={demoLaunchDisabled}
+                >
+                  {demoLaunchLabel}
+                </button>
+                <p className={styles.launchHint}>
+                  Lance une recherche d&apos;entreprises puis la génération des lettres et brouillons selon le type choisi.
+                </p>
+              </div>
             </form>
           </section>
 
           <section className={styles.panel}>
-            <h2>Etape 4 – Lancer et surveiller</h2>
+            <h2>Etape 4 – Suivi des recherches</h2>
             <p className={styles.sectionHint}>
-              Lancez un nouveau pipeline ou rechargez la liste et les details des executions.
+              Consultez vos recherches récentes et leur avancement ci-dessous.
             </p>
             <div className={styles.gmailStatusCard}>
               <p className={styles.gmailStatusTitle}>Connexion Gmail</p>
@@ -1403,12 +1415,12 @@ function DashboardContent() {
 
         <section className={styles.panel} id="step-runs">
           <div className={styles.panelHeader}>
-            <h2>Executions recentes</h2>
-            {isRefreshingRuns ? <span className={styles.loadingText}>Mise a jour...</span> : null}
+            <h2>Recherches récentes</h2>
+            {isRefreshingRuns ? <span className={styles.loadingText}>Mise à jour...</span> : null}
           </div>
           {runs.length === 0 ? (
             <p className={styles.emptyState}>
-              Aucune execution pour le moment. Configurez les parametres puis lancez un pipeline.
+              Aucune recherche pour le moment. Remplissez les paramètres ci-dessus puis lancez une recherche.
             </p>
           ) : (
             <div className={styles.tableWrap}>
@@ -1476,7 +1488,7 @@ function DashboardContent() {
 
         <section className={styles.panel} id="step-logs">
           <div className={styles.panelHeader}>
-            <h2>Details de execution</h2>
+            <h2>Détails de la recherche</h2>
             <div className={styles.panelHeaderActions}>
               <button
                 type="button"
@@ -1496,17 +1508,16 @@ function DashboardContent() {
                 onClick={onCancelRun}
                 disabled={!activeRun || END_STATUSES.has(activeRun.status) || isCancellingRun}
               >
-                {isCancellingRun ? "Annulation..." : "Annuler l'execution"}
+                {isCancellingRun ? "Annulation..." : "Annuler la recherche"}
               </button>
             </div>
           </div>
           <p className={styles.runSaveNote}>
-            L'annulation conserve les donnees deja enregistrees (entreprises trouvees, brouillons,
-            lettres de motivation).
+            L&apos;annulation conserve ce qui a déjà été fait (entreprises trouvées, brouillons, lettres).
           </p>
           {!activeRunId ? (
             <p className={styles.emptyState}>
-              Selectionnez une execution dans le tableau pour afficher les details et les logs.
+              Sélectionnez une recherche dans le tableau pour afficher les détails et l&apos;avancement.
             </p>
           ) : isRefreshingDetails && !runDetails ? (
             <p className={styles.loadingText}>Chargement des details...</p>
@@ -1565,7 +1576,7 @@ function DashboardContent() {
 
               {pipelineSteps ? (
                 <div className={styles.progressSteps}>
-                  <h3 className={styles.progressStepsTitle}>Avancee du pipeline</h3>
+                  <h3 className={styles.progressStepsTitle}>Avancement</h3>
                   <ul className={styles.progressStepsList}>
                     {pipelineSteps.map((step) => (
                       <li key={step.id} className={styles.progressStepItem}>
@@ -1663,7 +1674,7 @@ function DashboardContent() {
                         isTypingLogs ? styles.logsTyping : ""
                       }`}
                     >
-                      {animatedLogs || "Aucun log disponible pour cette execution."}
+                      {animatedLogs || "Aucun log disponible pour cette recherche."}
                       {isRunning || isTypingLogs ? <span className={styles.cursor}>█</span> : null}
                     </pre>
                   </div>

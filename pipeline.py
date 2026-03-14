@@ -50,13 +50,19 @@ def _run(cmd: List[str], dry_run: bool) -> int:
     print(f"\n>>> {printable}", flush=True)
     if dry_run:
         return 0
-    result = subprocess.run(
+    # Popen + inherited stdout/stderr = sortie en temps réel (pas de buffer).
+    # stdin=DEVNULL pour ne jamais bloquer sur input() (ex: OAuth console dans create_gmail_drafts).
+    env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    proc = subprocess.Popen(
         cmd,
         cwd=str(_project_root()),
-        check=False,
-        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        stdin=subprocess.DEVNULL,
+        stdout=None,
+        stderr=None,
+        env=env,
     )
-    return int(result.returncode)
+    proc.wait()
+    return int(proc.returncode or 0)
 
 
 def _python_cmd(python_executable: str) -> List[str]:
@@ -332,6 +338,7 @@ def main() -> None:
     for step in order:
         print(f"\n=== ETAPE: {step} ===", flush=True)
         exit_code = _run(pipeline_steps[step], dry_run=args.dry_run)
+        print(f"=== ETAPE: {step} terminee (code {exit_code}) ===", flush=True)
         if exit_code != 0:
             raise SystemExit(exit_code)
 
