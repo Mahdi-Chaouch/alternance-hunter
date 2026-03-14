@@ -1555,6 +1555,8 @@ function DashboardContent() {
             </form>
           </section>
 
+          </section>
+
           <section className={styles.panel}>
             <h2>📋 Etape 4 – Suivi des recherches</h2>
             <p className={styles.sectionHint}>
@@ -1703,7 +1705,7 @@ function DashboardContent() {
                   )
                 }
               >
-                Sauvegarder l'etat actuel
+                Sauvegarder l&apos;etat actuel
               </button>
               <button
                 className={styles.dangerBtn}
