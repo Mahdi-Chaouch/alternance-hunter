@@ -64,9 +64,15 @@ def _zone_to_hunter_filter(zone: str) -> str:
     """
     Transforme la zone libre en filtre pour alternance_hunter:
     - chaine vide => toutes les zones
+    - 'all' (insensible à la casse) => toutes les zones
     - sinon: renvoyee telle quelle (ex: 'Paris, Lyon, Lille')
     """
-    return (zone or "").strip()
+    cleaned = (zone or "").strip()
+    if not cleaned:
+        return ""
+    if cleaned.lower() == "all":
+        return ""
+    return cleaned
 
 
 def _sanitize_user_key(raw: str) -> str:
@@ -246,9 +252,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--zone",
-        choices=["paris", "cannes", "auxerre", "fontainebleau", "all"],
         default="all",
-        help="Zone cible pour l'etape hunter. 'all' = toutes les zones.",
+        help="Zone cible libre pour l'etape hunter (ex: 'Paris', 'Lyon, Marseille'). 'all' ou vide = toutes les zones.",
     )
     parser.add_argument(
         "--python",
