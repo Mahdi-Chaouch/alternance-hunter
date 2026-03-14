@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Alternance Automation",
+  title: "Alternance Hunter",
   description:
     "Automatisez vos candidatures d'alternance avec un pipeline Gmail suivi par un dashboard temps reel.",
 };
@@ -39,9 +39,9 @@ export default function RootLayout({
               <div className="app-brand">
                 <Link href="/" className="app-brand-link">
                   <span className="app-brand-mark" aria-hidden="true">
-                    AA
+                    AH
                   </span>
-                  <span className="app-brand-text">Alternance Automation</span>
+                  <span className="app-brand-text">Alternance Hunter</span>
                 </Link>
               </div>
               <nav className="app-nav" aria-label="Navigation principale">
@@ -66,7 +66,7 @@ export default function RootLayout({
           <footer className="app-footer">
             <div className="app-footer-inner">
               <p className="app-footer-meta">
-                © {new Date().getFullYear()} Alternance Automation. Tous droits réservés.
+                © {new Date().getFullYear()} Alternance Hunter. Tous droits réservés.
               </p>
             </div>
           </footer>

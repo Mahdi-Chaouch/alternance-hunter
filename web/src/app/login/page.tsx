@@ -32,7 +32,7 @@ export default function LoginPage() {
     <main className={styles.page}>
       <section className={styles.layout}>
         <div className={styles.copy}>
-          <p className={styles.eyebrow}>Alternance Automation</p>
+          <p className={styles.eyebrow}>Alternance Hunter</p>
           <h1 className={styles.title}>
             Connecte ton compte Google pour lancer le dashboard.
           </h1>
@@ -58,7 +58,7 @@ export default function LoginPage() {
         <div className={styles.card} aria-label="Connexion au dashboard">
           <h2 className={styles.cardTitle}>Connexion requise</h2>
           <p className={styles.cardText}>
-            Utilise ton compte Google autorisé pour accéder au dashboard Alternance Automation.
+            Utilise ton compte Google autorisé pour accéder au dashboard Alternance Hunter.
           </p>
           <button
             type="button"

@@ -34,7 +34,7 @@ export default async function AdminPage() {
           <p className={styles.eyebrow}>Administration</p>
           <h1>Dashboard admin</h1>
           <p className={styles.sectionHint}>
-            Cette page est reservee au compte admin pour superviser l&apos;outil Alternance Automation.
+            Cette page est reservee au compte admin pour superviser l&apos;outil Alternance Hunter.
           </p>
           <dl className={styles.metaGrid}>
             <div>
