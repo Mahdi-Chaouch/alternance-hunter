@@ -287,6 +287,17 @@ function DashboardContent() {
   }, []);
 
   useEffect(() => {
+    const onThemeChange = (e: Event) => {
+      const customEvent = e as CustomEvent<ThemeMode>;
+      if (customEvent.detail === "dark" || customEvent.detail === "light") {
+        setTheme(customEvent.detail);
+      }
+    };
+    window.addEventListener("alternance-theme-change", onThemeChange);
+    return () => window.removeEventListener("alternance-theme-change", onThemeChange);
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem("alternance-ui-theme", theme);
     document.documentElement.dataset.theme = theme;
   }, [theme]);
