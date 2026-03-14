@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { FloatingActions } from "./components/FloatingActions";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -70,6 +71,7 @@ export default function RootLayout({
               </p>
             </div>
           </footer>
+          <FloatingActions />
         </div>
       </body>
     </html>
