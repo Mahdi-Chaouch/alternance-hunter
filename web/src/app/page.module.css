@@ -818,6 +818,23 @@
   margin: 1rem 0;
 }
 
+.launchBlock {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--panel-border);
+}
+
+.launchBlock .primaryBtn {
+  font-size: 1rem;
+  padding: 0.65rem 1.25rem;
+}
+
+.launchHint {
+  margin: 0.5rem 0 0;
+  font-size: 0.88rem;
+  color: var(--muted-text);
+}
+
 /* Drop zone documents */
 .dropZone {
   border: 2px dashed var(--panel-border);
