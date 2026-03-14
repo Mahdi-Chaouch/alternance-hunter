@@ -12,6 +12,7 @@ export function FloatingActions() {
   useEffect(() => {
     const saved = window.localStorage.getItem(THEME_KEY);
     const initial: Theme = saved === "dark" || saved === "light" ? saved : "dark";
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(initial);
     document.documentElement.dataset.theme = initial;
   }, []);
