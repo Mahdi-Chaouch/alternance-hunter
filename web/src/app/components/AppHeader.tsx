@@ -48,23 +48,36 @@ export function AppHeader() {
             🔐 Connexion
           </Link>
         </div>
-        <button
-          type="button"
-          className="app-burger"
-          onClick={() => setMenuOpen((o) => !o)}
-          aria-expanded={menuOpen ? "true" : "false"}
-          aria-controls="app-mobile-menu"
-          aria-label={menuOpen ? "Fermer le menu" : "Ouvrir le menu"}
-        >
-          <span className="app-burger-bar" />
-          <span className="app-burger-bar" />
-          <span className="app-burger-bar" />
-        </button>
+        <div className={`app-burger-wrap${menuOpen ? " is-open" : ""}`}>
+          <button
+            type="button"
+            className="app-burger app-burger-closed"
+            onClick={() => setMenuOpen(true)}
+            aria-controls="app-mobile-menu"
+            aria-label="Ouvrir le menu"
+            aria-expanded="false"
+          >
+            <span className="app-burger-bar" />
+            <span className="app-burger-bar" />
+            <span className="app-burger-bar" />
+          </button>
+          <button
+            type="button"
+            className="app-burger app-burger-open"
+            onClick={() => setMenuOpen(false)}
+            aria-controls="app-mobile-menu"
+            aria-label="Fermer le menu"
+            aria-expanded="true"
+          >
+            <span className="app-burger-bar" />
+            <span className="app-burger-bar" />
+            <span className="app-burger-bar" />
+          </button>
+        </div>
       </div>
       <div
         id="app-mobile-menu"
         className={`app-mobile-menu ${menuOpen ? "app-mobile-menu-open" : ""}`}
-        aria-hidden={menuOpen ? "false" : "true"}
       >
         <div className="app-mobile-menu-backdrop" onClick={closeMenu} />
         <div className="app-mobile-menu-panel">
