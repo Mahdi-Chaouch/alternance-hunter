@@ -184,6 +184,35 @@ function getPipelineStepsFromLogs(logsTail: string[], runStatus: string): Pipeli
   return steps;
 }
 
+type ProgressCounts = { companiesFound: number; lettersWritten: number; draftsCreated: number };
+
+function getProgressCountsFromLogs(logsTail: string[]): ProgressCounts {
+  const text = logsTail.join("\n");
+  let companiesFound = 0;
+  let lettersWritten = 0;
+  let draftsCreated = 0;
+
+  const foundMatch = text.match(/FOUND:\s*(\d+)/);
+  if (foundMatch) companiesFound = Math.max(companiesFound, parseInt(foundMatch[1], 10));
+
+  const entreprisesMatch = text.match(/Entreprises trouvées:\s*(\d+)/);
+  if (entreprisesMatch) companiesFound = Math.max(companiesFound, parseInt(entreprisesMatch[1], 10));
+
+  const lmMatch = text.match(/LM générées\s*:\s*(\d+)/);
+  if (lmMatch) lettersWritten = Math.max(lettersWritten, parseInt(lmMatch[1], 10));
+
+  const creesMatch = text.match(/créés=(\d+)/g);
+  if (creesMatch) {
+    const last = creesMatch[creesMatch.length - 1];
+    const m = last.match(/créés=(\d+)/);
+    if (m) draftsCreated = Math.max(draftsCreated, parseInt(m[1], 10));
+  }
+  const termineeMatch = text.match(/Créés:\s*(\d+)/);
+  if (termineeMatch) draftsCreated = Math.max(draftsCreated, parseInt(termineeMatch[1], 10));
+
+  return { companiesFound, lettersWritten, draftsCreated };
+}
+
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -244,6 +273,11 @@ function DashboardContent() {
     if (!runDetails?.logs_tail?.length) return null;
     return getPipelineStepsFromLogs(runDetails.logs_tail, runDetails.status);
   }, [runDetails?.logs_tail, runDetails?.status]);
+
+  const progressCounts = useMemo(() => {
+    if (!runDetails?.logs_tail?.length) return null;
+    return getProgressCountsFromLogs(runDetails.logs_tail);
+  }, [runDetails?.logs_tail]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("alternance-ui-theme");
@@ -539,9 +573,9 @@ function DashboardContent() {
     : draftsRequireGmail
       ? "Connexion Gmail requise"
       : templateRequired && !templateUploaded
-        ? "Template LM requis (onglet Vos documents)"
+        ? "Template LM requis (déposez un fichier ci-dessus)"
         : cvRequired && !cvUploaded
-          ? "CV requis (onglet Vos documents)"
+          ? "CV obligatoire (déposez votre CV ci-dessus)"
           : "Lancer la recherche";
   const demoLaunchDisabled = showDemoBanner || launchDisabled;
   const demoLaunchLabel = showDemoBanner ? "Connectez-vous pour lancer une recherche" : launchButtonLabel;
@@ -554,7 +588,7 @@ function DashboardContent() {
     if (accessState !== "granted") {
       return;
     }
-    const intervalMs = isRunning ? 2000 : 5000;
+    const intervalMs = isRunning ? 5000 : 5000;
     const intervalId = window.setInterval(() => {
       void refreshAll();
     }, intervalMs);
@@ -1096,7 +1130,7 @@ function DashboardContent() {
             <li>
               <a className={styles.stepNavItem} href="#step-config">
                 <span className={styles.stepNavNumber}>3</span>
-                <span>Paramètres de la recherche</span>
+                <span>Options de recherche</span>
               </a>
             </li>
             <li>
@@ -1188,7 +1222,7 @@ function DashboardContent() {
             <form className={styles.uploadCard} onSubmit={onUploadAssets} id="step-documents">
               <p className={styles.uploadTitle}>Vos documents</p>
               <p className={styles.uploadHint}>
-                Glissez-déposez ou sélectionnez votre CV (PDF) et votre template LM (.docx/.doc).
+                Déposez votre <strong>CV (PDF, obligatoire)</strong> et votre <strong>template de lettre de motivation</strong> (.docx). Sans CV, vous ne pourrez pas lancer de recherche.
               </p>
               <div
                 className={`${styles.dropZone} ${isDraggingDocs ? styles.dropZoneActive : ""} ${(cvFile || templateFile) ? styles.dropZoneHasFiles : ""}`}
@@ -1226,24 +1260,6 @@ function DashboardContent() {
                       : "Déposez votre CV (PDF) et template LM (.docx) ici"}
                 </span>
               </div>
-              <div className={styles.uploadGrid}>
-                <label>
-                  CV (PDF)
-                  <input
-                    type="file"
-                    accept=".pdf,application/pdf"
-                    onChange={(e) => setCvFile(e.target.files?.[0] ?? null)}
-                  />
-                </label>
-                <label>
-                  Template LM (.docx/.doc)
-                  <input
-                    type="file"
-                    accept=".docx,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
-                    onChange={(e) => setTemplateFile(e.target.files?.[0] ?? null)}
-                  />
-                </label>
-              </div>
               <button className={styles.secondaryBtn} type="submit" disabled={isUploadingAssets || showDemoBanner}>
                 {isUploadingAssets ? "Upload en cours..." : showDemoBanner ? "Connectez-vous pour uploader" : "Uploader mes fichiers"}
               </button>
@@ -1257,7 +1273,7 @@ function DashboardContent() {
               aria-label="Paramètres de la recherche"
             >
               <h3 id="step-config" className={styles.sectionTitle}>
-                Etape 3 – Configuration du run
+                Etape 3 – Options de recherche
               </h3>
               <div className={styles.inputGrid}>
                 <label>
@@ -1574,38 +1590,101 @@ function DashboardContent() {
                 </div>
               </dl>
 
-              {pipelineSteps ? (
+              {(pipelineSteps || progressCounts) ? (
                 <div className={styles.progressSteps}>
                   <h3 className={styles.progressStepsTitle}>Avancement</h3>
-                  <ul className={styles.progressStepsList}>
-                    {pipelineSteps.map((step) => (
-                      <li key={step.id} className={styles.progressStepItem}>
-                        <span className={styles.progressStepIcon} aria-hidden="true">
-                          {step.icon}
-                        </span>
-                        <span className={styles.progressStepLabel}>{step.label}</span>
-                        <span
-                          className={`${styles.progressStepBadge} ${
-                            step.status === "done"
-                              ? styles.progressStepDone
+                  {pipelineSteps ? (
+                    <ul className={styles.progressStepsList}>
+                      {pipelineSteps.map((step) => (
+                        <li key={step.id} className={styles.progressStepItem}>
+                          <span className={styles.progressStepIcon} aria-hidden="true">
+                            {step.icon}
+                          </span>
+                          <span className={styles.progressStepLabel}>{step.label}</span>
+                          <span
+                            className={`${styles.progressStepBadge} ${
+                              step.status === "done"
+                                ? styles.progressStepDone
+                                : step.status === "running"
+                                  ? styles.progressStepRunning
+                                  : step.status === "error"
+                                    ? styles.progressStepError
+                                    : styles.progressStepPending
+                            }`}
+                          >
+                            {step.status === "pending"
+                              ? "En attente"
                               : step.status === "running"
-                                ? styles.progressStepRunning
-                                : step.status === "error"
-                                  ? styles.progressStepError
-                                  : styles.progressStepPending
-                          }`}
-                        >
-                          {step.status === "pending"
-                            ? "En attente"
-                            : step.status === "running"
-                              ? "En cours..."
-                              : step.status === "done"
-                                ? "Terminé"
-                                : "Erreur"}
+                                ? "En cours..."
+                                : step.status === "done"
+                                  ? "Terminé"
+                                  : "Erreur"}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {progressCounts ? (
+                    <div className={styles.progressBars}>
+                      <div className={styles.progressBarItem}>
+                        <div className={styles.progressBarLabel}>
+                          <span>Entreprises trouvées</span>
+                          <span className={styles.progressBarValue}>
+                            {progressCounts.companiesFound} / {targetFound}
+                          </span>
+                        </div>
+                        <div className={styles.progressBarTrack}>
+                          <div
+                            className={styles.progressBarFill}
+                            style={{
+                              width: `${Math.min(100, (progressCounts.companiesFound / Math.max(1, targetFound)) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                        <span className={styles.progressBarPct}>
+                          {Math.round((progressCounts.companiesFound / Math.max(1, targetFound)) * 100)} %
                         </span>
-                      </li>
-                    ))}
-                  </ul>
+                      </div>
+                      <div className={styles.progressBarItem}>
+                        <div className={styles.progressBarLabel}>
+                          <span>Lettres de motivation générées</span>
+                          <span className={styles.progressBarValue}>
+                            {progressCounts.lettersWritten} / {Math.max(progressCounts.companiesFound, targetFound)}
+                          </span>
+                        </div>
+                        <div className={styles.progressBarTrack}>
+                          <div
+                            className={styles.progressBarFill}
+                            style={{
+                              width: `${Math.min(100, (progressCounts.lettersWritten / Math.max(1, Math.max(progressCounts.companiesFound, targetFound))) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                        <span className={styles.progressBarPct}>
+                          {Math.round((progressCounts.lettersWritten / Math.max(1, Math.max(progressCounts.companiesFound, targetFound))) * 100)} %
+                        </span>
+                      </div>
+                      <div className={styles.progressBarItem}>
+                        <div className={styles.progressBarLabel}>
+                          <span>Brouillons Gmail créés</span>
+                          <span className={styles.progressBarValue}>
+                            {progressCounts.draftsCreated} / {Math.max(progressCounts.companiesFound, targetFound)}
+                          </span>
+                        </div>
+                        <div className={styles.progressBarTrack}>
+                          <div
+                            className={styles.progressBarFill}
+                            style={{
+                              width: `${Math.min(100, (progressCounts.draftsCreated / Math.max(1, Math.max(progressCounts.companiesFound, targetFound))) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                        <span className={styles.progressBarPct}>
+                          {Math.round((progressCounts.draftsCreated / Math.max(1, Math.max(progressCounts.companiesFound, targetFound))) * 100)} %
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 

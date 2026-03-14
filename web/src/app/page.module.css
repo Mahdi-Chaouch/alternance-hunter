@@ -814,6 +814,50 @@
   color: var(--status-failed-text);
 }
 
+.progressBars {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.progressBarItem {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.progressBarLabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.progressBarValue {
+  color: var(--muted-text);
+  font-weight: 500;
+}
+
+.progressBarTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--status-neutral-bg);
+  overflow: hidden;
+}
+
+.progressBarFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+
+.progressBarPct {
+  font-size: 0.8rem;
+  color: var(--subtle-text);
+}
+
 .logsToggleWrap {
   margin: 1rem 0;
 }
