@@ -1364,60 +1364,68 @@ function DashboardContent() {
               </button>
               {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
             </div>
-            <section className={styles.zoneCard} aria-labelledby="step-zone">
-              <h3 id="step-zone" className={styles.sectionTitle}>
-                🗺️ Etape 3 – Zone geographique
-              </h3>
-              <p className={styles.sectionHint}>
+            <section className={styles.stepCard} aria-labelledby="step-zone">
+              <div className={styles.stepCardHeader}>
+                <div className={styles.stepTitle} id="step-zone">
+                  <span className={styles.stepBadge}>3</span>
+                  <span>🗺️ Zone geographique</span>
+                </div>
+              </div>
+              <p className={styles.stepDescription}>
                 Choisissez une zone geographique pour affiner la recherche. Vous pouvez taper une
-                ville et selectionner une suggestion, ou laisser vide pour toute la France.
+                ville et selectionner une suggestion, ou laisser vide pour couvrir toute la France.
               </p>
               <div className={styles.zoneFieldRow}>
                 <label className={styles.zoneField}>
                   Zone geographique (optionnel)
-                  <input
-                    type="text"
-                    className={`${styles.zoneFieldInput} ${
-                      zoneValid ? styles.zoneFieldInputValid : ""
-                    }`}
-                    value={zoneQuery}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setZoneQuery(value);
-                      setZone(value);
-                      setZoneValid(false);
-                      const trimmed = value.trim().toLowerCase();
-                      if (!trimmed) {
-                        setZoneSuggestions([]);
-                        return;
-                      }
-                      setZoneSuggestions(
-                        KNOWN_ZONES.filter(
-                          (z) => z !== "all" && z.toLowerCase().includes(trimmed),
-                        ).slice(0, 8),
-                      );
-                    }}
-                    placeholder={ZONE_PLACEHOLDER}
-                    onFocus={() => {
-                      setIsZoneFocused(true);
-                      const trimmed = zoneQuery.trim().toLowerCase();
-                      if (!trimmed) {
-                        setZoneSuggestions([]);
-                        return;
-                      }
-                      setZoneSuggestions(
-                        KNOWN_ZONES.filter(
-                          (z) => z !== "all" && z.toLowerCase().includes(trimmed),
-                        ).slice(0, 8),
-                      );
-                    }}
-                    onBlur={() => {
-                      window.setTimeout(() => {
-                        setIsZoneFocused(false);
-                      }, 100);
-                    }}
-                    autoComplete="off"
-                  />
+                  <div className={styles.zoneFieldInputWrapper}>
+                    <span className={styles.zoneFieldIcon} aria-hidden="true">
+                      📍
+                    </span>
+                    <input
+                      type="text"
+                      className={`${styles.zoneFieldInput} ${
+                        zoneValid ? styles.zoneFieldInputValid : ""
+                      }`}
+                      value={zoneQuery}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setZoneQuery(value);
+                        setZone(value);
+                        setZoneValid(false);
+                        const trimmed = value.trim().toLowerCase();
+                        if (!trimmed) {
+                          setZoneSuggestions([]);
+                          return;
+                        }
+                        setZoneSuggestions(
+                          KNOWN_ZONES.filter(
+                            (z) => z !== "all" && z.toLowerCase().includes(trimmed),
+                          ).slice(0, 8),
+                        );
+                      }}
+                      placeholder={ZONE_PLACEHOLDER}
+                      onFocus={() => {
+                        setIsZoneFocused(true);
+                        const trimmed = zoneQuery.trim().toLowerCase();
+                        if (!trimmed) {
+                          setZoneSuggestions([]);
+                          return;
+                        }
+                        setZoneSuggestions(
+                          KNOWN_ZONES.filter(
+                            (z) => z !== "all" && z.toLowerCase().includes(trimmed),
+                          ).slice(0, 8),
+                        );
+                      }}
+                      onBlur={() => {
+                        window.setTimeout(() => {
+                          setIsZoneFocused(false);
+                        }, 100);
+                      }}
+                      autoComplete="off"
+                    />
+                  </div>
                   {isZoneFocused && zoneSuggestions.length > 0 ? (
                     <ul className={styles.zoneSuggestions}>
                       {zoneSuggestions.map((suggestion) => (
@@ -1448,17 +1456,25 @@ function DashboardContent() {
               </div>
             </section>
 
-            <form
-              id="pipeline-config-form"
-              className={styles.form}
-              onSubmit={onSubmit}
-              aria-label="Paramètres de la recherche"
-            >
-              <h3 id="step-config" className={styles.sectionTitle}>
-                ⚙️ Etape 4 – Options de recherche
-              </h3>
-              <div className={styles.inputGrid}>
-                <label>
+            <section className={styles.stepCard} aria-labelledby="step-config">
+              <div className={styles.stepCardHeader}>
+                <div className={styles.stepTitle} id="step-config">
+                  <span className={styles.stepBadge}>4</span>
+                  <span>⚙️ Options de recherche</span>
+                </div>
+              </div>
+              <p className={styles.stepDescription}>
+                Ajustez la duree maximale, le nombre de sites explores et le nombre de cibles
+                souhaitees avant de lancer la recherche.
+              </p>
+              <form
+                id="pipeline-config-form"
+                className={styles.form}
+                onSubmit={onSubmit}
+                aria-label="Paramètres de la recherche"
+              >
+                <div className={styles.inputGrid}>
+                  <label>
                   Type de recherche
                   <select value={mode} onChange={(e) => setMode(e.target.value as RunMode)}>
                     {(Object.keys(MODE_LABELS) as RunMode[]).map((option) => (

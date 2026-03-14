@@ -449,25 +449,108 @@
   gap: 0.65rem;
 }
 
+/* Zone & options cards */
+
+.stepCard {
+  border-radius: 18px;
+  padding: 1.2rem 1.3rem;
+  background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.12), transparent 55%),
+    var(--panel);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.55);
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1.2rem;
+}
+
+.stepCardHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.stepTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.02rem;
+  letter-spacing: 0.01em;
+}
+
+.stepBadge {
+  min-width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: radial-gradient(circle at 20% 0%, rgba(59, 130, 246, 0.45), rgba(15, 23, 42, 0.9));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #e5f0ff;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.8);
+}
+
+.stepDescription {
+  margin: 0.15rem 0 0;
+  font-size: 0.86rem;
+  color: var(--subtle-text);
+}
+
 .zoneField {
   position: relative;
 }
 
 .zoneFieldRow {
   display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  margin-top: 0.4rem;
+  align-items: stretch;
+  gap: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.zoneFieldInputWrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.zoneFieldIcon {
+  position: absolute;
+  left: 0.85rem;
+  font-size: 0.95rem;
+  pointer-events: none;
+  opacity: 0.9;
 }
 
 .zoneFieldInput {
   width: 100%;
+  padding-left: 2.2rem;
+  padding-right: 0.9rem;
+  height: 2.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--input-border);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.8);
+}
+
+.zoneFieldInput:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.9);
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.85),
+    0 0 0 8px rgba(37, 99, 235, 0.25);
 }
 
 .zoneFieldInputValid {
   border-color: #22c55e;
-  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.6), 0 0 18px rgba(34, 197, 94, 0.35);
-  animation: zonePulse 600ms ease-out;
+  box-shadow:
+    0 0 0 1px rgba(34, 197, 94, 0.9),
+    0 0 0 10px rgba(34, 197, 94, 0.18);
+  animation: zonePulse 550ms ease-out;
 }
 
 .zoneSuggestions {
@@ -507,26 +590,16 @@
   color: #ff4d4f;
 }
 
-.zoneValidBadge {
-  padding: 0.45rem 0.7rem;
-  border-radius: 999px;
-  background: rgba(34, 197, 94, 0.12);
-  color: #bbf7d0;
-  font-size: 0.82rem;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  white-space: nowrap;
-  animation: zoneBadgeIn 220ms ease-out;
-}
-
 @keyframes zonePulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+    box-shadow:
+      0 0 0 0 rgba(34, 197, 94, 0.65),
+      0 0 0 0 rgba(34, 197, 94, 0.1);
   }
   100% {
-    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+    box-shadow:
+      0 0 0 10px rgba(34, 197, 94, 0),
+      0 0 0 0 rgba(34, 197, 94, 0);
   }
 }
 
@@ -539,6 +612,22 @@
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+.zoneValidBadge {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.2), rgba(34, 197, 94, 0.32));
+  color: #ecfdf5;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+  border: 1px solid rgba(74, 222, 128, 0.9);
+  box-shadow: 0 12px 30px rgba(22, 163, 74, 0.4);
+  animation: zoneBadgeIn 220ms ease-out;
 }
 
 .profileSaveBlock {
