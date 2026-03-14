@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { GoogleLogo } from "@/app/components/GoogleLogo";
 import styles from "./login.module.css";
 
 export default function LoginPage() {
@@ -66,7 +67,14 @@ export default function LoginPage() {
             disabled={isLoading}
             className={`${styles.button} ${isLoading ? styles.buttonDisabled : ""}`}
           >
-            {isLoading ? "Connexion en cours..." : "🔐 Se connecter avec Google"}
+            {isLoading ? (
+              "Connexion en cours..."
+            ) : (
+              <>
+                <GoogleLogo size={20} />
+                Se connecter avec Google
+              </>
+            )}
           </button>
           {error ? (
             <p role="alert" className={styles.error}>

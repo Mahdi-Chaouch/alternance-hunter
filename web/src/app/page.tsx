@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GoogleLogo } from "@/app/components/GoogleLogo";
 import styles from "./page.module.css";
 
 export default function Home() {
@@ -23,7 +24,8 @@ export default function Home() {
                 👀 Voir le dashboard en démo
               </Link>
               <Link href="/login" className={styles.secondaryBtn}>
-                🔐 Se connecter avec Google
+                <GoogleLogo size={18} />
+                Se connecter avec Google
               </Link>
               <Link
                 href="https://github.com/Mahdi-Chaouch/alternance-killer"

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "../page.module.css";
 import { authClient } from "@/lib/auth-client";
+import { GoogleLogo } from "@/app/components/GoogleLogo";
 
 type RunMode = "pipeline" | "hunter" | "generate" | "drafts";
 type Zone = "paris" | "cannes" | "auxerre" | "fontainebleau" | "all";
@@ -1054,7 +1055,8 @@ function DashboardContent() {
             </p>
             <div className={styles.controls}>
               <button className={styles.primaryBtn} type="button" onClick={() => router.push("/login")}>
-                🔐 Se connecter
+                <GoogleLogo size={18} />
+                Se connecter
               </button>
               <Link href="/dashboard?demo=1" className={styles.secondaryBtn} style={{ display: "inline-block", textDecoration: "none" }}>
                 👀 Voir le dashboard en démo
