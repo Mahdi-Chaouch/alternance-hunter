@@ -26,8 +26,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `document.documentElement.dataset.theme = localStorage.getItem('alternance-ui-theme') === 'light' ? 'light' : 'dark';`,
+          }}
+        />
         <div className="app-shell">
           <header className="app-header">
             <div className="app-header-inner">
@@ -43,9 +48,6 @@ export default function RootLayout({
                 <Link href="/" className="app-nav-link">
                   Accueil
                 </Link>
-                <Link href="/dashboard?demo=1" className="app-nav-link">
-                  Voir en démo
-                </Link>
                 <Link href="/login" className="app-nav-link">
                   Connexion
                 </Link>
@@ -54,11 +56,8 @@ export default function RootLayout({
                 </a>
               </nav>
               <div className="app-header-cta">
-                <Link href="/dashboard?demo=1" className="app-nav-link" style={{ marginRight: "0.75rem" }}>
-                  Voir en démo
-                </Link>
-                <Link href="/dashboard" className="app-header-button">
-                  Ouvrir le dashboard
+                <Link href="/login" className="app-header-button">
+                  Connexion
                 </Link>
               </div>
             </div>

@@ -267,8 +267,8 @@ a {
 }
 
 .floating-theme {
-  top: 5rem;
-  right: var(--space-xl);
+  bottom: var(--space-xl);
+  left: var(--space-xl);
 }
 
 .floating-back-to-top {
@@ -280,8 +280,8 @@ a {
 
 @media (max-width: 768px) {
   .floating-theme {
-    top: 4.5rem;
-    right: var(--space-md);
+    bottom: var(--space-md);
+    left: var(--space-md);
   }
 
   .floating-back-to-top {
