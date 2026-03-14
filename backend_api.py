@@ -121,7 +121,9 @@ def sanitize_log_line(line: str, secrets: List[str]) -> str:
 
 class RunRequest(BaseModel):
     mode: Literal["pipeline", "hunter", "generate", "drafts"] = "pipeline"
-    zone: Literal["paris", "cannes", "auxerre", "fontainebleau", "all"] = "all"
+    # Zone libre saisie depuis le dashboard (ex: "Paris", "Lyon, Marseille" ou "all").
+    # On ne restreint plus la valeur ici : la logique d'interprétation se fait côté pipeline.
+    zone: str = "all"
     dry_run: bool = False
     python: Optional[str] = None
 
