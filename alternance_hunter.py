@@ -783,12 +783,13 @@ def build_email_draft(
         "NOM": sender_last_name.strip(),
         "NOM_COMPLET": display_name,
         "LINKEDIN": sender_linkedin_url.strip(),
+        "DATE": "Septembre 2026",
     }
 
-    default_subject = "Candidature spontanee - Alternance Developpeur Web - Septembre 2026 - {{ENTREPRISE}}"
+    default_subject = "Candidature spontanee - Alternance Developpeur Web - {{DATE}} - {{ENTREPRISE}}"
     default_body = """Madame, Monsieur,
 
-Je suis a la recherche d'une alternance en developpement web a partir de septembre 2026.
+Je suis a la recherche d'une alternance en developpement web a partir de {{DATE}}.
 
 Je souhaite rejoindre {{ENTREPRISE}} afin de contribuer a des projets concrets et progresser au contact d'une equipe.
 

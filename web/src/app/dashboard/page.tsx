@@ -1170,7 +1170,7 @@ function DashboardContent() {
               <p className={styles.uploadHint}>
                 Premiere connexion: renseignez votre prenom/nom. Vous pouvez personnaliser le sujet et
                 le corps complet du mail avec des placeholders ({`{{ENTREPRISE}}`},{" "}
-                {`{{NOM_COMPLET}}`}, {`{{PRENOM}}`}, {`{{NOM}}`}, {`{{LINKEDIN}}`}).
+                {`{{NOM_COMPLET}}`}, {`{{PRENOM}}`}, {`{{NOM}}`}, {`{{LINKEDIN}}`}, {`{{DATE}}`}).
               </p>
               <div className={styles.uploadGrid}>
                 <label>
@@ -1216,7 +1216,7 @@ function DashboardContent() {
                   value={mailBodyTemplate}
                   onChange={(e) => setMailBodyTemplate(e.target.value)}
                   rows={8}
-                  placeholder={"Ex: Bonjour,\nJe suis {{NOM_COMPLET}} et je candidate chez {{ENTREPRISE}}."}
+                  placeholder={"Ex: Bonjour,\nJe suis à la recherche d'une alternance en {{DATE}}.\nJe candidate chez {{ENTREPRISE}}."}
                 />
               </label>
               <button className={styles.secondaryBtn} type="submit" disabled={isSavingProfile || showDemoBanner}>
