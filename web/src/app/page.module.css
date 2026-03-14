@@ -740,6 +740,128 @@
   max-width: 66ch;
 }
 
+/* Progress steps (avancee du pipeline) */
+.progressSteps {
+  margin: 1.25rem 0;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-bg) 95%, var(--bg) 5%);
+  border: 1px solid var(--panel-border);
+}
+
+.progressStepsTitle {
+  margin: 0 0 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--muted-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.progressStepsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.progressStepItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.progressStepIcon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.progressStepLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.progressStepBadge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.progressStepPending {
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
+}
+
+.progressStepRunning {
+  background: var(--status-running-bg);
+  color: var(--status-running-text);
+}
+
+.progressStepDone {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.progressStepError {
+  background: var(--status-failed-bg);
+  color: var(--status-failed-text);
+}
+
+.logsToggleWrap {
+  margin: 1rem 0;
+}
+
+/* Drop zone documents */
+.dropZone {
+  border: 2px dashed var(--panel-border);
+  border-radius: 12px;
+  padding: 1.25rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  margin-bottom: 1rem;
+}
+
+.dropZone:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+.dropZoneActive {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.dropZoneHasFiles {
+  border-color: var(--status-success-text);
+  background: color-mix(in srgb, var(--status-success-bg) 40%, transparent);
+}
+
+.dropZoneIcon {
+  display: block;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.9;
+}
+
+.dropZoneText {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+}
+
+.dropZoneActive .dropZoneText,
+.dropZoneHasFiles .dropZoneText {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .tableWrap {
   overflow: auto;
   border: 1px solid var(--panel-border);
