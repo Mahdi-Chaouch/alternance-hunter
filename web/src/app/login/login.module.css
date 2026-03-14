@@ -176,3 +176,26 @@
     padding: 1.4rem 1.2rem 1.5rem;
   }
 }
+
+/* Light mode: fond restant sombre → texte clair pour lisibilité */
+:global(:root[data-theme="light"]) .copy {
+  color: #e5e7eb;
+}
+
+:global(:root[data-theme="light"]) .eyebrow {
+  color: #cbd5e1;
+}
+
+:global(:root[data-theme="light"]) .title {
+  color: #f1f5f9;
+}
+
+:global(:root[data-theme="light"]) .subtitle,
+:global(:root[data-theme="light"]) .points,
+:global(:root[data-theme="light"]) .helperText {
+  color: #cbd5e1;
+}
+
+:global(:root[data-theme="light"]) .helperLink {
+  color: #a3e635;
+}

@@ -28,6 +28,39 @@
   color: var(--text);
 }
 
+/* Page d'accueil : dark mode quand le thème global est dark */
+:global(:root[data-theme="dark"]) .page {
+  --bg: #030712;
+  --text: #e5e7eb;
+  --panel-bg: #0b1220;
+  --panel-border: #1f2b3d;
+  --input-bg: #0b1324;
+  --input-border: #30445d;
+  --muted-text: #a6b4c7;
+  --subtle-text: #8ea1b8;
+  --secondary-bg: #0f172a;
+  --secondary-text: #dbeafe;
+  --btn-border: #32475f;
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --danger: #ef4444;
+  --danger-hover: #f87171;
+  --status-running-bg: #172554;
+  --status-running-text: #93c5fd;
+  --status-success-bg: #14532d;
+  --status-success-text: #bbf7d0;
+  --status-failed-bg: #7f1d1d;
+  --status-failed-text: #fecaca;
+  --status-neutral-bg: #1e293b;
+  --status-neutral-text: #cbd5e1;
+}
+
+:global(:root[data-theme="dark"]) .page .hero {
+  background: radial-gradient(circle at top left, #0f172a 0, #020617 65%);
+  border-color: #1f2937;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.65);
+}
+
 .pageDark {
   --bg: #030712;
   --text: #e5e7eb;
