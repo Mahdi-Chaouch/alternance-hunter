@@ -34,16 +34,16 @@ export default function LoginPage() {
         <div className={styles.copy}>
           <p className={styles.eyebrow}>Alternance Hunter</p>
           <h1 className={styles.title}>
-            Connecte ton compte Google pour lancer le dashboard.
+            🔐 Connecte ton compte Google pour lancer le dashboard.
           </h1>
           <p className={styles.subtitle}>
             L&apos;authentification se fait via Google pour te permettre de générer et suivre
             tes brouillons de candidatures directement dans Gmail, avec des logs détaillés.
           </p>
           <ul className={styles.points}>
-            <li>Accès au pipeline complet de candidatures d&apos;alternance.</li>
-            <li>Création de brouillons Gmail traçables avant tout envoi.</li>
-            <li>Dashboard temps réel pour suivre chaque exécution.</li>
+            <li>📋 Accès au pipeline complet de candidatures d&apos;alternance.</li>
+            <li>✉️ Création de brouillons Gmail traçables avant tout envoi.</li>
+            <li>📊 Dashboard temps réel pour suivre chaque exécution.</li>
           </ul>
           <p className={styles.helperText}>
             Tu peux toujours revenir à l&apos;accueil pour revoir le fonctionnement de
@@ -56,7 +56,7 @@ export default function LoginPage() {
         </div>
 
         <div className={styles.card} aria-label="Connexion au dashboard">
-          <h2 className={styles.cardTitle}>Connexion requise</h2>
+          <h2 className={styles.cardTitle}>🔐 Connexion requise</h2>
           <p className={styles.cardText}>
             Utilise ton compte Google autorisé pour accéder au dashboard Alternance Hunter.
           </p>
@@ -66,7 +66,7 @@ export default function LoginPage() {
             disabled={isLoading}
             className={`${styles.button} ${isLoading ? styles.buttonDisabled : ""}`}
           >
-            {isLoading ? "Connexion en cours..." : "Se connecter avec Google"}
+            {isLoading ? "Connexion en cours..." : "🔐 Se connecter avec Google"}
           </button>
           {error ? (
             <p role="alert" className={styles.error}>
