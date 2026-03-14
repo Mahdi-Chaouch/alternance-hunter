@@ -26,7 +26,7 @@ export default function Home() {
                 Se connecter avec Google
               </Link>
               <Link
-                href="https://github.com"
+                href="https://github.com/Mahdi-Chaouch/alternance-killer"
                 target="_blank"
                 rel="noreferrer noopener"
                 className={styles.ghostLink}
@@ -208,7 +208,7 @@ export default function Home() {
                 </li>
                 <li>
                   <a
-                    href="https://github.com"
+                    href="https://github.com/Mahdi-Chaouch/alternance-killer"
                     target="_blank"
                     rel="noreferrer noopener"
                     className={styles.contactLink}

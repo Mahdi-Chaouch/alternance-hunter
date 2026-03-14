@@ -136,6 +136,54 @@ function getStatusTone(status: string): "running" | "success" | "failed" | "neut
   return "running";
 }
 
+type StepStatus = "pending" | "running" | "done" | "error";
+type PipelineStep = { id: string; label: string; status: StepStatus; icon: string };
+
+function getPipelineStepsFromLogs(logsTail: string[], runStatus: string): PipelineStep[] {
+  const text = logsTail.join("\n");
+  const normalizedStatus = runStatus.toLowerCase();
+  const steps: PipelineStep[] = [
+    { id: "hunter", label: "Recherche d'entreprises", status: "pending", icon: "🔍" },
+    { id: "generate", label: "Génération des lettres de motivation", status: "pending", icon: "📄" },
+    { id: "drafts", label: "Création des brouillons Gmail", status: "pending", icon: "✉️" },
+  ];
+  const hunterStarted = /ETAPE:\s*hunter/i.test(text);
+  const generateStarted = /ETAPE:\s*generate/i.test(text);
+  const draftsStarted = /ETAPE:\s*drafts/i.test(text);
+  const pipelineDone = /Pipeline termine/i.test(text);
+
+  if (pipelineDone || normalizedStatus === "succeeded") {
+    steps[0].status = "done";
+    steps[1].status = "done";
+    steps[2].status = "done";
+    return steps;
+  }
+  if (normalizedStatus === "failed" || normalizedStatus === "cancelled") {
+    if (draftsStarted) {
+      steps[0].status = "done";
+      steps[1].status = "done";
+      steps[2].status = "error";
+    } else if (generateStarted) {
+      steps[0].status = "done";
+      steps[1].status = "error";
+    } else if (hunterStarted) {
+      steps[0].status = "error";
+    }
+    return steps;
+  }
+  if (draftsStarted) {
+    steps[0].status = "done";
+    steps[1].status = "done";
+    steps[2].status = "running";
+  } else if (generateStarted) {
+    steps[0].status = "done";
+    steps[1].status = "running";
+  } else if (hunterStarted) {
+    steps[0].status = "running";
+  }
+  return steps;
+}
+
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -171,7 +219,6 @@ function DashboardContent() {
   const [maxSites, setMaxSites] = useState(1500);
   const [targetFound, setTargetFound] = useState(100);
   const [workers, setWorkers] = useState(20);
-  const [useAi, setUseAi] = useState(false);
   const [isLaunchingRun, setIsLaunchingRun] = useState(false);
   const [isRefreshingRuns, setIsRefreshingRuns] = useState(false);
   const [isRefreshingDetails, setIsRefreshingDetails] = useState(false);
@@ -186,10 +233,17 @@ function DashboardContent() {
   const [terminalFlash, setTerminalFlash] = useState(false);
   const [animatedLogs, setAnimatedLogs] = useState("");
   const [isTypingLogs, setIsTypingLogs] = useState(false);
+  const [showLogsSection, setShowLogsSection] = useState(false);
+  const [isDraggingDocs, setIsDraggingDocs] = useState(false);
   const logsRef = useRef<HTMLPreElement | null>(null);
   const typingTimerRef = useRef<number | null>(null);
   const animatedLogsRef = useRef("");
   const showDemoBanner = accessState === "unauthenticated" && isDemoView;
+
+  const pipelineSteps = useMemo(() => {
+    if (!runDetails?.logs_tail?.length) return null;
+    return getPipelineStepsFromLogs(runDetails.logs_tail, runDetails.status);
+  }, [runDetails?.logs_tail, runDetails?.status]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("alternance-ui-theme");
@@ -400,7 +454,6 @@ function DashboardContent() {
         setMaxSites(Number(data.profile?.run_max_sites ?? 1500));
         setTargetFound(Number(data.profile?.run_target_found ?? 100));
         setWorkers(Number(data.profile?.run_workers ?? 20));
-        setUseAi(Boolean(data.profile?.run_use_ai));
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : "Erreur de chargement du profil.";
@@ -617,7 +670,7 @@ function DashboardContent() {
         max_sites: maxSites,
         target_found: targetFound,
         workers,
-        use_ai: useAi,
+        use_ai: false,
       };
       const response = await fetch("/api/runs", {
         method: "POST",
@@ -793,7 +846,7 @@ function DashboardContent() {
           run_max_sites: maxSites,
           run_target_found: targetFound,
           run_workers: workers,
-          run_use_ai: useAi,
+          run_use_ai: false,
         }),
       });
       const data = (await safeJson<{ ok?: boolean; detail?: string }>(response)) as {
@@ -890,7 +943,7 @@ function DashboardContent() {
           run_max_sites: maxSites,
           run_target_found: targetFound,
           run_workers: workers,
-          run_use_ai: useAi,
+          run_use_ai: false,
         }),
       });
       const data = (await safeJson<{ ok?: boolean; detail?: string }>(response)) as {
@@ -1135,9 +1188,44 @@ function DashboardContent() {
             <form className={styles.uploadCard} onSubmit={onUploadAssets} id="step-documents">
               <p className={styles.uploadTitle}>Vos documents</p>
               <p className={styles.uploadHint}>
-                Importez votre CV (PDF) et votre template LM (.docx/.doc). Les runs utiliseront vos
-                fichiers automatiquement.
+                Glissez-déposez ou sélectionnez votre CV (PDF) et votre template LM (.docx/.doc).
               </p>
+              <div
+                className={`${styles.dropZone} ${isDraggingDocs ? styles.dropZoneActive : ""} ${(cvFile || templateFile) ? styles.dropZoneHasFiles : ""}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!showDemoBanner) setIsDraggingDocs(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingDocs(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDraggingDocs(false);
+                  if (showDemoBanner) return;
+                  const files = Array.from(e.dataTransfer?.files ?? []);
+                  for (const file of files) {
+                    const name = (file.name || "").toLowerCase();
+                    const isPdf = name.endsWith(".pdf") || file.type === "application/pdf";
+                    const isDoc = name.endsWith(".docx") || name.endsWith(".doc") || file.type.includes("word") || file.type.includes("document");
+                    if (isPdf) setCvFile(file);
+                    if (isDoc) setTemplateFile(file);
+                  }
+                }}
+              >
+                <span className={styles.dropZoneIcon} aria-hidden="true">📁</span>
+                <span className={styles.dropZoneText}>
+                  {cvFile || templateFile
+                    ? [cvFile?.name, templateFile?.name].filter(Boolean).join(" • ")
+                    : isDraggingDocs
+                      ? "Déposez les fichiers ici"
+                      : "Déposez votre CV (PDF) et template LM (.docx) ici"}
+                </span>
+              </div>
               <div className={styles.uploadGrid}>
                 <label>
                   CV (PDF)
@@ -1244,17 +1332,6 @@ function DashboardContent() {
                       type="checkbox"
                       checked={dryRun}
                       onChange={(e) => setDryRun(e.target.checked)}
-                    />
-                    <span className={styles.switchTrack} aria-hidden="true" />
-                  </span>
-                </label>
-                <label className={styles.switchField}>
-                  <span>Utiliser IA pour enrichir les resultats</span>
-                  <span className={styles.switchControl}>
-                    <input
-                      type="checkbox"
-                      checked={useAi}
-                      onChange={(e) => setUseAi(e.target.checked)}
                     />
                     <span className={styles.switchTrack} aria-hidden="true" />
                   </span>
@@ -1481,80 +1558,117 @@ function DashboardContent() {
                   </dd>
                 </div>
                 <div>
-                  <dt>PID</dt>
-                  <dd>{runDetails.pid ?? "n/a"}</dd>
-                </div>
-                <div>
-                  <dt>Code de sortie</dt>
-                  <dd>{runDetails.exit_code ?? "n/a"}</dd>
-                </div>
-                <div>
                   <dt>Zone</dt>
                   <dd>{runDetails.zone ?? "-"}</dd>
                 </div>
               </dl>
-              {isTerminalFullscreen ? (
-                <div
-                  className={styles.terminalBackdrop}
-                  onClick={() => setIsTerminalFullscreen(false)}
-                />
-              ) : null}
-              <div
-                className={`${styles.terminalShell} ${terminalFlash ? styles.terminalFlash : ""} ${
-                  isTypingLogs ? styles.terminalShellTyping : ""
-                } ${isTerminalFullscreen ? styles.terminalFullscreen : ""}`}
-              >
-                <div className={styles.terminalHeader}>
-                  <span className={styles.dotRed} />
-                  <span className={styles.dotYellow} />
-                  <span className={styles.dotGreen} />
-                  <strong>Logs en direct</strong>
-                  <span className={styles.terminalStatus}>
-                    {isRunning ? "Execution en cours..." : "Execution terminee"}
-                  </span>
-                  <button
-                    className={styles.secondaryBtn}
-                    type="button"
-                    onClick={() => setAutoScrollLogs((prev) => !prev)}
-                  >
-                    {autoScrollLogs ? "Defiler automatiquement: oui" : "Defiler automatiquement: non"}
-                  </button>
-                  <button
-                    className={styles.secondaryBtn}
-                    type="button"
-                    onClick={() => {
-                      setAnimatedLogs("");
-                      animatedLogsRef.current = "";
-                      setRunDetails((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              logs_tail: [],
-                            }
-                          : prev,
-                      );
-                    }}
-                  >
-                    Clear terminal
-                  </button>
-                  <button
-                    className={styles.secondaryBtn}
-                    type="button"
-                    onClick={() => setIsTerminalFullscreen((prev) => !prev)}
-                  >
-                    {isTerminalFullscreen ? "Quitter le plein ecran" : "Plein ecran"}
-                  </button>
+
+              {pipelineSteps ? (
+                <div className={styles.progressSteps}>
+                  <h3 className={styles.progressStepsTitle}>Avancee du pipeline</h3>
+                  <ul className={styles.progressStepsList}>
+                    {pipelineSteps.map((step) => (
+                      <li key={step.id} className={styles.progressStepItem}>
+                        <span className={styles.progressStepIcon} aria-hidden="true">
+                          {step.icon}
+                        </span>
+                        <span className={styles.progressStepLabel}>{step.label}</span>
+                        <span
+                          className={`${styles.progressStepBadge} ${
+                            step.status === "done"
+                              ? styles.progressStepDone
+                              : step.status === "running"
+                                ? styles.progressStepRunning
+                                : step.status === "error"
+                                  ? styles.progressStepError
+                                  : styles.progressStepPending
+                          }`}
+                        >
+                          {step.status === "pending"
+                            ? "En attente"
+                            : step.status === "running"
+                              ? "En cours..."
+                              : step.status === "done"
+                                ? "Terminé"
+                                : "Erreur"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <pre
-                  ref={logsRef}
-                  className={`${styles.logs} ${isTerminalFullscreen ? styles.logsFullscreen : ""} ${
-                    isTypingLogs ? styles.logsTyping : ""
-                  }`}
+              ) : null}
+
+              <div className={styles.logsToggleWrap}>
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  onClick={() => setShowLogsSection((prev) => !prev)}
                 >
-                  {animatedLogs || "Aucun log disponible pour cette execution."}
-                  {isRunning || isTypingLogs ? <span className={styles.cursor}>█</span> : null}
-                </pre>
+                  {showLogsSection ? "Masquer les logs" : "Afficher les logs"}
+                </button>
               </div>
+
+              {showLogsSection ? (
+                <>
+                  {isTerminalFullscreen ? (
+                    <div
+                      className={styles.terminalBackdrop}
+                      onClick={() => setIsTerminalFullscreen(false)}
+                    />
+                  ) : null}
+                  <div
+                    className={`${styles.terminalShell} ${terminalFlash ? styles.terminalFlash : ""} ${
+                      isTypingLogs ? styles.terminalShellTyping : ""
+                    } ${isTerminalFullscreen ? styles.terminalFullscreen : ""}`}
+                  >
+                    <div className={styles.terminalHeader}>
+                      <span className={styles.dotRed} />
+                      <span className={styles.dotYellow} />
+                      <span className={styles.dotGreen} />
+                      <strong>Logs en direct</strong>
+                      <span className={styles.terminalStatus}>
+                        {isRunning ? "Execution en cours..." : "Execution terminee"}
+                      </span>
+                      <button
+                        className={styles.secondaryBtn}
+                        type="button"
+                        onClick={() => setAutoScrollLogs((prev) => !prev)}
+                      >
+                        {autoScrollLogs ? "Defiler auto: oui" : "Defiler auto: non"}
+                      </button>
+                      <button
+                        className={styles.secondaryBtn}
+                        type="button"
+                        onClick={() => {
+                          setAnimatedLogs("");
+                          animatedLogsRef.current = "";
+                          setRunDetails((prev) =>
+                            prev ? { ...prev, logs_tail: [] } : prev,
+                          );
+                        }}
+                      >
+                        Clear
+                      </button>
+                      <button
+                        className={styles.secondaryBtn}
+                        type="button"
+                        onClick={() => setIsTerminalFullscreen((prev) => !prev)}
+                      >
+                        {isTerminalFullscreen ? "Quitter plein ecran" : "Plein ecran"}
+                      </button>
+                    </div>
+                    <pre
+                      ref={logsRef}
+                      className={`${styles.logs} ${isTerminalFullscreen ? styles.logsFullscreen : ""} ${
+                        isTypingLogs ? styles.logsTyping : ""
+                      }`}
+                    >
+                      {animatedLogs || "Aucun log disponible pour cette execution."}
+                      {isRunning || isTypingLogs ? <span className={styles.cursor}>█</span> : null}
+                    </pre>
+                  </div>
+                </>
+              ) : null}
             </>
           )}
         </section>

@@ -42,16 +42,13 @@ export default function RootLayout({
                 <Link href="/" className="app-nav-link">
                   Accueil
                 </Link>
-                <Link href="/dashboard" className="app-nav-link">
-                  Dashboard
-                </Link>
                 <Link href="/dashboard?demo=1" className="app-nav-link">
                   Voir en démo
                 </Link>
                 <Link href="/login" className="app-nav-link">
                   Connexion
                 </Link>
-                <a href="https://github.com" target="_blank" rel="noreferrer noopener" className="app-nav-link">
+                <a href="https://github.com/Mahdi-Chaouch/alternance-killer" target="_blank" rel="noreferrer noopener" className="app-nav-link">
                   GitHub
                 </a>
               </nav>
