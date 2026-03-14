@@ -8,7 +8,7 @@ import { authClient } from "@/lib/auth-client";
 import { GoogleLogo } from "@/app/components/GoogleLogo";
 
 type RunMode = "pipeline" | "hunter" | "generate" | "drafts";
-type Zone = "paris" | "cannes" | "auxerre" | "fontainebleau" | "all";
+type Zone = string;
 
 type RunListItem = {
   run_id: string;
@@ -57,13 +57,8 @@ const MODE_LABELS: Record<RunMode, string> = {
   drafts: "Création des brouillons Gmail",
 };
 
-const ZONE_LABELS: Record<Zone, string> = {
-  all: "Toutes les zones",
-  paris: "Paris",
-  cannes: "Cannes",
-  auxerre: "Auxerre",
-  fontainebleau: "Fontainebleau",
-};
+const ZONE_PLACEHOLDER =
+  "Ex: Paris, Lyon, Lille (laissez vide pour toute la France)";
 
 async function safeJson<T>(response: Response): Promise<T | Record<string, unknown>> {
   const rawBody = await response.text();
@@ -187,11 +182,19 @@ function getPipelineStepsFromLogs(logsTail: string[], runStatus: string): Pipeli
 
 type ProgressCounts = { companiesFound: number; lettersWritten: number; draftsCreated: number };
 
+/** Compte le nombre de lignes "✅ FOUND" dans les logs (1 FOUND = 1 email trouvé). */
+function countFoundInLogs(logsTail: string[]): number {
+  return logsTail.filter((line) => /✅\s*FOUND/i.test(line)).length;
+}
+
 function getProgressCountsFromLogs(logsTail: string[]): ProgressCounts {
   const text = logsTail.join("\n");
   let companiesFound = 0;
   let lettersWritten = 0;
   let draftsCreated = 0;
+
+  const foundFromLines = countFoundInLogs(logsTail);
+  if (foundFromLines > 0) companiesFound = foundFromLines;
 
   const foundMatch = text.match(/FOUND:\s*(\d+)/);
   if (foundMatch) companiesFound = Math.max(companiesFound, parseInt(foundMatch[1], 10));
@@ -214,6 +217,16 @@ function getProgressCountsFromLogs(logsTail: string[]): ProgressCounts {
   return { companiesFound, lettersWritten, draftsCreated };
 }
 
+/** Détecte le mode lancé (hunter, generate, drafts, pipeline) depuis la commande du run. */
+function getLaunchedModeFromCommand(command: string[] | undefined): RunMode | null {
+  if (!command?.length) return null;
+  const idx = command.indexOf("--mode");
+  if (idx === -1 || idx + 1 >= command.length) return null;
+  const mode = command[idx + 1]?.toLowerCase();
+  if (mode === "hunter" || mode === "generate" || mode === "drafts" || mode === "pipeline") return mode as RunMode;
+  return null;
+}
+
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -231,6 +244,7 @@ function DashboardContent() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [portfolioUrl, setPortfolioUrl] = useState("");
   const [mailSubjectTemplate, setMailSubjectTemplate] = useState("");
   const [mailBodyTemplate, setMailBodyTemplate] = useState("");
   const [profileInfo, setProfileInfo] = useState("");
@@ -270,15 +284,28 @@ function DashboardContent() {
   const animatedLogsRef = useRef("");
   const showDemoBanner = accessState === "unauthenticated" && isDemoView;
 
-  const pipelineSteps = useMemo(() => {
+  const pipelineStepsRaw = useMemo(() => {
     if (!runDetails?.logs_tail?.length) return null;
     return getPipelineStepsFromLogs(runDetails.logs_tail, runDetails.status);
   }, [runDetails?.logs_tail, runDetails?.status]);
+
+  const pipelineSteps = useMemo(() => {
+    const mode = getLaunchedModeFromCommand(runDetails?.command ?? undefined);
+    if (!pipelineStepsRaw || !mode) return pipelineStepsRaw;
+    if (mode === "hunter") return pipelineStepsRaw.slice(0, 1);
+    if (mode === "generate") return pipelineStepsRaw.slice(0, 2);
+    return pipelineStepsRaw;
+  }, [pipelineStepsRaw, runDetails?.command]);
 
   const progressCounts = useMemo(() => {
     if (!runDetails?.logs_tail?.length) return null;
     return getProgressCountsFromLogs(runDetails.logs_tail);
   }, [runDetails?.logs_tail]);
+
+  const launchedMode = useMemo(
+    () => getLaunchedModeFromCommand(runDetails?.command ?? undefined),
+    [runDetails?.command],
+  );
 
   useEffect(() => {
     const saved = window.localStorage.getItem("alternance-ui-theme");
@@ -487,6 +514,7 @@ function DashboardContent() {
         setFirstName(data.profile?.first_name ?? "");
         setLastName(data.profile?.last_name ?? "");
         setLinkedinUrl(data.profile?.linkedin_url ?? "");
+        setPortfolioUrl(data.profile?.portfolio_url ?? "");
         setMailSubjectTemplate(data.profile?.subject_template ?? "");
         setMailBodyTemplate(data.profile?.body_template ?? "");
         if (data.profile?.run_mode) {
@@ -883,6 +911,7 @@ function DashboardContent() {
           first_name: normalizedFirstName,
           last_name: normalizedLastName,
           linkedin_url: linkedinUrl,
+          portfolio_url: portfolioUrl,
           subject_template: mailSubjectTemplate,
           body_template: mailBodyTemplate,
           run_mode: mode,
@@ -1172,7 +1201,8 @@ function DashboardContent() {
               <p className={styles.uploadHint}>
                 Premiere connexion: renseignez votre prenom/nom. Vous pouvez personnaliser le sujet et
                 le corps complet du mail avec des placeholders ({`{{ENTREPRISE}}`},{" "}
-                {`{{NOM_COMPLET}}`}, {`{{PRENOM}}`}, {`{{NOM}}`}, {`{{LINKEDIN}}`}, {`{{DATE}}`}).
+                {`{{NOM_COMPLET}}`}, {`{{PRENOM}}`}, {`{{NOM}}`}, {`{{LINKEDIN}}`}, {`{{PORTFOLIO}}`},{" "}
+                {`{{DATE}}`}).
               </p>
               <div className={styles.uploadGrid}>
                 <label>
@@ -1201,6 +1231,15 @@ function DashboardContent() {
                   value={linkedinUrl}
                   onChange={(e) => setLinkedinUrl(e.target.value)}
                   placeholder="https://www.linkedin.com/in/votre-profil"
+                />
+              </label>
+              <label>
+                Portfolio (optionnel)
+                <input
+                  type="url"
+                  value={portfolioUrl}
+                  onChange={(e) => setPortfolioUrl(e.target.value)}
+                  placeholder="https://votre-portfolio.dev"
                 />
               </label>
               <label>
@@ -1301,14 +1340,13 @@ function DashboardContent() {
                 </label>
 
                 <label>
-                  Zone geographique
-                  <select value={zone} onChange={(e) => setZone(e.target.value as Zone)}>
-                    {(Object.keys(ZONE_LABELS) as Zone[]).map((option) => (
-                      <option key={option} value={option}>
-                        {ZONE_LABELS[option]}
-                      </option>
-                    ))}
-                  </select>
+                  Zone geographique (optionnel)
+                  <input
+                    type="text"
+                    value={zone}
+                    onChange={(e) => setZone(e.target.value)}
+                    placeholder={ZONE_PLACEHOLDER}
+                  />
                 </label>
 
                 <label>
@@ -1637,25 +1675,91 @@ function DashboardContent() {
                       ))}
                     </ul>
                   ) : null}
-                  {progressCounts ? (
+                  {progressCounts && launchedMode ? (
+                    <div className={styles.progressBars}>
+                      {(launchedMode === "hunter" || launchedMode === "pipeline") && (
+                        <div className={styles.progressBarItem}>
+                          <div className={styles.progressBarLabel}>
+                            <span>Alternance Hunter – emails trouvés</span>
+                            <span className={styles.progressBarValue}>
+                              {progressCounts.companiesFound} (1 FOUND = 1 %)
+                            </span>
+                          </div>
+                          <div className={styles.progressBarTrack}>
+                            <div
+                              className={styles.progressBarFill}
+                              style={{
+                                width: `${Math.min(100, progressCounts.companiesFound)}%`,
+                              }}
+                            />
+                          </div>
+                          <span className={styles.progressBarPct}>
+                            {Math.min(100, progressCounts.companiesFound)} %
+                          </span>
+                        </div>
+                      )}
+                      {(launchedMode === "generate" || launchedMode === "pipeline") && (
+                        <div className={styles.progressBarItem}>
+                          <div className={styles.progressBarLabel}>
+                            <span>Lettres de motivation générées</span>
+                            <span className={styles.progressBarValue}>
+                              {progressCounts.lettersWritten} / {Math.max(progressCounts.companiesFound, targetFound)}
+                            </span>
+                          </div>
+                          <div className={styles.progressBarTrack}>
+                            <div
+                              className={styles.progressBarFill}
+                              style={{
+                                width: `${Math.min(100, (progressCounts.lettersWritten / Math.max(1, Math.max(progressCounts.companiesFound, targetFound))) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                          <span className={styles.progressBarPct}>
+                            {Math.round((progressCounts.lettersWritten / Math.max(1, Math.max(progressCounts.companiesFound, targetFound))) * 100)} %
+                          </span>
+                        </div>
+                      )}
+                      {(launchedMode === "drafts" || launchedMode === "pipeline") && (
+                        <div className={styles.progressBarItem}>
+                          <div className={styles.progressBarLabel}>
+                            <span>Brouillons Gmail créés</span>
+                            <span className={styles.progressBarValue}>
+                              {progressCounts.draftsCreated} / {Math.max(progressCounts.companiesFound, targetFound)}
+                            </span>
+                          </div>
+                          <div className={styles.progressBarTrack}>
+                            <div
+                              className={styles.progressBarFill}
+                              style={{
+                                width: `${Math.min(100, (progressCounts.draftsCreated / Math.max(1, Math.max(progressCounts.companiesFound, targetFound))) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                          <span className={styles.progressBarPct}>
+                            {Math.round((progressCounts.draftsCreated / Math.max(1, Math.max(progressCounts.companiesFound, targetFound))) * 100)} %
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : progressCounts && !launchedMode ? (
                     <div className={styles.progressBars}>
                       <div className={styles.progressBarItem}>
                         <div className={styles.progressBarLabel}>
-                          <span>Entreprises trouvées</span>
+                          <span>Alternance Hunter – emails trouvés</span>
                           <span className={styles.progressBarValue}>
-                            {progressCounts.companiesFound} / {targetFound}
+                            {progressCounts.companiesFound} (1 FOUND = 1 %)
                           </span>
                         </div>
                         <div className={styles.progressBarTrack}>
                           <div
                             className={styles.progressBarFill}
                             style={{
-                              width: `${Math.min(100, (progressCounts.companiesFound / Math.max(1, targetFound)) * 100)}%`,
+                              width: `${Math.min(100, progressCounts.companiesFound)}%`,
                             }}
                           />
                         </div>
                         <span className={styles.progressBarPct}>
-                          {Math.round((progressCounts.companiesFound / Math.max(1, targetFound)) * 100)} %
+                          {Math.min(100, progressCounts.companiesFound)} %
                         </span>
                       </div>
                       <div className={styles.progressBarItem}>

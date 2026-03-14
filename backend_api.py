@@ -144,6 +144,7 @@ class RunRequest(BaseModel):
     sender_first_name: str = ""
     sender_last_name: str = ""
     sender_linkedin_url: str = ""
+    sender_portfolio_url: str = ""
     mail_subject_template: str = ""
     mail_body_template: str = ""
 
@@ -274,6 +275,8 @@ def build_pipeline_command(
         cmd += ["--sender-last-name", payload.sender_last_name]
     if payload.sender_linkedin_url:
         cmd += ["--sender-linkedin-url", payload.sender_linkedin_url]
+    if payload.sender_portfolio_url:
+        cmd += ["--sender-portfolio-url", payload.sender_portfolio_url]
     if payload.mail_subject_template:
         cmd += ["--mail-subject-template", payload.mail_subject_template]
     if payload.mail_body_template:

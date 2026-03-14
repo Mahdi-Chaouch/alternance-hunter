@@ -51,6 +51,7 @@ const ACCEPTED_RUN_REQUEST_FIELDS = new Set([
   "sender_first_name",
   "sender_last_name",
   "sender_linkedin_url",
+  "sender_portfolio_url",
   "mail_subject_template",
   "mail_body_template",
   "cv",
@@ -303,6 +304,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           sender_first_name: profile.first_name,
           sender_last_name: profile.last_name,
           sender_linkedin_url: profile.linkedin_url,
+          sender_portfolio_url: profile.portfolio_url,
           mail_subject_template: profile.subject_template,
           mail_body_template: profile.body_template,
         };

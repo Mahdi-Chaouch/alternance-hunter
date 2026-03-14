@@ -18,7 +18,7 @@ function splitName(fullName: string | null | undefined): { firstName: string; la
 }
 
 const ALLOWED_MODES = new Set(["pipeline", "hunter", "generate", "drafts"]);
-const ALLOWED_ZONES = new Set(["all", "paris", "cannes", "auxerre", "fontainebleau"]);
+const ALLOWED_ZONES = null;
 
 export async function GET(): Promise<NextResponse> {
   const authResult = await requireApiAuthorizedSession();
@@ -40,6 +40,7 @@ export async function GET(): Promise<NextResponse> {
         first_name: name.firstName,
         last_name: name.lastName,
         linkedin_url: "",
+        portfolio_url: "",
         subject_template: "",
         body_template: "",
         run_mode: "pipeline",
@@ -80,6 +81,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     first_name?: string;
     last_name?: string;
     linkedin_url?: string;
+    portfolio_url?: string;
     subject_template?: string;
     body_template?: string;
     run_mode?: string;
@@ -102,10 +104,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const linkedinUrl = (payload.linkedin_url ?? "").trim();
+  const portfolioUrl = (payload.portfolio_url ?? "").trim();
   const subjectTemplate = payload.subject_template ?? "";
   const bodyTemplate = payload.body_template ?? "";
   const runMode = (payload.run_mode ?? "pipeline").toLowerCase();
-  const runZone = (payload.run_zone ?? "all").toLowerCase();
+  const runZone = (payload.run_zone ?? "all").toString();
   const runDryRun = payload.run_dry_run === true;
   const runMaxMinutes = Number(payload.run_max_minutes ?? 30);
   const runMaxSites = Number(payload.run_max_sites ?? 1500);
@@ -116,8 +119,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!ALLOWED_MODES.has(runMode)) {
     return NextResponse.json({ detail: "Mode pipeline invalide." }, { status: 400 });
   }
-  if (!ALLOWED_ZONES.has(runZone)) {
-    return NextResponse.json({ detail: "Zone invalide." }, { status: 400 });
+  if (runZone.length > 200) {
+    return NextResponse.json({ detail: "Zone trop longue." }, { status: 400 });
   }
   if (
     Number.isNaN(runMaxMinutes) ||
@@ -138,6 +141,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     firstName,
     lastName,
     linkedinUrl,
+    portfolioUrl,
     subjectTemplate,
     bodyTemplate,
     runMode,
