@@ -587,7 +587,7 @@ function DashboardContent() {
         ? "Template LM requis (déposez un fichier ci-dessus)"
         : cvRequired && !cvUploaded
           ? "CV obligatoire (déposez votre CV ci-dessus)"
-          : "Lancer la recherche";
+          : "▶️ Lancer la recherche";
   const demoLaunchDisabled = showDemoBanner || launchDisabled;
   const demoLaunchLabel = showDemoBanner ? "Connectez-vous pour lancer une recherche" : launchButtonLabel;
 
@@ -1047,17 +1047,17 @@ function DashboardContent() {
         <main className={styles.main}>
           <section className={styles.panel}>
             <p className={styles.eyebrow}>Alternance Hunter</p>
-            <h1>Bienvenue</h1>
+            <h1>👋 Bienvenue</h1>
             <p className={styles.panelHint}>
               Connectez-vous avec votre compte Google invite pour acceder au dashboard et lancer vos
               executions.
             </p>
             <div className={styles.controls}>
               <button className={styles.primaryBtn} type="button" onClick={() => router.push("/login")}>
-                Se connecter
+                🔐 Se connecter
               </button>
               <Link href="/dashboard?demo=1" className={styles.secondaryBtn} style={{ display: "inline-block", textDecoration: "none" }}>
-                Voir le dashboard en démo
+                👀 Voir le dashboard en démo
               </Link>
               <button
                 className={styles.secondaryBtn}
@@ -1087,7 +1087,7 @@ function DashboardContent() {
         ) : null}
         <header className={styles.headerCard}>
           <div>
-            <p className={styles.eyebrow}>Tableau de bord</p>
+            <p className={styles.eyebrow}>📊 Tableau de bord</p>
             <h1>Tableau de bord Alternance Hunter</h1>
             <p className={styles.panelHint}>
               Suivez les étapes : profil, documents, paramètres, puis lancez une recherche et suivez l’avancement.
@@ -1104,7 +1104,7 @@ function DashboardContent() {
             {!showDemoBanner ? (
               <>
                 <button className={styles.secondaryBtn} type="button" onClick={onSaveWorkInProgress}>
-                  Enregistrer le travail
+                  💾 Enregistrer le travail
                 </button>
                 <button
                   className={styles.secondaryBtn}
@@ -1112,7 +1112,7 @@ function DashboardContent() {
                   onClick={onSignOut}
                   disabled={isSigningOut}
                 >
-                  {isSigningOut ? "Deconnexion..." : "Se deconnecter"}
+                  {isSigningOut ? "Deconnexion..." : "🚪 Se deconnecter"}
                 </button>
               </>
             ) : (
@@ -1124,24 +1124,24 @@ function DashboardContent() {
         </header>
 
         <nav className={styles.stepNav} aria-label="Navigation des etapes du dashboard">
-          <p className={styles.stepNavTitle}>Parcours du pipeline</p>
+          <p className={styles.stepNavTitle}>🛤️ Parcours du pipeline</p>
           <ul className={styles.stepNavList}>
             <li>
               <a className={styles.stepNavItem} href="#step-profil">
                 <span className={styles.stepNavNumber}>1</span>
-                <span>Profil expediteur</span>
+                <span>👤 Profil expediteur</span>
               </a>
             </li>
             <li>
               <a className={styles.stepNavItem} href="#step-documents">
                 <span className={styles.stepNavNumber}>2</span>
-                <span>Documents & templates</span>
+                <span>📁 Documents & templates</span>
               </a>
             </li>
             <li>
               <a className={styles.stepNavItem} href="#step-config">
                 <span className={styles.stepNavNumber}>3</span>
-                <span>Options de recherche</span>
+                <span>⚙️ Options de recherche</span>
               </a>
             </li>
             <li>
@@ -1153,7 +1153,7 @@ function DashboardContent() {
             <li>
               <a className={styles.stepNavItem} href="#step-logs">
                 <span className={styles.stepNavNumber}>5</span>
-                <span>Logs & terminal</span>
+                <span>🖥️ Logs & terminal</span>
               </a>
             </li>
           </ul>
@@ -1161,12 +1161,12 @@ function DashboardContent() {
 
         <div className={styles.topGrid}>
           <section className={styles.panel} id="step-profil">
-            <h2>Etape 1 – Profil & personnalisation</h2>
+            <h2>👤 Etape 1 – Profil & personnalisation</h2>
             <p className={styles.sectionHint}>
               Renseignez votre profil et personnalisez vos emails avant de lancer une recherche.
             </p>
             <form className={styles.profileCard} onSubmit={onSaveProfile}>
-              <p className={styles.uploadTitle}>Profil expediteur</p>
+              <p className={styles.uploadTitle}>👤 Profil expediteur</p>
               <p className={styles.uploadHint}>
                 Premiere connexion: renseignez votre prenom/nom. Vous pouvez personnaliser le sujet et
                 le corps complet du mail avec des placeholders ({`{{ENTREPRISE}}`},{" "}
@@ -1226,12 +1226,12 @@ function DashboardContent() {
                     ? "Connectez-vous pour enregistrer"
                     : isProfileLoading
                       ? "Chargement du profil..."
-                      : "Enregistrer mon profil"}
+                      : "💾 Enregistrer mon profil"}
               </button>
               {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
             </form>
             <form className={styles.uploadCard} onSubmit={onUploadAssets} id="step-documents">
-              <p className={styles.uploadTitle}>Vos documents</p>
+              <p className={styles.uploadTitle}>📁 Vos documents</p>
               <p className={styles.uploadHint}>
                 Déposez votre <strong>CV (PDF, obligatoire)</strong> et votre <strong>template de lettre de motivation</strong> (.docx). Sans CV, vous ne pourrez pas lancer de recherche.
               </p>
@@ -1284,7 +1284,7 @@ function DashboardContent() {
               aria-label="Paramètres de la recherche"
             >
               <h3 id="step-config" className={styles.sectionTitle}>
-                Etape 3 – Options de recherche
+                ⚙️ Etape 3 – Options de recherche
               </h3>
               <div className={styles.inputGrid}>
                 <label>
@@ -1380,7 +1380,7 @@ function DashboardContent() {
           </section>
 
           <section className={styles.panel}>
-            <h2>Etape 4 – Suivi des recherches</h2>
+            <h2>📋 Etape 4 – Suivi des recherches</h2>
             <p className={styles.sectionHint}>
               Consultez vos recherches récentes et leur avancement ci-dessous.
             </p>
