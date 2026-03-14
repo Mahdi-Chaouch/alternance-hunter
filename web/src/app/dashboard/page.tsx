@@ -58,7 +58,7 @@ const MODE_LABELS: Record<RunMode, string> = {
 };
 
 const ZONE_PLACEHOLDER =
-  "Ex: Paris, Lyon, Lille (laissez vide pour toute la France)";
+  "Tapez une ville (ex: Paris) — laissez vide pour toute la France";
 
 const KNOWN_ZONES: readonly Zone[] = [
   "all",
