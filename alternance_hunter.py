@@ -119,6 +119,43 @@ def rq_post(url: str, **kwargs):
 # OSM / OVERPASS CONFIG
 # ============================================================
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+# Fallback lat/lon when Nominatim fails (e.g. 403, rate limit, timeout on Render).
+# Keys must match place strings used in ZONES / FRANCE_COMMUNES / dynamic zones.
+NOMINATIM_FALLBACK: Dict[str, Tuple[float, float]] = {
+    "Aix-en-Provence, France": (43.5297, 5.4474),
+    "Auxerre, France": (47.7986, 3.5672),
+    "Bordeaux, France": (44.8378, -0.5792),
+    "Cannes, France": (43.5528, 7.0174),
+    "Fontainebleau, France": (48.4047, 2.7013),
+    "Lille, France": (50.6292, 3.0573),
+    "Lyon, France": (45.7640, 4.8357),
+    "Marseille, France": (43.2965, 5.3698),
+    "Montpellier, France": (43.6108, 3.8767),
+    "Nantes, France": (47.2184, -1.5536),
+    "Nice, France": (43.7102, 7.2620),
+    "Rennes, France": (48.1173, -1.6778),
+    "Strasbourg, France": (48.5734, 7.7521),
+    "Toulouse, France": (43.6047, 1.4442),
+    "Toulon, France": (43.1242, 5.9280),
+    "Grenoble, France": (45.1885, 5.7245),
+    "Dijon, France": (47.3220, 5.0415),
+    "Nimes, France": (43.8367, 4.3601),
+    "Reims, France": (49.2583, 4.0317),
+    "Saint-Etienne, France": (45.4397, 4.3872),
+    "Le Havre, France": (49.4944, 0.1079),
+    "Angers, France": (47.4784, -0.5632),
+    "Clermont-Ferrand, France": (45.7772, 3.0870),
+    "Brest, France": (48.3905, -4.4860),
+    "Tours, France": (47.3941, 0.6848),
+    "Rouen, France": (49.4432, 1.0993),
+    "Avignon, France": (43.9493, 4.8059),
+    "Versailles, France": (48.8014, 2.1301),
+    "Mulhouse, France": (47.7508, 7.3359),
+    "Caen, France": (49.1829, -0.3707),
+    "Nancy, France": (48.6937, 6.1834),
+}
+NOMINATIM_RETRIES = 3
+NOMINATIM_DELAY_SEC = 1.2  # Nominatim policy: max 1 request per second
 
 OVERPASS_ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
@@ -490,13 +527,29 @@ def load_done_sites(csv_path: str) -> Set[str]:
 # OSM HELPERS
 # ============================================================
 def geocode_place(place: str) -> Tuple[float, float]:
+    """Geocode a place (e.g. 'Marseille, France'). Uses fallback coords if Nominatim fails."""
     params = {"q": place, "format": "json", "limit": 1}
-    r = rq_get(NOMINATIM_URL, params=params, headers=HTTP_HEADERS, timeout=TIMEOUT_NOMINATIM)
-    r.raise_for_status()
-    data = r.json()
-    if not data:
-        raise RuntimeError(f"Nominatim: lieu introuvable: {place}")
-    return float(data[0]["lat"]), float(data[0]["lon"])
+    last_error = None
+    for attempt in range(NOMINATIM_RETRIES):
+        if attempt > 0:
+            time.sleep(NOMINATIM_DELAY_SEC)
+        try:
+            r = rq_get(NOMINATIM_URL, params=params, headers=HTTP_HEADERS, timeout=TIMEOUT_NOMINATIM)
+            r.raise_for_status()
+            data = r.json()
+            if not data:
+                raise RuntimeError(f"Nominatim: lieu introuvable: {place}")
+            return float(data[0]["lat"]), float(data[0]["lon"])
+        except Exception as e:
+            last_error = e
+    # Fallback: known coordinates for French cities (avoids 0 targets when Nominatim is down/403)
+    fallback = NOMINATIM_FALLBACK.get(place)
+    if fallback is not None:
+        print(f"     (fallback coords pour {place}, Nominatim indisponible)")
+        return fallback
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError(f"Nominatim: lieu introuvable: {place}")
 
 def _build_overpass_query(lat: float, lon: float, radius_km: float, sector: str = "it") -> bytes:
     radius_m = int(radius_km * 1000)
@@ -653,7 +706,7 @@ def _search_zone(
     try:
         lat, lon = geocode_place(place)
     except Exception as e:
-        print(f"     \u26a0\ufe0f  Nominatim skip: {e.__class__.__name__}")
+        print(f"     \u26a0\ufe0f  Nominatim skip: {e.__class__.__name__}: {e}")
         return []
     try:
         elements = overpass_search(lat, lon, radius_km, sector=sector)
