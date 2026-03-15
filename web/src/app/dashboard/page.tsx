@@ -277,6 +277,8 @@ function DashboardContent() {
   const [maxSites, setMaxSites] = useState(1500);
   const [targetFound, setTargetFound] = useState(100);
   const [workers, setWorkers] = useState(20);
+  const [useAi, setUseAi] = useState(false);
+  const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [isLaunchingRun, setIsLaunchingRun] = useState(false);
   const [isRefreshingRuns, setIsRefreshingRuns] = useState(false);
   const [isRefreshingDetails, setIsRefreshingDetails] = useState(false);
@@ -560,6 +562,7 @@ function DashboardContent() {
         setMaxSites(Number(data.profile?.run_max_sites ?? 1500));
         setTargetFound(Number(data.profile?.run_target_found ?? 100));
         setWorkers(Number(data.profile?.run_workers ?? 20));
+        setUseAi(Boolean(data.profile?.run_use_ai));
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : "Erreur de chargement du profil.";
@@ -778,7 +781,8 @@ function DashboardContent() {
         max_sites: maxSites,
         target_found: targetFound,
         workers,
-        use_ai: false,
+        use_ai: useAi,
+        ...(useAi && openaiApiKey.trim() ? { openai_api_key: openaiApiKey.trim() } : {}),
       };
       const response = await fetch("/api/runs", {
         method: "POST",
@@ -970,7 +974,7 @@ function DashboardContent() {
           run_max_sites: maxSites,
           run_target_found: targetFound,
           run_workers: workers,
-          run_use_ai: false,
+          run_use_ai: useAi,
         }),
       });
       const data = (await safeJson<{ ok?: boolean; detail?: string }>(response)) as {
@@ -1069,7 +1073,7 @@ function DashboardContent() {
           run_max_sites: maxSites,
           run_target_found: targetFound,
           run_workers: workers,
-          run_use_ai: false,
+          run_use_ai: useAi,
         }),
       });
       const data = (await safeJson<{ ok?: boolean; detail?: string }>(response)) as {
@@ -1625,6 +1629,37 @@ function DashboardContent() {
                     <span className={styles.switchTrack} aria-hidden="true" />
                   </span>
                 </label>
+                <label className={styles.switchField}>
+                  <span>Générer le paragraphe personnalisé avec l&apos;IA</span>
+                  <span className={styles.switchControl}>
+                    <input
+                      type="checkbox"
+                      checked={useAi}
+                      onChange={(e) => setUseAi(e.target.checked)}
+                      aria-describedby="use-ai-hint"
+                    />
+                    <span className={styles.switchTrack} aria-hidden="true" />
+                  </span>
+                </label>
+                {useAi ? (
+                  <div className={styles.openaiKeyBlock} id="use-ai-hint">
+                    <label className={styles.openaiKeyLabel} htmlFor="openai-api-key">
+                      Clé API OpenAI (votre clé, non stockée)
+                    </label>
+                    <input
+                      id="openai-api-key"
+                      type="password"
+                      autoComplete="off"
+                      placeholder="sk-..."
+                      value={openaiApiKey}
+                      onChange={(e) => setOpenaiApiKey(e.target.value)}
+                      className={styles.openaiKeyInput}
+                    />
+                    <p className={styles.openaiKeyHint}>
+                      Saisissez votre clé OpenAI pour que le pipeline génère un paragraphe personnalisé par entreprise. Envoyée en HTTPS pour ce run puis effacée de la mémoire ; jamais enregistrée, loggée ou affichée. Utilisez une clé à plafond d'usage (OpenAI) pour limiter les risques. 
+                    </p>
+                  </div>
+                ) : null}
               </fieldset>
               <div className={styles.launchBlock}>
                 <button

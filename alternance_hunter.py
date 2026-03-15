@@ -1310,6 +1310,15 @@ def run_email_finder(
                         print(f"\n🎯 STOP: target-found atteint ({found}/{target_found}).")
                         break
 
+            # Cancel pending futures so the executor can exit quickly (otherwise it waits for all 291)
+            for f in futures:
+                if not f.done():
+                    f.cancel()
+            try:
+                ex.shutdown(cancel_futures=True)
+            except TypeError:
+                pass  # Python < 3.9 has no cancel_futures
+
     print("\n===== STATS SESSION =====")
     print(f"Focus:      {focus}")
     print(f"Traités:    {processed}")

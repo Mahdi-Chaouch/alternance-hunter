@@ -50,6 +50,7 @@ const ACCEPTED_RUN_REQUEST_FIELDS = new Set([
   "template",
   "out_dir",
   "use_ai",
+  "openai_api_key",
   "ai_model",
   "sender_first_name",
   "sender_last_name",
