@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import styles from "../page.module.css";
 import { authClient } from "@/lib/auth-client";
 import { GoogleLogo } from "@/app/components/GoogleLogo";
+import { SuiviCandidatures, type CandidatureItem } from "@/app/components/SuiviCandidatures";
 import { COMMUNES_FRANCE } from "@/data/communes-france";
 import {
   SECTOR_LABELS,
@@ -70,35 +71,6 @@ type AnalyticsData = {
   taux_conversion_reponse: number;
 };
 
-const CANDIDATURE_STATUSES = [
-  "draft_created",
-  "sent",
-  "relance",
-  "reponse_positive",
-  "reponse_negative",
-  "no_reponse",
-] as const;
-type CandidatureStatus = (typeof CANDIDATURE_STATUSES)[number];
-
-const CANDIDATURE_LABELS: Record<CandidatureStatus, string> = {
-  draft_created: "Brouillon créé",
-  sent: "Envoyé",
-  relance: "Relance",
-  reponse_positive: "Réponse positive",
-  reponse_negative: "Réponse négative",
-  no_reponse: "Sans réponse",
-};
-
-type CandidatureItem = {
-  id: number;
-  run_id: string | null;
-  company: string;
-  email: string;
-  status: string;
-  draft_id: string | null;
-  created_at: string;
-  updated_at: string;
-};
 const MODE_LABELS: Record<RunMode, string> = {
   pipeline: "Recherche complète",
   hunter: "Recherche d'entreprises",
@@ -1995,97 +1967,18 @@ function DashboardContent() {
           )}
         </section>
 
-        <section className={styles.panel} id="candidatures">
-          <div className={styles.panelHeader}>
-            <h2>Suivi candidatures</h2>
-            <div className={styles.panelHeaderActions}>
-              <button
-                type="button"
-                className={styles.secondaryBtn}
-                onClick={() => void syncCandidatures(activeRunId ?? undefined)}
-                disabled={isSyncingCandidatures || accessState !== "granted"}
-              >
-                {isSyncingCandidatures ? "Synchronisation..." : "Importer depuis les brouillons"}
-              </button>
-              <button
-                type="button"
-                className={styles.secondaryBtn}
-                onClick={() => void refreshCandidatures()}
-                disabled={isRefreshingCandidatures}
-              >
-                {isRefreshingCandidatures ? "Chargement..." : "Rafraîchir"}
-              </button>
-            </div>
-          </div>
-          <p className={styles.sectionHint}>
-            Statuts : Brouillon créé → Envoyé → Relance / Réponse. Cliquez sur « Importer depuis les brouillons » après une recherche pour importer les brouillons créés.
-          </p>
-          <div style={{ marginBottom: "0.75rem" }}>
-            <label htmlFor="candidature-filter" className={styles.sectionHint}>
-              Filtrer par statut :{" "}
-            </label>
-            <select
-              id="candidature-filter"
-              value={candidatureStatusFilter}
-              onChange={(e) => setCandidatureStatusFilter(e.target.value)}
-              className={styles.select}
-              style={{ minWidth: "180px" }}
-            >
-              <option value="">Tous</option>
-              {CANDIDATURE_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {CANDIDATURE_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </div>
-          {candidaturesList.length === 0 ? (
-            <p className={styles.emptyState}>
-              Aucune candidature. Lancez une recherche, créez des brouillons Gmail, puis cliquez sur « Importer depuis les brouillons ».
-            </p>
-          ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.runTable}>
-                <thead>
-                  <tr>
-                    <th>Entreprise</th>
-                    <th>Email</th>
-                    <th>Statut</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {candidaturesList.map((c) => (
-                    <tr key={c.id} className={styles.tableRow}>
-                      <td>{c.company}</td>
-                      <td style={{ fontSize: "0.9rem" }}>{c.email}</td>
-                      <td>
-                        <span className={`${styles.statusBadge} ${styles.badgeNeutral}`}>
-                          {CANDIDATURE_LABELS[c.status as CandidatureStatus] ?? c.status}
-                        </span>
-                      </td>
-                      <td>
-                        <select
-                          aria-label={`Changer le statut de la candidature ${c.company}`}
-                          value={c.status}
-                          onChange={(e) => updateCandidatureStatus(c.id, e.target.value)}
-                          className={styles.select}
-                          style={{ fontSize: "0.85rem", padding: "0.25rem 0.5rem" }}
-                        >
-                          {CANDIDATURE_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {CANDIDATURE_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        <SuiviCandidatures
+          candidaturesList={candidaturesList}
+          candidatureStatusFilter={candidatureStatusFilter}
+          setCandidatureStatusFilter={setCandidatureStatusFilter}
+          isRefreshingCandidatures={isRefreshingCandidatures}
+          isSyncingCandidatures={isSyncingCandidatures}
+          refreshCandidatures={refreshCandidatures}
+          syncCandidatures={syncCandidatures}
+          updateCandidatureStatus={updateCandidatureStatus}
+          isGranted={accessState === "granted"}
+          activeRunId={activeRunId}
+        />
 
         <section className={styles.panel} id="step-logs">
           <div className={styles.panelHeader}>
