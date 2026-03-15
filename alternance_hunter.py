@@ -179,19 +179,24 @@ _OVERPASS_FILTERS = {
   way(around:RADIUS, LAT, LON)["amenity"~"restaurant|cafe|pharmacy|doctors|dentist|clinic"]["website"];
 );""",
 }
+# Aliases: same Overpass filter as another sector, different label
+_OVERPASS_FILTERS["digital"] = _OVERPASS_FILTERS["it"]
+_OVERPASS_FILTERS["restauration"] = _OVERPASS_FILTERS["food"]
 
 KNOWN_SECTORS = list(_OVERPASS_FILTERS.keys())
 
-# Libellés secteur uniques (format "Catégorie / Domaine") pour l'objet et le corps du mail.
+# Une option = un secteur (libellé pour objet et corps du mail).
 SECTOR_LABELS: dict = {
-    "it": "Informatique / Digital & IT",
-    "food": "Alimentation / Food & Restauration",
-    "law": "Droit / Juridique & Assurance",
-    "trade": "Commerce / Retail & Distribution",
-    "health": "Santé / Médical & Paramédical",
-    "construction": "BTP / Construction & Artisanat",
-    "marketing": "Marketing / Communication & Médias",
-    "finance": "Finance / Comptabilité & Audit",
+    "it": "Informatique",
+    "food": "Alimentation",
+    "law": "Droit",
+    "trade": "Commerce",
+    "health": "Santé",
+    "construction": "BTP",
+    "marketing": "Marketing",
+    "finance": "Finance",
+    "digital": "Digital",
+    "restauration": "Restauration",
     "all": "Tous secteurs",
 }
 
