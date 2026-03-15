@@ -40,6 +40,7 @@ const ACCEPTED_RUN_REQUEST_FIELDS = new Set([
   "target_found",
   "workers",
   "focus",
+  "sector",
   "enable_sitemap",
   "insecure",
   "rh_only",

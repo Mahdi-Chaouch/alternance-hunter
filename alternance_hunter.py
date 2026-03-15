@@ -114,26 +114,76 @@ OVERPASS_ENDPOINTS = [
     "https://overpass.openstreetmap.ru/api/interpreter",
 ]
 
-# v5: filtre élargi web/digital/software + agences + ESN + consulting IT
-OVERPASS_FILTER = r"""
-(
+# Overpass filter templates per sector.
+# Each returns an Overpass union block with RADIUS/LAT/LON placeholders.
+_OVERPASS_FILTERS = {
+    "it": r"""(
   node(around:RADIUS, LAT, LON)["office"~"it|software|telecommunication|digital|consulting|marketing|advertising|company"];
   way(around:RADIUS, LAT, LON)["office"~"it|software|telecommunication|digital|consulting|marketing|advertising|company"];
   relation(around:RADIUS, LAT, LON)["office"~"it|software|telecommunication|digital|consulting|marketing|advertising|company"];
-
   node(around:RADIUS, LAT, LON)["company"~"it|it_service|software|web|digital|agency|studio|dev|development"];
   way(around:RADIUS, LAT, LON)["company"~"it|it_service|software|web|digital|agency|studio|dev|development"];
   relation(around:RADIUS, LAT, LON)["company"~"it|it_service|software|web|digital|agency|studio|dev|development"];
-
   node(around:RADIUS, LAT, LON)["craft"~"web_design|graphic_design"];
   way(around:RADIUS, LAT, LON)["craft"~"web_design|graphic_design"];
   relation(around:RADIUS, LAT, LON)["craft"~"web_design|graphic_design"];
-
   node(around:RADIUS, LAT, LON)["shop"~"computer|electronics"];
   way(around:RADIUS, LAT, LON)["shop"~"computer|electronics"];
   relation(around:RADIUS, LAT, LON)["shop"~"computer|electronics"];
-);
-"""
+);""",
+    "food": r"""(
+  node(around:RADIUS, LAT, LON)["shop"~"bakery|butcher|greengrocer|deli|pastry|seafood|cheese|chocolate|farm|organic|frozen_food|convenience"];
+  way(around:RADIUS, LAT, LON)["shop"~"bakery|butcher|greengrocer|deli|pastry|seafood|cheese|chocolate|farm|organic|frozen_food|convenience"];
+  node(around:RADIUS, LAT, LON)["amenity"~"restaurant|cafe|fast_food|bar|food_court|ice_cream"];
+  way(around:RADIUS, LAT, LON)["amenity"~"restaurant|cafe|fast_food|bar|food_court|ice_cream"];
+  node(around:RADIUS, LAT, LON)["craft"~"caterer|confectionery|winery|brewery|distillery"];
+  way(around:RADIUS, LAT, LON)["craft"~"caterer|confectionery|winery|brewery|distillery"];
+);""",
+    "law": r"""(
+  node(around:RADIUS, LAT, LON)["office"~"lawyer|notary|accountant|tax_advisor|financial|insurance|estate_agent"];
+  way(around:RADIUS, LAT, LON)["office"~"lawyer|notary|accountant|tax_advisor|financial|insurance|estate_agent"];
+  relation(around:RADIUS, LAT, LON)["office"~"lawyer|notary|accountant|tax_advisor|financial|insurance|estate_agent"];
+);""",
+    "trade": r"""(
+  node(around:RADIUS, LAT, LON)["shop"]["website"];
+  way(around:RADIUS, LAT, LON)["shop"]["website"];
+  node(around:RADIUS, LAT, LON)["office"~"company"]["website"];
+  way(around:RADIUS, LAT, LON)["office"~"company"]["website"];
+);""",
+    "health": r"""(
+  node(around:RADIUS, LAT, LON)["amenity"~"pharmacy|doctors|dentist|clinic|hospital|veterinary"];
+  way(around:RADIUS, LAT, LON)["amenity"~"pharmacy|doctors|dentist|clinic|hospital|veterinary"];
+  node(around:RADIUS, LAT, LON)["healthcare"];
+  way(around:RADIUS, LAT, LON)["healthcare"];
+  node(around:RADIUS, LAT, LON)["shop"~"optician|hearing_aids|medical_supply"];
+  way(around:RADIUS, LAT, LON)["shop"~"optician|hearing_aids|medical_supply"];
+);""",
+    "construction": r"""(
+  node(around:RADIUS, LAT, LON)["craft"~"electrician|plumber|carpenter|roofer|painter|hvac|tiler|plasterer|builder|stonemason|insulation|metal_construction|window_construction"];
+  way(around:RADIUS, LAT, LON)["craft"~"electrician|plumber|carpenter|roofer|painter|hvac|tiler|plasterer|builder|stonemason|insulation|metal_construction|window_construction"];
+  node(around:RADIUS, LAT, LON)["office"~"architect|construction_company|engineer"];
+  way(around:RADIUS, LAT, LON)["office"~"architect|construction_company|engineer"];
+  node(around:RADIUS, LAT, LON)["shop"~"trade|hardware|doityourself"];
+  way(around:RADIUS, LAT, LON)["shop"~"trade|hardware|doityourself"];
+);""",
+    "all": r"""(
+  node(around:RADIUS, LAT, LON)["office"]["website"];
+  way(around:RADIUS, LAT, LON)["office"]["website"];
+  node(around:RADIUS, LAT, LON)["company"]["website"];
+  way(around:RADIUS, LAT, LON)["company"]["website"];
+  node(around:RADIUS, LAT, LON)["shop"]["website"];
+  way(around:RADIUS, LAT, LON)["shop"]["website"];
+  node(around:RADIUS, LAT, LON)["craft"]["website"];
+  way(around:RADIUS, LAT, LON)["craft"]["website"];
+  node(around:RADIUS, LAT, LON)["amenity"~"restaurant|cafe|pharmacy|doctors|dentist|clinic"]["website"];
+  way(around:RADIUS, LAT, LON)["amenity"~"restaurant|cafe|pharmacy|doctors|dentist|clinic"]["website"];
+);""",
+}
+
+KNOWN_SECTORS = list(_OVERPASS_FILTERS.keys())
+
+def get_overpass_filter(sector: str) -> str:
+    return _OVERPASS_FILTERS.get(sector, _OVERPASS_FILTERS["it"])
 
 OVERPASS_RETRIES_PER_ENDPOINT = 2
 OVERPASS_BACKOFF_SECONDS = [2, 6, 12]
@@ -145,13 +195,154 @@ PARIS_CENTERS = [
     ("Paris-Montparnasse", 48.8422, 2.3212, 7.0, 100),
 ]
 
-# Villes / zones recherchées : Paris (voir PARIS_CENTERS) + Cannes, Auxerre, Fontainebleau.
-# Tu peux limiter avec --zones "Cannes, Fontainebleau" si besoin.
 ZONES = [
     {"name": "Fontainebleau, France", "radius_km": 25.0, "limit": 150},
     {"name": "Cannes, France", "radius_km": 20.0, "limit": 150},
     {"name": "Auxerre, France", "radius_km": 25.0, "limit": 150},
 ]
+
+# ~200 largest/medium communes in France (prefectures + cities > ~20k inhabitants).
+# Used when zones_filter is empty ("all") to cover the whole country.
+FRANCE_COMMUNES: List[dict] = [
+    {"name": "Lyon, France", "radius_km": 18.0, "limit": 200},
+    {"name": "Marseille, France", "radius_km": 20.0, "limit": 200},
+    {"name": "Toulouse, France", "radius_km": 18.0, "limit": 200},
+    {"name": "Nice, France", "radius_km": 15.0, "limit": 150},
+    {"name": "Nantes, France", "radius_km": 18.0, "limit": 180},
+    {"name": "Strasbourg, France", "radius_km": 15.0, "limit": 150},
+    {"name": "Montpellier, France", "radius_km": 15.0, "limit": 150},
+    {"name": "Bordeaux, France", "radius_km": 18.0, "limit": 180},
+    {"name": "Lille, France", "radius_km": 15.0, "limit": 180},
+    {"name": "Rennes, France", "radius_km": 15.0, "limit": 150},
+    {"name": "Reims, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Saint-Etienne, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Toulon, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Le Havre, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Grenoble, France", "radius_km": 15.0, "limit": 150},
+    {"name": "Dijon, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Angers, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Nimes, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Villeurbanne, France", "radius_km": 12.0, "limit": 100},
+    {"name": "Clermont-Ferrand, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Le Mans, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Aix-en-Provence, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Brest, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Tours, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Amiens, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Limoges, France", "radius_km": 15.0, "limit": 100},
+    {"name": "Perpignan, France", "radius_km": 15.0, "limit": 100},
+    {"name": "Metz, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Besancon, France", "radius_km": 15.0, "limit": 100},
+    {"name": "Orleans, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Rouen, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Mulhouse, France", "radius_km": 12.0, "limit": 100},
+    {"name": "Caen, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Nancy, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Argenteuil, France", "radius_km": 10.0, "limit": 80},
+    {"name": "Saint-Denis, France", "radius_km": 10.0, "limit": 80},
+    {"name": "Montreuil, France", "radius_km": 10.0, "limit": 80},
+    {"name": "Roubaix, France", "radius_km": 12.0, "limit": 100},
+    {"name": "Tourcoing, France", "radius_km": 12.0, "limit": 100},
+    {"name": "Avignon, France", "radius_km": 15.0, "limit": 120},
+    {"name": "Dunkerque, France", "radius_km": 15.0, "limit": 100},
+    {"name": "Poitiers, France", "radius_km": 15.0, "limit": 100},
+    {"name": "Pau, France", "radius_km": 15.0, "limit": 100},
+    {"name": "Calais, France", "radius_km": 12.0, "limit": 80},
+    {"name": "La Rochelle, France", "radius_km": 15.0, "limit": 100},
+    {"name": "Colmar, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Chambery, France", "radius_km": 12.0, "limit": 100},
+    {"name": "Annecy, France", "radius_km": 12.0, "limit": 100},
+    {"name": "Bayonne, France", "radius_km": 12.0, "limit": 100},
+    {"name": "Lorient, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Troyes, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Quimper, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Saint-Brieuc, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Valence, France", "radius_km": 12.0, "limit": 100},
+    {"name": "Bourges, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Vannes, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Chartres, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Laval, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Niort, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Tarbes, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Arras, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Ajaccio, France", "radius_km": 15.0, "limit": 80},
+    {"name": "Bastia, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Beauvais, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Compiegne, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Epinal, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Cherbourg, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Boulogne-sur-Mer, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Charleville-Mezieres, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Cholet, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Beziers, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Sete, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Agen, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Angouleme, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Brive-la-Gaillarde, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Albi, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Montauban, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Blois, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Chalon-sur-Saone, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Macon, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Carcassonne, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Frejus, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Saint-Nazaire, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Chateauroux, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Montlucon, France", "radius_km": 12.0, "limit": 60},
+    {"name": "Vichy, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Nevers, France", "radius_km": 12.0, "limit": 60},
+    {"name": "Moulins, France", "radius_km": 12.0, "limit": 60},
+    {"name": "Aurillac, France", "radius_km": 12.0, "limit": 60},
+    {"name": "Le Puy-en-Velay, France", "radius_km": 12.0, "limit": 60},
+    {"name": "Cahors, France", "radius_km": 12.0, "limit": 60},
+    {"name": "Rodez, France", "radius_km": 12.0, "limit": 60},
+    {"name": "Auch, France", "radius_km": 12.0, "limit": 60},
+    {"name": "Mont-de-Marsan, France", "radius_km": 12.0, "limit": 60},
+    {"name": "Dax, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Perigueux, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Bergerac, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Tulle, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Gueret, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Foix, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Saint-Quentin, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Soissons, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Laon, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Sens, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Auxerre, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Lons-le-Saunier, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Vesoul, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Belfort, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Gap, France", "radius_km": 12.0, "limit": 60},
+    {"name": "Digne-les-Bains, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Draguignan, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Carpentras, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Salon-de-Provence, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Istres, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Martigues, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Arles, France", "radius_km": 12.0, "limit": 60},
+    {"name": "Narbonne, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Ales, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Cergy, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Versailles, France", "radius_km": 12.0, "limit": 100},
+    {"name": "Boulogne-Billancourt, France", "radius_km": 8.0, "limit": 80},
+    {"name": "Nanterre, France", "radius_km": 8.0, "limit": 80},
+    {"name": "Evry, France", "radius_km": 10.0, "limit": 80},
+    {"name": "Melun, France", "radius_km": 10.0, "limit": 80},
+    {"name": "Meaux, France", "radius_km": 10.0, "limit": 80},
+    {"name": "Fontainebleau, France", "radius_km": 15.0, "limit": 80},
+    {"name": "Saint-Malo, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Saint-Raphael, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Antibes, France", "radius_km": 10.0, "limit": 80},
+    {"name": "Grasse, France", "radius_km": 10.0, "limit": 60},
+    {"name": "Menton, France", "radius_km": 8.0, "limit": 60},
+    {"name": "Cannes, France", "radius_km": 12.0, "limit": 80},
+    {"name": "Hyeres, France", "radius_km": 10.0, "limit": 60},
+    {"name": "La Seyne-sur-Mer, France", "radius_km": 8.0, "limit": 60},
+]
+
+# Names already covered by PARIS_CENTERS and ZONES (for dedup in build_targets).
+_STATIC_ZONE_NAMES = {z["name"].split(",")[0].strip().lower() for z in ZONES}
+_STATIC_ZONE_NAMES.add("paris")
 
 
 # ============================================================
@@ -275,17 +466,18 @@ def geocode_place(place: str) -> Tuple[float, float]:
         raise RuntimeError(f"Nominatim: lieu introuvable: {place}")
     return float(data[0]["lat"]), float(data[0]["lon"])
 
-def _build_overpass_query(lat: float, lon: float, radius_km: float) -> bytes:
+def _build_overpass_query(lat: float, lon: float, radius_km: float, sector: str = "it") -> bytes:
     radius_m = int(radius_km * 1000)
+    overpass_filter = get_overpass_filter(sector)
     q = f"""
 [out:json][timeout:40];
-{OVERPASS_FILTER.replace("RADIUS", str(radius_m)).replace("LAT", str(lat)).replace("LON", str(lon))}
+{overpass_filter.replace("RADIUS", str(radius_m)).replace("LAT", str(lat)).replace("LON", str(lon))}
 out tags center;
 """
     return q.encode("utf-8")
 
-def overpass_search(lat: float, lon: float, radius_km: float) -> List[dict]:
-    query = _build_overpass_query(lat, lon, radius_km)
+def overpass_search(lat: float, lon: float, radius_km: float, sector: str = "it") -> List[dict]:
+    query = _build_overpass_query(lat, lon, radius_km, sector=sector)
 
     last_error = None
     for endpoint in OVERPASS_ENDPOINTS:
@@ -370,17 +562,74 @@ def score_company(name: str, website: str, focus: str) -> int:
     return base
 
 
-def build_targets(max_sites: int, focus: str, zones_filter: str = "") -> List[Target]:
+def _search_zone(
+    place: str,
+    radius_km: float,
+    limit: int,
+    focus: str,
+    sector: str,
+    seen: set,
+    max_sites: int,
+    current_count: int,
+) -> List[Target]:
+    """Search a single zone via geocode + Overpass; returns a batch of Targets."""
+    if current_count >= max_sites:
+        return []
+    print(f"\n==> ZONE: {place} (rayon {radius_km} km)")
+    try:
+        lat, lon = geocode_place(place)
+    except Exception as e:
+        print(f"     \u26a0\ufe0f  Nominatim skip: {e.__class__.__name__}")
+        return []
+    try:
+        elements = overpass_search(lat, lon, radius_km, sector=sector)
+    except RuntimeError as e:
+        print(f"     \u26a0\ufe0f  Overpass skip: {e}")
+        return []
+
+    batch: List[Target] = []
+    for el in elements:
+        tags = el.get("tags") or {}
+        name = tags.get("name")
+        if not isinstance(name, str) or not name.strip():
+            continue
+        name = name.strip()
+        if should_exclude_company(name):
+            continue
+        website = pick_website(tags)
+        if not website:
+            continue
+        site = normalize_site(website)
+        if not site:
+            continue
+        domain = urlparse(site).netloc.replace("www.", "").lower()
+        key = (name.lower(), domain)
+        if key in seen:
+            continue
+        seen.add(key)
+        sc = score_company(name, site, focus)
+        ville = zone_to_ville(place)
+        batch.append(Target(entreprise=name, site=site, zone=place, ville=ville, score=sc))
+
+    batch.sort(key=lambda t: t.score, reverse=True)
+    batch = batch[:limit]
+    print(f"     ajout\u00e9s: {len(batch)}")
+    return batch
+
+
+def build_targets(max_sites: int, focus: str, zones_filter: str = "", sector: str = "it") -> List[Target]:
     """
-    zones_filter: si non vide, liste de noms séparés par des virgules (ex: "Lyon, Marseille").
-    Seules les zones dont le nom contient l'un de ces mots sont utilisées. Vide = toutes.
+    zones_filter: si non vide, liste de noms s\u00e9par\u00e9s par des virgules (ex: "Lyon, Marseille").
+    Seules les zones dont le nom contient l'un de ces mots sont utilis\u00e9es. Vide = toutes.
+    sector: secteur d'activit\u00e9 pour adapter le filtre Overpass.
     """
     targets: List[Target] = []
-    seen = set()  # (name_lower, domain)
+    seen: set = set()
 
     filter_parts = [p.strip().lower() for p in zones_filter.split(",") if p.strip()] if zones_filter else []
     include_paris = not filter_parts or any("paris" in p for p in filter_parts)
 
+    # --- Paris (multi-centres, hardcoded lat/lon) ---
     if include_paris:
         print("\n==> ZONE: Paris (multi-centres)")
     for cname, lat, lon, radius_km, local_limit in PARIS_CENTERS:
@@ -390,9 +639,9 @@ def build_targets(max_sites: int, focus: str, zones_filter: str = "") -> List[Ta
             break
         print(f"  -> {cname} | rayon={radius_km}km")
         try:
-            elements = overpass_search(lat, lon, radius_km)
+            elements = overpass_search(lat, lon, radius_km, sector=sector)
         except RuntimeError as e:
-            print(f"     ⚠️  Overpass skip: {e}")
+            print(f"     \u26a0\ufe0f  Overpass skip: {e}")
             continue
 
         batch: List[Target] = []
@@ -404,30 +653,26 @@ def build_targets(max_sites: int, focus: str, zones_filter: str = "") -> List[Ta
             name = name.strip()
             if should_exclude_company(name):
                 continue
-
             website = pick_website(tags)
             if not website:
                 continue
             site = normalize_site(website)
             if not site:
                 continue
-
             domain = urlparse(site).netloc.replace("www.", "").lower()
             key = (name.lower(), domain)
             if key in seen:
                 continue
             seen.add(key)
-
             sc = score_company(name, site, focus)
             batch.append(Target(entreprise=name, site=site, zone=f"Paris ({cname})", ville="Paris", score=sc))
 
-        # trie par score descendant (meilleur d’abord)
         batch.sort(key=lambda t: t.score, reverse=True)
         batch = batch[:local_limit]
-
         targets.extend(batch)
-        print(f"     ajoutés: {len(batch)}")
+        print(f"     ajout\u00e9s: {len(batch)}")
 
+    # --- Static ZONES (Fontainebleau, Cannes, Auxerre) ---
     for z in ZONES:
         if len(targets) >= max_sites:
             break
@@ -435,58 +680,47 @@ def build_targets(max_sites: int, focus: str, zones_filter: str = "") -> List[Ta
             name_lower = z["name"].lower()
             if not any(fp in name_lower for fp in filter_parts):
                 continue
-        place = z["name"]
-        radius_km = float(z["radius_km"])
-        limit = int(z["limit"])
-        print(f"\n==> ZONE: {place} (rayon {radius_km} km)")
-
-        try:
-            lat, lon = geocode_place(place)
-        except Exception as e:
-            print(f"     ⚠️  Nominatim skip: {e.__class__.__name__}")
-            continue
-
-        try:
-            elements = overpass_search(lat, lon, radius_km)
-        except RuntimeError as e:
-            print(f"     ⚠️  Overpass skip: {e}")
-            continue
-
-        batch: List[Target] = []
-        for el in elements:
-            tags = el.get("tags") or {}
-            name = tags.get("name")
-            if not isinstance(name, str) or not name.strip():
-                continue
-            name = name.strip()
-            if should_exclude_company(name):
-                continue
-
-            website = pick_website(tags)
-            if not website:
-                continue
-            site = normalize_site(website)
-            if not site:
-                continue
-
-            domain = urlparse(site).netloc.replace("www.", "").lower()
-            key = (name.lower(), domain)
-            if key in seen:
-                continue
-            seen.add(key)
-
-            sc = score_company(name, site, focus)
-            ville = zone_to_ville(place)
-            batch.append(Target(entreprise=name, site=site, zone=place, ville=ville, score=sc))
-
-        batch.sort(key=lambda t: t.score, reverse=True)
-        batch = batch[:limit]
+        batch = _search_zone(
+            z["name"], float(z["radius_km"]), int(z["limit"]),
+            focus, sector, seen, max_sites, len(targets),
+        )
         targets.extend(batch)
-        print(f"     ajoutés: {len(batch)}")
 
-    # cap global
+    if filter_parts:
+        # --- Dynamic zones: any city the user typed that wasn't already covered ---
+        covered = set(_STATIC_ZONE_NAMES)
+        for z in ZONES:
+            covered.add(z["name"].split(",")[0].strip().lower())
+        for fp in filter_parts:
+            if len(targets) >= max_sites:
+                break
+            if fp in covered:
+                continue
+            covered.add(fp)
+            place = f"{fp.strip().title()}, France"
+            batch = _search_zone(
+                place, 18.0, 200, focus, sector, seen, max_sites, len(targets),
+            )
+            targets.extend(batch)
+    else:
+        # --- "All of France": iterate FRANCE_COMMUNES ---
+        communes_seen = set(_STATIC_ZONE_NAMES)
+        for z in ZONES:
+            communes_seen.add(z["name"].split(",")[0].strip().lower())
+        for fc in FRANCE_COMMUNES:
+            if len(targets) >= max_sites:
+                break
+            ckey = fc["name"].split(",")[0].strip().lower()
+            if ckey in communes_seen:
+                continue
+            communes_seen.add(ckey)
+            batch = _search_zone(
+                fc["name"], float(fc["radius_km"]), int(fc["limit"]),
+                focus, sector, seen, max_sites, len(targets),
+            )
+            targets.extend(batch)
+
     return targets[:max_sites]
-
 
 def write_targets_csv(targets: List[Target], targets_csv: str) -> None:
     parent = os.path.dirname(targets_csv)
@@ -1078,6 +1312,8 @@ def parse_args():
                    help="N'écrire un brouillon que si l'email trouvé est RH/recrutement (recrut@, rh@, jobs@, etc.)")
     p.add_argument("--zones", type=str, default="",
                    help="Limiter aux zones voulues, séparées par des virgules (ex: Lyon, Marseille, Toulouse). Vide = toutes les zones.")
+    p.add_argument("--sector", type=str, default="it",
+                   help=f"Secteur d'activité pour le filtre Overpass. Valeurs: {', '.join(KNOWN_SECTORS)} (défaut: it)")
     p.add_argument("--targets-csv", type=str, default=DEFAULT_TARGETS_AUTO_CSV,
                    help="Chemin du CSV de cibles collectées.")
     p.add_argument("--emails-found-csv", type=str, default=DEFAULT_EMAILS_FOUND_CSV,
@@ -1107,7 +1343,9 @@ def main():
         print("⚠️  MODE --insecure activé: vérification SSL désactivée (temporaire).")
 
     print("==> 1) Génération des entreprises (OSM Overpass) [WEB FOCUS]")
-    targets = build_targets(max_sites=args.max_sites, focus=args.focus, zones_filter=args.zones)
+    sector = getattr(args, "sector", "it") or "it"
+    print(f"    sector={sector}")
+    targets = build_targets(max_sites=args.max_sites, focus=args.focus, zones_filter=args.zones, sector=sector)
     write_targets_csv(targets, args.targets_csv)
     print(f"✅ targets: {args.targets_csv} ({len(targets)} lignes)")
 

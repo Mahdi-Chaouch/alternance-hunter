@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import styles from "../page.module.css";
 import { authClient } from "@/lib/auth-client";
 import { GoogleLogo } from "@/app/components/GoogleLogo";
+import { COMMUNES_FRANCE } from "@/data/communes-france";
 
 type RunMode = "pipeline" | "hunter" | "generate" | "drafts";
 type Zone = string;
@@ -57,23 +58,20 @@ const MODE_LABELS: Record<RunMode, string> = {
   drafts: "Création des brouillons Gmail",
 };
 
+const SECTOR_LABELS: Record<string, string> = {
+  it: "Informatique / Digital",
+  food: "Alimentation / Restauration",
+  law: "Droit / Finance / Assurance",
+  trade: "Commerce / Retail",
+  health: "Santé / Médical",
+  construction: "BTP / Construction / Artisanat",
+  all: "Tous secteurs",
+};
+
 const ZONE_PLACEHOLDER =
   "Tapez une ville (ex: Paris) — laissez vide pour toute la France";
 
-const KNOWN_ZONES: readonly Zone[] = [
-  "all",
-  "Paris",
-  "Lyon",
-  "Lille",
-  "Marseille",
-  "Toulouse",
-  "Bordeaux",
-  "Nantes",
-  "Rennes",
-  "Nice",
-  "Strasbourg",
-  "Montpellier",
-];
+const KNOWN_ZONES: readonly Zone[] = ["all", ...COMMUNES_FRANCE];
 
 async function safeJson<T>(response: Response): Promise<T | Record<string, unknown>> {
   const rawBody = await response.text();
@@ -277,6 +275,7 @@ function DashboardContent() {
   const [zoneSuggestions, setZoneSuggestions] = useState<Zone[]>([]);
   const [isZoneFocused, setIsZoneFocused] = useState(false);
   const [zoneValid, setZoneValid] = useState(false);
+  const [sector, setSector] = useState("it");
   const [dryRun, setDryRun] = useState(false);
   const [maxMinutes, setMaxMinutes] = useState(30);
   const [maxSites, setMaxSites] = useState(1500);
@@ -500,6 +499,7 @@ function DashboardContent() {
             body_template?: string;
             run_mode?: RunMode;
             run_zone?: Zone;
+            run_sector?: string;
             run_dry_run?: boolean;
             run_max_minutes?: number;
             run_max_sites?: number;
@@ -518,6 +518,7 @@ function DashboardContent() {
             body_template?: string;
             run_mode?: RunMode;
             run_zone?: Zone;
+            run_sector?: string;
             run_dry_run?: boolean;
             run_max_minutes?: number;
             run_max_sites?: number;
@@ -552,6 +553,9 @@ function DashboardContent() {
           ) {
             setZoneValid(true);
           }
+        }
+        if (data.profile?.run_sector) {
+          setSector(data.profile.run_sector);
         }
         setDryRun(Boolean(data.profile?.run_dry_run));
         setMaxMinutes(Number(data.profile?.run_max_minutes ?? 30));
@@ -769,6 +773,7 @@ function DashboardContent() {
       const payload = {
         mode,
         zone,
+        sector,
         dry_run: dryRun,
         max_minutes: maxMinutes,
         max_sites: maxSites,
@@ -959,6 +964,7 @@ function DashboardContent() {
           body_template: mailBodyTemplate,
           run_mode: mode,
           run_zone: zone,
+          run_sector: sector,
           run_dry_run: dryRun,
           run_max_minutes: maxMinutes,
           run_max_sites: maxSites,
@@ -1056,6 +1062,7 @@ function DashboardContent() {
           body_template: mailBodyTemplate,
           run_mode: mode,
           run_zone: zone,
+          run_sector: sector,
           run_dry_run: dryRun,
           run_max_minutes: maxMinutes,
           run_max_sites: maxSites,
@@ -1490,6 +1497,17 @@ function DashboardContent() {
                     {(Object.keys(MODE_LABELS) as RunMode[]).map((option) => (
                       <option key={option} value={option}>
                         {MODE_LABELS[option]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Secteur d&apos;activite
+                  <select value={sector} onChange={(e) => setSector(e.target.value)}>
+                    {Object.entries(SECTOR_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
                       </option>
                     ))}
                   </select>
