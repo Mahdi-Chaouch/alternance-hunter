@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthHeaders, getBackendConfig } from "@/lib/backend";
 import { requireApiAuthorizedSession } from "@/lib/auth-guard";
-import { resolveGoogleOAuthContext } from "@/lib/google-oauth-context";
+import { resolveGoogleOAuthContextForSync } from "@/lib/google-oauth-context";
 import { readJsonSafely } from "@/lib/http";
 
 function buildUserScopedHeaders(user: { id?: string; email?: string | null }): HeadersInit {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const { baseUrl, token } = getBackendConfig();
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    const oauthResult = await resolveGoogleOAuthContext();
+    const oauthResult = await resolveGoogleOAuthContextForSync();
     const bodyToSend = oauthResult.ok ? { ...body, ...oauthResult.payload } : body ?? {};
     const response = await fetch(`${baseUrl}/candidatures/sync`, {
       method: "POST",
