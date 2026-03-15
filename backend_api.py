@@ -174,7 +174,7 @@ class RunRequest(BaseModel):
     lm: str = ""
     credentials: str = "secrets/credentials.json"
     token: str = "secrets/token.json"
-    sleep: float = 1.0
+    sleep: float = 0.3
     max: int = 999999
     console_auth: bool = False
     resume_log: str = "outputs/logs/drafts_created_log.csv"
