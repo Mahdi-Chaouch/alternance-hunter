@@ -47,7 +47,7 @@ export default function LoginPage() {
             <li>📊 Dashboard temps réel pour suivre chaque exécution.</li>
           </ul>
           <p className={styles.helperText}>
-            Tu peux toujours revenir à l&apos;accueil pour revoir le fonctionnement de
+            Tu peux toujours revenir à l&apos;accueil pour voir comment envoyer des mails avec
             l&apos;outil{" "}
             <Link href="/" className={styles.helperLink}>
               depuis la landing
