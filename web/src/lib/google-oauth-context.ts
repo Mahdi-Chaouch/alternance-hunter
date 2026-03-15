@@ -135,7 +135,7 @@ export async function resolveGoogleOAuthContextForSync(): Promise<
             "Configuration OAuth manquante en production. Definissez GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET.",
         },
         { status: 503 },
-      );
+      ),
     };
   }
   return {
