@@ -36,6 +36,19 @@ AI_PARAGRAPH_WORKERS = 5  # appels OpenAI en parallèle (limite pour éviter rat
 
 SEP = "=============================="
 
+# Libellés secteur pour le prompt IA quand la spécialité est vide (éviter le fallback "développement web").
+SECTOR_LABELS_FOR_PROMPT: dict[str, str] = {
+    "it": "Informatique / Digital",
+    "food": "Alimentation / Restauration",
+    "law": "Droit / Finance / Assurance",
+    "trade": "Commerce / Retail",
+    "health": "Santé / Médical",
+    "construction": "BTP / Construction / Artisanat",
+    "marketing": "Commerce / Marketing",
+    "finance": "Finance",
+    "all": "tous secteurs",
+}
+
 
 def safe_filename(name: str) -> str:
     name = re.sub(r'[<>:"/\\|?*]', "", name)
@@ -167,7 +180,11 @@ def generate_personalized_paragraph(
     except ImportError:
         return ""
 
-    domain_label = specialty.strip() or sector.strip() or "développement web"
+    # Utiliser la spécialité choisie, sinon le libellé du secteur, jamais de fallback "développement web".
+    domain_label = (
+        specialty.strip()
+        or SECTOR_LABELS_FOR_PROMPT.get(sector.strip(), sector.strip() or "votre domaine")
+    ) or "votre domaine"
     client = openai.OpenAI(api_key=api_key)
     prompt = (
         f"Rédige en français, en 2 à 3 phrases maximum, un paragraphe pour une lettre de motivation "
@@ -257,6 +274,7 @@ def main() -> None:
 
     sector = getattr(args, "sector", "") or ""
     specialty = getattr(args, "specialty", "") or ""
+    sector_display = SECTOR_LABELS_FOR_PROMPT.get(sector, sector) or sector
 
     # Avec --use-ai : générer tous les paragraphes en parallèle (plus rapide).
     paragraphs_by_index = [""] * len(companies_info)
@@ -293,7 +311,7 @@ def main() -> None:
         if use_ai and paragraphs_by_index[i]:
             extra = {"{{PARAGRAPHE_PERSONNALISE}}": paragraphs_by_index[i]}
 
-        replace_in_doc(doc, info, extra, sector=sector, specialty=specialty)
+        replace_in_doc(doc, info, extra, sector=sector_display, specialty=specialty)
 
         filename = safe_filename(info["company"]) + "_LM.docx"
         path = outdir / filename
