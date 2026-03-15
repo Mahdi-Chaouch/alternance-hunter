@@ -26,9 +26,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const oauthResult = await resolveGoogleOAuthContextForSync();
     const bodyToSend = oauthResult.ok ? { ...body, ...oauthResult.payload } : body ?? {};
-    const response = await fetch(`${baseUrl}/candidatures/sync`, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120_000);
+    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/candidatures/sync`, {
       method: "POST",
       cache: "no-store",
+      signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
         ...getAuthHeaders(token),
@@ -36,13 +39,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
       body: JSON.stringify(bodyToSend),
     });
+    clearTimeout(timeoutId);
     const data = await readJsonSafely(response);
     return NextResponse.json(data, { status: response.status });
-  } catch {
+  } catch (err) {
+    const isTimeout =
+      err instanceof Error && (err.name === "AbortError" || err.message?.includes("abort"));
     return NextResponse.json(
       {
-        detail:
-          "Backend Python inaccessible. Verifie PIPELINE_API_BASE_URL et demarre backend_api.py.",
+        detail: isTimeout
+          ? "Le backend a mis trop de temps à répondre (serveur en veille ?). Réessayez dans 30 secondes."
+          : "Backend inaccessible. Vérifiez PIPELINE_API_BASE_URL et que le backend est démarré.",
       },
       { status: 503 },
     );
