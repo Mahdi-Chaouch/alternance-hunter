@@ -1,10 +1,35 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
+
+function getInitials(name: string | null | undefined): string {
+  const n = (name ?? "").trim();
+  if (!n) return "?";
+  const parts = n.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0]!.charAt(0) + parts[1]!.charAt(0)).toUpperCase();
+  }
+  return n.slice(0, 2).toUpperCase();
+}
+
+function getFirstName(name: string | null | undefined): string {
+  const n = (name ?? "").trim();
+  if (!n) return "Profil";
+  return n.split(/\s+/)[0] ?? n;
+}
 
 export function AppHeader() {
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profilDropdownOpen, setProfilDropdownOpen] = useState(false);
+  const profilDropdownRef = useRef<HTMLDivElement>(null);
+
+  const { data: session, isPending } = authClient.useSession();
+  const user = session?.user;
+  const isConnected = Boolean(user?.email);
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
@@ -21,6 +46,54 @@ export function AppHeader() {
     };
   }, [menuOpen, closeMenu]);
 
+  useEffect(() => {
+    if (!profilDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profilDropdownRef.current && !profilDropdownRef.current.contains(e.target as Node)) {
+        setProfilDropdownOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setProfilDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [profilDropdownOpen]);
+
+  async function handleSignOut() {
+    setProfilDropdownOpen(false);
+    closeMenu();
+    await authClient.signOut();
+    router.push("/login");
+    router.refresh();
+  }
+
+  const toggleProfilDropdown = () => setProfilDropdownOpen((o) => !o);
+
+  const profilButtonContent = (
+    <>
+      {user?.image ? (
+        <img
+          src={user.image}
+          alt=""
+          className="app-header-profil-avatar-img"
+          width={28}
+          height={28}
+        />
+      ) : (
+        <span className="app-header-profil-avatar" aria-hidden="true">
+          {getInitials(user?.name)}
+        </span>
+      )}
+      <span className="app-header-profil-name">{getFirstName(user?.name)}</span>
+      <span className="app-header-profil-chevron" aria-hidden="true">▾</span>
+    </>
+  );
+
   return (
     <header className="app-header">
       <div className="app-header-inner">
@@ -36,17 +109,87 @@ export function AppHeader() {
           <Link href="/" className="app-nav-link">
             🏠 Accueil
           </Link>
-          <Link href="/login" className="app-nav-link">
-            🔐 Connexion
-          </Link>
+          {isConnected ? (
+            <Link href="/profil" className="app-nav-link">
+              👤 Profil
+            </Link>
+          ) : (
+            <Link href="/login" className="app-nav-link">
+              🔐 Connexion
+            </Link>
+          )}
           <a href="https://github.com/Mahdi-Chaouch/alternance-killer" target="_blank" rel="noreferrer noopener" className="app-nav-link">
             📦 GitHub
           </a>
         </nav>
         <div className="app-header-cta">
-          <Link href="/login" className="app-header-button">
-            🔐 Connexion
-          </Link>
+          {isPending ? (
+            <span className="app-header-profil-button app-header-profil-button-loading" aria-hidden="true">
+              <span className="app-header-profil-avatar">...</span>
+              <span>Chargement</span>
+            </span>
+          ) : isConnected ? (
+            <div className="app-header-profil-wrap" ref={profilDropdownRef}>
+              {profilDropdownOpen ? (
+                <button
+                  type="button"
+                  className="app-header-profil-button"
+                  onClick={toggleProfilDropdown}
+                  aria-expanded="true"
+                  aria-haspopup="menu"
+                  aria-label="Fermer le menu profil"
+                >
+                  {profilButtonContent}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="app-header-profil-button"
+                  onClick={toggleProfilDropdown}
+                  aria-expanded="false"
+                  aria-haspopup="menu"
+                  aria-label="Ouvrir le menu profil"
+                >
+                  {profilButtonContent}
+                </button>
+              )}
+              {profilDropdownOpen ? (
+                <div
+                  className="app-header-profil-dropdown"
+                  role="menu"
+                >
+                  <Link
+                    href="/profil"
+                    className="app-header-profil-dropdown-item"
+                    role="menuitem"
+                    onClick={() => setProfilDropdownOpen(false)}
+                  >
+                    👤 Mon profil
+                  </Link>
+                  <Link
+                    href="/dashboard#candidatures"
+                    className="app-header-profil-dropdown-item"
+                    role="menuitem"
+                    onClick={() => setProfilDropdownOpen(false)}
+                  >
+                    📋 Suivi de candidatures
+                  </Link>
+                  <button
+                    type="button"
+                    className="app-header-profil-dropdown-item app-header-profil-dropdown-item-signout"
+                    role="menuitem"
+                    onClick={() => void handleSignOut()}
+                  >
+                    🚪 Déconnexion
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <Link href="/login" className="app-header-button">
+              🔐 Connexion
+            </Link>
+          )}
         </div>
         <div className={`app-burger-wrap${menuOpen ? " is-open" : ""}`}>
           <button
@@ -85,9 +228,27 @@ export function AppHeader() {
             <Link href="/" className="app-mobile-nav-link" onClick={closeMenu}>
               🏠 Accueil
             </Link>
-            <Link href="/login" className="app-mobile-nav-link" onClick={closeMenu}>
-              🔐 Connexion
-            </Link>
+            {isConnected ? (
+              <>
+                <Link href="/profil" className="app-mobile-nav-link" onClick={closeMenu}>
+                  👤 Mon profil
+                </Link>
+                <Link href="/dashboard#candidatures" className="app-mobile-nav-link" onClick={closeMenu}>
+                  📋 Suivi de candidatures
+                </Link>
+                <button
+                  type="button"
+                  className="app-mobile-nav-link app-mobile-nav-signout"
+                  onClick={() => void handleSignOut()}
+                >
+                  🚪 Déconnexion
+                </button>
+              </>
+            ) : (
+              <Link href="/login" className="app-mobile-nav-link" onClick={closeMenu}>
+                🔐 Connexion
+              </Link>
+            )}
             <a
               href="https://github.com/Mahdi-Chaouch/alternance-killer"
               target="_blank"
@@ -97,9 +258,11 @@ export function AppHeader() {
             >
               📦 GitHub
             </a>
-            <Link href="/login" className="app-mobile-nav-cta" onClick={closeMenu}>
-              🔐 Connexion
-            </Link>
+            {!isConnected ? (
+              <Link href="/login" className="app-mobile-nav-cta" onClick={closeMenu}>
+                🔐 Connexion
+              </Link>
+            ) : null}
           </nav>
         </div>
       </div>
