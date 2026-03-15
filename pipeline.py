@@ -24,6 +24,8 @@ from pathlib import Path
 from typing import List
 import re
 
+# Aucun temps d'attente entre hunter et generate : passage direct à l'étape suivante.
+
 
 def _project_root() -> Path:
     return Path(__file__).resolve().parent
@@ -349,8 +351,12 @@ def main() -> None:
 
     for step in order:
         print(f"\n=== ETAPE: {step} ===", flush=True)
+        sys.stdout.flush()
+        sys.stderr.flush()
         exit_code = _run(pipeline_steps[step], dry_run=args.dry_run)
         print(f"=== ETAPE: {step} terminee (code {exit_code}) ===", flush=True)
+        sys.stdout.flush()
+        sys.stderr.flush()
         if exit_code != 0:
             raise SystemExit(exit_code)
 

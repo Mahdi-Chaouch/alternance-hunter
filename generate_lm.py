@@ -24,11 +24,15 @@ import argparse
 import os
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import date
+from typing import Tuple
 from urllib.parse import urlparse
 
 from docx import Document
+
+AI_PARAGRAPH_WORKERS = 5  # appels OpenAI en parallèle (limite pour éviter rate limit)
 
 SEP = "=============================="
 
@@ -254,19 +258,19 @@ def main() -> None:
     sector = getattr(args, "sector", "") or ""
     specialty = getattr(args, "specialty", "") or ""
 
-    generated = 0
-    for info in companies_info:
-        doc = Document(template)
-        extra = None
-
-        if use_ai:
-            full_text = "\n".join(p.text for p in doc.paragraphs)
-            for t in doc.tables:
-                for row in t.rows:
-                    for cell in row.cells:
-                        full_text += "\n" + cell.text
-            if "{{PARAGRAPHE_PERSONNALISE}}" in full_text:
-                paragraph = generate_personalized_paragraph(
+    # Avec --use-ai : générer tous les paragraphes en parallèle (plus rapide).
+    paragraphs_by_index = [""] * len(companies_info)
+    if use_ai:
+        check_doc = Document(template)
+        full_text = "\n".join(p.text for p in check_doc.paragraphs)
+        for t in check_doc.tables:
+            for row in t.rows:
+                for cell in row.cells:
+                    full_text += "\n" + cell.text
+        if "{{PARAGRAPHE_PERSONNALISE}}" in full_text:
+            def _gen(i: int) -> Tuple[int, str]:
+                info = companies_info[i]
+                p = generate_personalized_paragraph(
                     info["company"],
                     info.get("domain", ""),
                     api_key,
@@ -274,7 +278,20 @@ def main() -> None:
                     sector=sector,
                     specialty=specialty,
                 )
-                extra = {"{{PARAGRAPHE_PERSONNALISE}}": paragraph or "(Paragraphe non généré.)"}
+                return i, p or "(Paragraphe non généré.)"
+
+            with ThreadPoolExecutor(max_workers=AI_PARAGRAPH_WORKERS) as ex:
+                futures = [ex.submit(_gen, i) for i in range(len(companies_info))]
+                for fut in as_completed(futures):
+                    idx, para = fut.result()
+                    paragraphs_by_index[idx] = para
+
+    generated = 0
+    for i, info in enumerate(companies_info):
+        doc = Document(template)
+        extra = None
+        if use_ai and paragraphs_by_index[i]:
+            extra = {"{{PARAGRAPHE_PERSONNALISE}}": paragraphs_by_index[i]}
 
         replace_in_doc(doc, info, extra, sector=sector, specialty=specialty)
 

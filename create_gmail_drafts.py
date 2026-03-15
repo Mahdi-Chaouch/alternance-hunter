@@ -352,7 +352,7 @@ def main():
     ap.add_argument("--oauth-scope", default="", help="OAuth scopes separes par espaces")
     ap.add_argument("--oauth-access-token-expires-at", default="", help="Expiration ISO access token")
     ap.add_argument("--oauth-account-id", default="", help="Identifiant du compte OAuth")
-    ap.add_argument("--sleep", type=float, default=1.0, help="pause entre drafts (sec)")
+    ap.add_argument("--sleep", type=float, default=0.3, help="pause entre drafts (sec); 0 = max vitesse (risque rate limit)")
     ap.add_argument("--max", type=int, default=999999, help="max drafts à créer")
     ap.add_argument("--dry-run", action="store_true", help="ne crée rien, affiche juste")
     ap.add_argument("--console-auth", action="store_true",

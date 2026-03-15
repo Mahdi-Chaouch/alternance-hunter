@@ -89,6 +89,18 @@ TIMEOUT_HTML = (6, 18)  # (connect, read)
 
 MAX_BYTES = 900_000  # limite de taille page (évite de télécharger 20MB)
 SLEEP_BETWEEN_REQUESTS_SEC = 0.0  # si tu veux ralentir un peu : 0.05
+CHUNK_SIZE_HTTP = 65536  # lecture HTTP par blocs (64k = moins d’appels système)
+
+# Session HTTP par thread pour réutiliser les connexions TCP (plus rapide).
+_thread_local = threading.local()
+
+def _get_web_session() -> requests.Session:
+    if not getattr(_thread_local, "session", None):
+        s = requests.Session()
+        s.headers.update(HEADERS_WEB)
+        s.verify = not INSECURE_SSL
+        _thread_local.session = s
+    return _thread_local.session
 
 # si ton Python/requests a un bug SSL -> flag runtime
 def rq_get(url: str, **kwargs):
@@ -977,7 +989,8 @@ def fetch_html(url: str) -> Tuple[Optional[str], Optional[int]]:
         if SLEEP_BETWEEN_REQUESTS_SEC > 0:
             time.sleep(SLEEP_BETWEEN_REQUESTS_SEC)
 
-        r = rq_get(url, headers=HEADERS_WEB, timeout=TIMEOUT_HTML, allow_redirects=True, stream=True)
+        session = _get_web_session()
+        r = session.get(url, timeout=TIMEOUT_HTML, allow_redirects=True, stream=True)
         status = r.status_code
         ct = (r.headers.get("Content-Type") or "").lower()
 
@@ -991,7 +1004,7 @@ def fetch_html(url: str) -> Tuple[Optional[str], Optional[int]]:
 
         chunks = []
         total = 0
-        for chunk in r.iter_content(chunk_size=8192):
+        for chunk in r.iter_content(chunk_size=CHUNK_SIZE_HTTP):
             if not chunk:
                 break
             chunks.append(chunk)
@@ -1050,7 +1063,7 @@ def build_email_draft(
         "SPECIALITE": domain_label,
     }
 
-    default_subject = f"Candidature stage {sector_label} - {{DATE}} - {{ENTREPRISE}}"
+    default_subject = f"Candidature alternance {sector_label} - {{DATE}} - {{ENTREPRISE}}"
 
     footer_lines = [
         "Cordialement,",
@@ -1307,22 +1320,23 @@ def run_email_finder(
                             "contact_urls": " | ".join(contact_urls) if contact_urls else "",
                             "reason": reason,
                         }
-                        writer.writerow(row)
+                    writer.writerow(row)
+                    if processed % 5 == 0:
                         fcsv.flush()
-                        done_sites.add(t.site)
+                    done_sites.add(t.site)
 
-                        print(f"\n[+] {t.entreprise} ({t.zone}) -> {t.site} [score={t.score}]")
-                        if status == "FOUND":
-                            print(f"    ✅ FOUND {email} (source: {source_url})")
-                        elif status == "FORM_ONLY":
-                            print(f"    📨 FORM_ONLY ({len(contact_urls)} url(s) contact/career)")
-                        else:
-                            print(f"    ❌ NOT_FOUND (reason={reason})")
+                    print(f"\n[+] {t.entreprise} ({t.zone}) -> {t.site} [score={t.score}]")
+                    if status == "FOUND":
+                        print(f"    ✅ FOUND {email} (source: {source_url})")
+                    elif status == "FORM_ONLY":
+                        print(f"    📨 FORM_ONLY ({len(contact_urls)} url(s) contact/career)")
+                    else:
+                        print(f"    ❌ NOT_FOUND (reason={reason})")
 
-                        if found >= target_found:
-                            print(f"\n🎯 STOP: target-found atteint ({found}/{target_found}).")
-                            stop_requested = True
-                            break
+                    if found >= target_found:
+                        print(f"\n🎯 STOP: target-found atteint ({found}/{target_found}).")
+                        stop_requested = True
+                        break
 
                 if stop_requested:
                     for f in futures:
