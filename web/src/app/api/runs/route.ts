@@ -4,6 +4,7 @@ import { getAuthHeaders, getBackendConfig } from "@/lib/backend";
 import { requireApiAuthorizedSession } from "@/lib/auth-guard";
 import { auth } from "@/lib/auth";
 import { readJsonSafely } from "@/lib/http";
+import { insertRunEvent } from "@/lib/run-events";
 import { getUserProfile } from "@/lib/user-profile";
 
 type RequestInitWithJson = RequestInit & {
@@ -41,6 +42,7 @@ const ACCEPTED_RUN_REQUEST_FIELDS = new Set([
   "workers",
   "focus",
   "sector",
+  "specialty",
   "enable_sitemap",
   "insecure",
   "rh_only",
@@ -251,6 +253,20 @@ async function forward(
       },
     });
     const body = await readJsonSafely(response);
+    if (
+      path === "/runs" &&
+      init.method === "POST" &&
+      response.ok &&
+      body &&
+      typeof (body as { run_id?: string }).run_id === "string"
+    ) {
+      const runId = (body as { run_id: string }).run_id;
+      insertRunEvent({
+        runId,
+        ownerUserId: user.id ?? "",
+        ownerEmail: user.email ?? "",
+      }).catch(() => {});
+    }
     return NextResponse.json(body, { status: response.status });
   } catch {
     return NextResponse.json(

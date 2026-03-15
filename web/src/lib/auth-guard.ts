@@ -1,29 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth-session";
-
-const INVITED_EMAILS_ENV_KEYS = ["AUTH_ALLOWED_EMAILS", "INVITED_EMAILS"] as const;
-
-function parseAllowedEmails(raw: string | undefined): Set<string> {
-  if (!raw) {
-    return new Set();
-  }
-  return new Set(
-    raw
-      .split(",")
-      .map((value) => value.trim().toLowerCase())
-      .filter((value) => value.length > 0),
-  );
-}
-
-function getAllowedEmails(): Set<string> {
-  for (const key of INVITED_EMAILS_ENV_KEYS) {
-    const parsed = parseAllowedEmails(process.env[key]);
-    if (parsed.size > 0) {
-      return parsed;
-    }
-  }
-  return new Set();
-}
+import { isInvitedEmail as isInvitedEmailDb } from "@/lib/invited-emails";
 
 type SessionUser = {
   id?: string;
@@ -36,17 +13,8 @@ export type AuthorizedSession = {
   session: unknown;
 };
 
-function normalizeEmail(email: string | null | undefined): string {
-  return (email ?? "").trim().toLowerCase();
-}
-
-export function isInvitedEmail(email: string | null | undefined): boolean {
-  const normalized = normalizeEmail(email);
-  if (!normalized) {
-    return false;
-  }
-  const allowedEmails = getAllowedEmails();
-  return allowedEmails.has(normalized);
+export async function isInvitedEmail(email: string | null | undefined): Promise<boolean> {
+  return isInvitedEmailDb(email);
 }
 
 export async function requireApiAuthorizedSession(): Promise<
@@ -66,7 +34,7 @@ export async function requireApiAuthorizedSession(): Promise<
     };
   }
 
-  if (!isInvitedEmail(user.email)) {
+  if (!(await isInvitedEmailDb(user.email))) {
     return {
       ok: false,
       response: NextResponse.json(

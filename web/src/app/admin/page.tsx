@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "@/lib/auth-session";
 import styles from "../page.module.css";
+import { AdminDashboard } from "./AdminDashboard";
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
 
@@ -22,7 +23,6 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
-  // Si ADMIN_EMAIL est défini, seuls les admins y ont accès; sinon tout utilisateur autorisé (AUTH_ALLOWED_EMAILS) peut accéder.
   if (ADMIN_EMAIL && email !== ADMIN_EMAIL) {
     redirect("/dashboard");
   }
@@ -46,11 +46,8 @@ export default async function AdminPage() {
               <dd>Administrateur</dd>
             </div>
           </dl>
-          <p className={styles.sectionHint}>
-            Tu pourras utiliser cette page pour ajouter des vues avancees (stats des runs, controle des
-            comptes invites, sante du pipeline, etc.).
-          </p>
         </section>
+        <AdminDashboard />
       </main>
     </div>
   );

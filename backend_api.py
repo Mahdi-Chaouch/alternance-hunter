@@ -134,6 +134,7 @@ class RunRequest(BaseModel):
     workers: int = 20
     focus: Literal["web", "it", "all"] = "web"
     sector: str = "it"
+    specialty: str = ""
     enable_sitemap: bool = False
     insecure: bool = False
     rh_only: bool = False
@@ -269,6 +270,7 @@ def build_pipeline_command(
     cmd += ["--workers", str(payload.workers)]
     cmd += ["--focus", payload.focus]
     cmd += ["--sector", payload.sector]
+    cmd += ["--specialty", payload.specialty or ""]
     cmd += ["--draft-file", payload.draft_file]
     cmd += ["--template", template_path]
     cmd += ["--out-dir", payload.out_dir]

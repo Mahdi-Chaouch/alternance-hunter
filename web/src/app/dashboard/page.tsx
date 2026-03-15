@@ -7,6 +7,11 @@ import styles from "../page.module.css";
 import { authClient } from "@/lib/auth-client";
 import { GoogleLogo } from "@/app/components/GoogleLogo";
 import { COMMUNES_FRANCE } from "@/data/communes-france";
+import {
+  SECTOR_LABELS,
+  SECTORS_SPECIALTIES,
+  type SectorId,
+} from "@/data/sectors-specialties";
 
 type RunMode = "pipeline" | "hunter" | "generate" | "drafts";
 type Zone = string;
@@ -56,16 +61,6 @@ const MODE_LABELS: Record<RunMode, string> = {
   hunter: "Recherche d'entreprises",
   generate: "Génération des lettres",
   drafts: "Création des brouillons Gmail",
-};
-
-const SECTOR_LABELS: Record<string, string> = {
-  it: "Informatique / Digital",
-  food: "Alimentation / Restauration",
-  law: "Droit / Finance / Assurance",
-  trade: "Commerce / Retail",
-  health: "Santé / Médical",
-  construction: "BTP / Construction / Artisanat",
-  all: "Tous secteurs",
 };
 
 const ZONE_PLACEHOLDER =
@@ -276,6 +271,7 @@ function DashboardContent() {
   const [isZoneFocused, setIsZoneFocused] = useState(false);
   const [zoneValid, setZoneValid] = useState(false);
   const [sector, setSector] = useState("it");
+  const [specialty, setSpecialty] = useState("");
   const [dryRun, setDryRun] = useState(false);
   const [maxMinutes, setMaxMinutes] = useState(30);
   const [maxSites, setMaxSites] = useState(1500);
@@ -500,6 +496,7 @@ function DashboardContent() {
             run_mode?: RunMode;
             run_zone?: Zone;
             run_sector?: string;
+            run_specialty?: string;
             run_dry_run?: boolean;
             run_max_minutes?: number;
             run_max_sites?: number;
@@ -519,6 +516,7 @@ function DashboardContent() {
             run_mode?: RunMode;
             run_zone?: Zone;
             run_sector?: string;
+            run_specialty?: string;
             run_dry_run?: boolean;
             run_max_minutes?: number;
             run_max_sites?: number;
@@ -557,6 +555,7 @@ function DashboardContent() {
         if (data.profile?.run_sector) {
           setSector(data.profile.run_sector);
         }
+        setSpecialty(data.profile?.run_specialty ?? "");
         setDryRun(Boolean(data.profile?.run_dry_run));
         setMaxMinutes(Number(data.profile?.run_max_minutes ?? 30));
         setMaxSites(Number(data.profile?.run_max_sites ?? 1500));
@@ -774,6 +773,7 @@ function DashboardContent() {
         mode,
         zone,
         sector,
+        specialty: specialty || undefined,
         dry_run: dryRun,
         max_minutes: maxMinutes,
         max_sites: maxSites,
@@ -965,6 +965,7 @@ function DashboardContent() {
           run_mode: mode,
           run_zone: zone,
           run_sector: sector,
+          run_specialty: specialty.trim() || "",
           run_dry_run: dryRun,
           run_max_minutes: maxMinutes,
           run_max_sites: maxSites,
@@ -1063,6 +1064,7 @@ function DashboardContent() {
           run_mode: mode,
           run_zone: zone,
           run_sector: sector,
+          run_specialty: specialty.trim() || "",
           run_dry_run: dryRun,
           run_max_minutes: maxMinutes,
           run_max_sites: maxSites,
@@ -1502,16 +1504,42 @@ function DashboardContent() {
                   </select>
                 </label>
 
-                <label>
-                  Secteur d&apos;activite
-                  <select value={sector} onChange={(e) => setSector(e.target.value)}>
-                    {Object.entries(SECTOR_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className={styles.inputGrid} role="group" aria-label="Domaine de recherche">
+                  <label>
+                    Secteur d&apos;activite
+                    <select
+                      value={sector}
+                      onChange={(e) => {
+                        const next = e.target.value as SectorId;
+                        setSector(next);
+                        setSpecialty("");
+                      }}
+                      aria-label="Secteur d'activité"
+                    >
+                      {(Object.keys(SECTOR_LABELS) as SectorId[]).map((key) => (
+                        <option key={key} value={key}>
+                          {SECTOR_LABELS[key]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Metier / specialite
+                    <select
+                      value={specialty}
+                      onChange={(e) => setSpecialty(e.target.value)}
+                      disabled={sector === "all"}
+                      aria-label="Métier ou spécialité"
+                    >
+                      <option value="">Toutes</option>
+                      {(SECTORS_SPECIALTIES[sector as SectorId] ?? []).map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
 
                 <label>
                   Duree maximale (minutes)

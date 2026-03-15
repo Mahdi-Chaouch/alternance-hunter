@@ -1314,6 +1314,8 @@ def parse_args():
                    help="Limiter aux zones voulues, séparées par des virgules (ex: Lyon, Marseille, Toulouse). Vide = toutes les zones.")
     p.add_argument("--sector", type=str, default="it",
                    help=f"Secteur d'activité pour le filtre Overpass. Valeurs: {', '.join(KNOWN_SECTORS)} (défaut: it)")
+    p.add_argument("--specialty", type=str, default="",
+                   help="Métier / spécialité (réservé pour usage futur: scoring, etc.).")
     p.add_argument("--targets-csv", type=str, default=DEFAULT_TARGETS_AUTO_CSV,
                    help="Chemin du CSV de cibles collectées.")
     p.add_argument("--emails-found-csv", type=str, default=DEFAULT_EMAILS_FOUND_CSV,
