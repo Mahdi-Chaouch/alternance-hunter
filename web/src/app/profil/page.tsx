@@ -174,16 +174,23 @@ export default function ProfilPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ run_id: runId ?? null }),
         });
-        const data = (await safeJson<{ synced?: number; detail?: string }>(response)) as {
+        const data = (await safeJson<{ synced?: number; detail?: string; message?: string }>(response)) as {
           synced?: number;
           detail?: string;
+          message?: string;
         };
         if (response.ok) {
           await refreshCandidatures();
           await refreshAnalytics();
-          setSyncMessage(
-            data.synced != null ? `${data.synced} candidature(s) importée(s) depuis les brouillons.` : "Synchronisation terminée.",
-          );
+          const msg =
+            data.synced != null && data.synced > 0
+              ? `${data.synced} candidature(s) importée(s) depuis les brouillons.`
+              : typeof data.message === "string" && data.message.trim()
+                ? data.message.trim()
+                : data.synced != null
+                  ? "Aucune nouvelle candidature importée."
+                  : "Synchronisation terminée.";
+          setSyncMessage(msg);
         } else {
           setSyncError(
             typeof data.detail === "string" && data.detail.trim()

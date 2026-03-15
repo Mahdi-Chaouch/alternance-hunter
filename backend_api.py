@@ -1185,15 +1185,15 @@ def _get_header(msg: dict, name: str) -> str:
     return ""
 
 
-def _fetch_draft_entries_from_gmail(body: CandidatureSyncBody) -> List[dict]:
-    """List Gmail drafts via API and return entries {company, to, status, draft_id}. Requires OAuth."""
+def _fetch_draft_entries_from_gmail(body: CandidatureSyncBody) -> tuple[List[dict], Optional[str]]:
+    """List Gmail drafts via API. Returns (entries, error_message). error_message is set on API failure."""
     at = (body.oauth_access_token or "").strip()
     if not at:
-        return []
+        return [], None
     try:
         from create_gmail_drafts import get_gmail_service_from_oauth_tokens
-    except ImportError:
-        return []
+    except ImportError as e:
+        return [], f"Module Gmail indisponible: {e}"
     try:
         service = get_gmail_service_from_oauth_tokens(
             access_token=at,
@@ -1204,13 +1204,18 @@ def _fetch_draft_entries_from_gmail(body: CandidatureSyncBody) -> List[dict]:
             scope=(body.oauth_scope or "https://www.googleapis.com/auth/gmail.compose").strip(),
             access_token_expires_at=(body.oauth_access_token_expires_at or "").strip(),
         )
-    except Exception:
-        return []
+    except Exception as e:
+        return [], f"Connexion Gmail impossible: {e!s}"
+
     entries: List[dict] = []
     page_token: Optional[str] = None
-    # Regex to extract "Entreprise: X" from body (app draft format)
     entreprise_re = re.compile(r"Entreprise\s*:\s*(.+?)(?:\n|$)", re.IGNORECASE | re.DOTALL)
     email_re = re.compile(r"[A-Za-z0-9._%+\-']+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+
+    try:
+        from googleapiclient.errors import HttpError
+    except ImportError:
+        HttpError = Exception  # type: ignore[misc, assignment]
 
     while True:
         list_params: Dict[str, Union[str, int]] = {"userId": "me", "maxResults": 500}
@@ -1218,8 +1223,25 @@ def _fetch_draft_entries_from_gmail(body: CandidatureSyncBody) -> List[dict]:
             list_params["pageToken"] = page_token
         try:
             result = service.users().drafts().list(**list_params).execute()
-        except Exception:
-            break
+        except HttpError as e:
+            err_msg = "Permissions Gmail insuffisantes."
+            if getattr(e, "resp", None) and getattr(e.resp, "status", None) == 403:
+                err_msg = (
+                    "Gmail a refusé l'accès (autorisation de lecture des brouillons manquante). "
+                    "Reconnectez votre compte Google et acceptez toutes les autorisations demandées."
+                )
+            try:
+                err_content = getattr(e, "content", b"")
+                if err_content:
+                    err_data = json.loads(err_content.decode("utf-8", errors="replace"))
+                    err_inner = (err_data.get("error") or {}).get("message", err_msg)
+                    if err_inner:
+                        err_msg = err_inner
+            except Exception:
+                pass
+            return [], err_msg
+        except Exception as e:
+            return [], f"Erreur Gmail: {e!s}"
         drafts = result.get("drafts") or []
         if not drafts:
             break
@@ -1262,7 +1284,7 @@ def _fetch_draft_entries_from_gmail(body: CandidatureSyncBody) -> List[dict]:
         page_token = result.get("nextPageToken")
         if not page_token:
             break
-    return entries
+    return entries, None
 
 
 @app.post("/candidatures/sync", dependencies=[Depends(verify_token)])
@@ -1277,11 +1299,15 @@ def sync_candidatures_from_draft_log(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
     run_id = (body.run_id if body else None) or ""
     entries: List[dict] = []
+    message: Optional[str] = None
 
     if body and (body.oauth_access_token or "").strip():
-        entries = _fetch_draft_entries_from_gmail(body)
+        entries, gmail_error = _fetch_draft_entries_from_gmail(body)
+        if gmail_error:
+            inserted = candidature_store.upsert_candidatures_from_draft_log(user_key, run_id, [])
+            return {"synced": 0, "run_id": run_id or None, "message": gmail_error}
         if not entries:
-            pass
+            message = "Aucun brouillon trouvé dans votre boîte Gmail."
     if not entries:
         draft_log_path = PROJECT_ROOT / "outputs" / "logs" / user_key / "drafts_created_log.csv"
         if draft_log_path.exists():
@@ -1299,6 +1325,14 @@ def sync_candidatures_from_draft_log(
                             })
             except (OSError, Exception):
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not read draft log.")
+        if not entries and not message:
+            message = (
+                "Connectez votre compte Google (paramètres du compte) pour importer les brouillons depuis Gmail. "
+                "Sinon, lancez d'abord une recherche depuis le dashboard pour créer des brouillons."
+            )
 
     inserted = candidature_store.upsert_candidatures_from_draft_log(user_key, run_id, entries)
-    return {"synced": inserted, "run_id": run_id or None}
+    out: dict = {"synced": inserted, "run_id": run_id or None}
+    if message:
+        out["message"] = message
+    return out
