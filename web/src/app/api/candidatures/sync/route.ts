@@ -45,11 +45,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch (err) {
     const isTimeout =
       err instanceof Error && (err.name === "AbortError" || err.message?.includes("abort"));
+    const message =
+      err instanceof Error ? err.message : String(err);
+    console.error("[candidatures/sync] Backend request failed:", message);
     return NextResponse.json(
       {
         detail: isTimeout
-          ? "Le backend a mis trop de temps à répondre (serveur en veille ?). Réessayez dans 30 secondes."
-          : "Backend inaccessible. Vérifiez PIPELINE_API_BASE_URL et que le backend est démarré.",
+          ? "Le backend a mis trop de temps à répondre (serveur en veille ?). Ouvrez d'abord alternance-killer.onrender.com/docs puis réessayez."
+          : `Backend inaccessible: ${message}. Vérifiez que Render est démarré (ouvrez .onrender.com/docs) et PIPELINE_API_BASE_URL.`,
       },
       { status: 503 },
     );
