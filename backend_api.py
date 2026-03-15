@@ -1159,17 +1159,22 @@ def _analyze_inbox_from_gmail(
         )
     except HttpError as e:
         err_msg = "Permissions Gmail insuffisantes."
-        if getattr(e, "resp", None) and getattr(e.resp, "status", None) == 403:
-            err_msg = "Gmail: accès refusé. Reconnectez Google avec l'autorisation de lecture des e-mails."
-        try:
-            err_content = getattr(e, "content", b"")
-            if err_content:
-                err_data = json.loads(err_content.decode("utf-8", errors="replace"))
-                err_inner = (err_data.get("error") or {}).get("message", err_msg)
-                if err_inner:
-                    err_msg = err_inner
-        except Exception:
-            pass
+        is_403 = getattr(e, "resp", None) and getattr(e.resp, "status", None) == 403
+        if is_403:
+            err_msg = (
+                "Autorisations Gmail insuffisantes. Déconnectez puis reconnectez votre compte Google "
+                "et acceptez toutes les autorisations demandées (notamment « Voir vos e-mails »)."
+            )
+        if not is_403:
+            try:
+                err_content = getattr(e, "content", b"")
+                if err_content:
+                    err_data = json.loads(err_content.decode("utf-8", errors="replace"))
+                    err_inner = (err_data.get("error") or {}).get("message", err_msg)
+                    if err_inner:
+                        err_msg = err_inner
+            except Exception:
+                pass
         return {"analyzed": 0, "updated": 0, "positive": 0, "negative": 0}, err_msg
     except Exception as e:
         return {"analyzed": 0, "updated": 0, "positive": 0, "negative": 0}, f"Erreur: {e!s}"
@@ -1411,20 +1416,22 @@ def _fetch_draft_entries_from_gmail(body: CandidatureSyncBody) -> tuple[List[dic
             result = service.users().drafts().list(**list_params).execute()
         except HttpError as e:
             err_msg = "Permissions Gmail insuffisantes."
-            if getattr(e, "resp", None) and getattr(e.resp, "status", None) == 403:
+            is_403 = getattr(e, "resp", None) and getattr(e.resp, "status", None) == 403
+            if is_403:
                 err_msg = (
-                    "Gmail a refusé l'accès (autorisation de lecture des brouillons manquante). "
-                    "Reconnectez votre compte Google et acceptez toutes les autorisations demandées."
+                    "Autorisations Gmail insuffisantes. Déconnectez puis reconnectez votre compte Google "
+                    "et acceptez toutes les autorisations demandées (notamment « Voir vos e-mails »)."
                 )
-            try:
-                err_content = getattr(e, "content", b"")
-                if err_content:
-                    err_data = json.loads(err_content.decode("utf-8", errors="replace"))
-                    err_inner = (err_data.get("error") or {}).get("message", err_msg)
-                    if err_inner:
-                        err_msg = err_inner
-            except Exception:
-                pass
+            if not is_403:
+                try:
+                    err_content = getattr(e, "content", b"")
+                    if err_content:
+                        err_data = json.loads(err_content.decode("utf-8", errors="replace"))
+                        err_inner = (err_data.get("error") or {}).get("message", err_msg)
+                        if err_inner:
+                            err_msg = err_inner
+                except Exception:
+                    pass
             return [], err_msg
         except Exception as e:
             return [], f"Erreur Gmail: {e!s}"
