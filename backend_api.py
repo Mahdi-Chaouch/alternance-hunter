@@ -41,7 +41,16 @@ SENSITIVE_LOG_PATTERNS = [
     re.compile(r"(oauth_access_token\s*[=:]\s*)(\S+)", flags=re.IGNORECASE),
     re.compile(r"(oauth_refresh_token\s*[=:]\s*)(\S+)", flags=re.IGNORECASE),
     re.compile(r"(oauth_client_secret\s*[=:]\s*)(\S+)", flags=re.IGNORECASE),
+    # OpenAI API keys (sk-...); never log or display
+    re.compile(r"(sk-[a-zA-Z0-9_-]{20,})"),
+    re.compile(r"(OPENAI_API_KEY\s*[=:]\s*)(\S+)", flags=re.IGNORECASE),
 ]
+
+
+def _redact_openai_key(match: re.Match) -> str:
+    """Replace OPENAI_API_KEY=... with OPENAI_API_KEY=[REDACTED] (group 2 is the secret)."""
+    return match.group(1) + REDACTED_VALUE
+
 
 def _read_token_from_env_file(path: Path) -> Optional[str]:
     if not path.exists():
@@ -115,7 +124,12 @@ def sanitize_log_line(line: str, secrets: List[str]) -> str:
         if secret:
             masked = masked.replace(secret, REDACTED_VALUE)
     for pattern in SENSITIVE_LOG_PATTERNS:
-        masked = pattern.sub(rf"\1{REDACTED_VALUE}\2", masked)
+        if pattern.groups == 2 and "OPENAI_API_KEY" in pattern.pattern:
+            masked = pattern.sub(_redact_openai_key, masked)
+        elif pattern.groups == 1 and "sk-" in pattern.pattern:
+            masked = pattern.sub(REDACTED_VALUE, masked)
+        else:
+            masked = pattern.sub(rf"\1{REDACTED_VALUE}\2", masked)
     return masked
 
 
@@ -144,6 +158,7 @@ class RunRequest(BaseModel):
     template: str = ""
     out_dir: str = "outputs/letters"
     use_ai: bool = False
+    openai_api_key: Optional[str] = None
     ai_model: str = "gpt-4o-mini"
     sender_first_name: str = ""
     sender_last_name: str = ""
@@ -215,6 +230,7 @@ class RunState:
     process: Optional[subprocess.Popen[str]] = None
     owner_user_id: Optional[str] = None
     owner_user_email: Optional[str] = None
+    openai_api_key: Optional[str] = None
     logs_tail: Deque[str] = field(
         default_factory=lambda: deque(maxlen=MAX_IN_MEMORY_LOG_LINES)
     )
@@ -357,13 +373,16 @@ def run_in_background(run_id: str) -> None:
     # Avoid leaking sensitive CLI arguments (OAuth tokens/secrets) into run logs.
     run.append_log(f"[{utc_now_iso()}] Starting run.")
 
+    env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    if run.openai_api_key:
+        env["OPENAI_API_KEY"] = run.openai_api_key
     popen_kwargs = {
         "cwd": str(PROJECT_ROOT),
         "stdout": subprocess.PIPE,
         "stderr": subprocess.STDOUT,
         "text": True,
         "bufsize": 1,
-        "env": {**os.environ, "PYTHONUNBUFFERED": "1"},
+        "env": env,
     }
     if sys.platform.startswith("win"):
         popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
@@ -411,6 +430,7 @@ def run_in_background(run_id: str) -> None:
             run.status = "failed"
         run.process = None
         run.pid = None
+        run.openai_api_key = None  # clear key from memory immediately after run
 
     run.append_log(f"[{utc_now_iso()}] Run finished with exit code {exit_code}.")
 
@@ -511,14 +531,22 @@ def create_run(
     run_id = uuid4().hex
     command = build_pipeline_command(payload, owner_user_id, owner_user_email)
     log_file = RUN_LOG_DIR / f"{run_id}.log"
+    openai_key: Optional[str] = None
+    if payload.use_ai and payload.openai_api_key:
+        raw = (payload.openai_api_key or "").strip()
+        if raw:
+            openai_key = raw
+
     run = RunState(
         run_id=run_id,
         command=command,
         display_command=redact_command(command),
         log_file=log_file,
-        redaction_secrets=extract_command_secrets(command),
+        redaction_secrets=extract_command_secrets(command)
+        + ([openai_key] if openai_key else []),
         owner_user_id=owner_user_id,
         owner_user_email=owner_user_email,
+        openai_api_key=openai_key,
     )
 
     with RUNS_LOCK:
