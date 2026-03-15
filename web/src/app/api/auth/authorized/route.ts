@@ -2,16 +2,14 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { requireApiAuthorizedSession } from "@/lib/auth-guard";
 import { auth } from "@/lib/auth";
-
-const REQUIRED_GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.compose"] as const;
-
-type AccountSummary = {
-  providerId?: string;
-  scopes?: string[];
-};
+import type { GoogleLinkedAccount } from "@/lib/google-oauth-context";
 
 function hasRequiredGmailScopes(scopes: string[]): boolean {
-  return REQUIRED_GMAIL_SCOPES.every((requiredScope) => scopes.includes(requiredScope));
+  const required = [
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.readonly",
+  ] as const;
+  return required.every((s) => scopes.includes(s));
 }
 
 export async function GET(): Promise<NextResponse> {
@@ -26,7 +24,7 @@ export async function GET(): Promise<NextResponse> {
   try {
     const linkedAccounts = (await auth.api.listUserAccounts({
       headers: await headers(),
-    })) as AccountSummary[];
+    })) as GoogleLinkedAccount[];
     const googleAccount = linkedAccounts.find((account) => account.providerId === "google");
     googleAccountLinked = Boolean(googleAccount);
     gmailConnected = Boolean(googleAccount && hasRequiredGmailScopes(googleAccount.scopes ?? []));

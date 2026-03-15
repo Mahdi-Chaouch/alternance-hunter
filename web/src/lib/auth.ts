@@ -49,6 +49,7 @@ const GOOGLE_GMAIL_SCOPES = [
   "email",
   "profile",
   "https://www.googleapis.com/auth/gmail.compose",
+  "https://www.googleapis.com/auth/gmail.readonly",
 ];
 
 export const auth = betterAuth({

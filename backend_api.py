@@ -3,15 +3,16 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import queue
+import re
 import signal
 import subprocess
 import sys
 import threading
 import time
-import re
 from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -987,6 +988,14 @@ class CandidatureUpdateStatus(BaseModel):
 
 class CandidatureSyncBody(BaseModel):
     run_id: Optional[str] = None
+    oauth_access_token: Optional[str] = None
+    oauth_refresh_token: Optional[str] = None
+    oauth_client_id: Optional[str] = None
+    oauth_client_secret: Optional[str] = None
+    oauth_token_uri: Optional[str] = None
+    oauth_scope: Optional[str] = None
+    oauth_access_token_expires_at: Optional[str] = None
+    oauth_account_id: Optional[str] = None
 
     class Config:
         extra = "forbid"
@@ -1146,34 +1155,150 @@ def update_candidature_status_api(
     }
 
 
+def _get_message_body_text(payload: Optional[dict]) -> str:
+    """Extract plain text body from Gmail message payload (single or multipart)."""
+    if not payload:
+        return ""
+    body = payload.get("body") or {}
+    data = body.get("data")
+    if data:
+        try:
+            return base64.urlsafe_b64decode(data.encode("ASCII")).decode("utf-8", errors="replace")
+        except Exception:
+            pass
+    for part in payload.get("parts") or []:
+        if (part.get("mimeType") or "").startswith("text/plain"):
+            part_data = (part.get("body") or {}).get("data")
+            if part_data:
+                try:
+                    return base64.urlsafe_b64decode(part_data.encode("ASCII")).decode("utf-8", errors="replace")
+                except Exception:
+                    pass
+    return ""
+
+
+def _get_header(msg: dict, name: str) -> str:
+    headers = (msg.get("payload") or {}).get("headers") or []
+    for h in headers:
+        if (h.get("name") or "").lower() == name.lower():
+            return (h.get("value") or "").strip()
+    return ""
+
+
+def _fetch_draft_entries_from_gmail(body: CandidatureSyncBody) -> List[dict]:
+    """List Gmail drafts via API and return entries {company, to, status, draft_id}. Requires OAuth."""
+    at = (body.oauth_access_token or "").strip()
+    if not at:
+        return []
+    try:
+        from create_gmail_drafts import get_gmail_service_from_oauth_tokens
+    except ImportError:
+        return []
+    try:
+        service = get_gmail_service_from_oauth_tokens(
+            access_token=at,
+            refresh_token=(body.oauth_refresh_token or "").strip(),
+            client_id=(body.oauth_client_id or "").strip(),
+            client_secret=(body.oauth_client_secret or "").strip(),
+            token_uri=(body.oauth_token_uri or "https://oauth2.googleapis.com/token").strip(),
+            scope=(body.oauth_scope or "https://www.googleapis.com/auth/gmail.compose").strip(),
+            access_token_expires_at=(body.oauth_access_token_expires_at or "").strip(),
+        )
+    except Exception:
+        return []
+    entries: List[dict] = []
+    page_token: Optional[str] = None
+    # Regex to extract "Entreprise: X" from body (app draft format)
+    entreprise_re = re.compile(r"Entreprise\s*:\s*(.+?)(?:\n|$)", re.IGNORECASE | re.DOTALL)
+    email_re = re.compile(r"[A-Za-z0-9._%+\-']+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+
+    while True:
+        list_params: Dict[str, Union[str, int]] = {"userId": "me", "maxResults": 500}
+        if page_token:
+            list_params["pageToken"] = page_token
+        try:
+            result = service.users().drafts().list(**list_params).execute()
+        except Exception:
+            break
+        drafts = result.get("drafts") or []
+        if not drafts:
+            break
+        for d in drafts:
+            draft_id = d.get("id")
+            if not draft_id:
+                continue
+            try:
+                draft = service.users().drafts().get(userId="me", id=draft_id, format="full").execute()
+                msg = draft.get("message") or {}
+                to_raw = _get_header(msg, "To")
+                subject = _get_header(msg, "Subject")
+                body_text = _get_message_body_text(msg.get("payload"))
+                company = ""
+                m = entreprise_re.search(body_text)
+                if m:
+                    company = m.group(1).strip()[:200]
+                if not company and subject:
+                    company = subject.strip()[:200] or "Inconnu"
+                if not company:
+                    company = "Inconnu"
+                to_email = ""
+                if email_re.search(to_raw):
+                    to_email = email_re.search(to_raw).group(0)
+                else:
+                    for token in to_raw.replace(",", " ").split():
+                        if email_re.search(token):
+                            to_email = email_re.search(token).group(0)
+                            break
+                if not to_email:
+                    continue
+                entries.append({
+                    "company": company,
+                    "to": to_email,
+                    "status": "OK",
+                    "draft_id": draft_id,
+                })
+            except Exception:
+                continue
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            break
+    return entries
+
+
 @app.post("/candidatures/sync", dependencies=[Depends(verify_token)])
 def sync_candidatures_from_draft_log(
     body: Optional[CandidatureSyncBody] = None,
     x_run_user_id: Optional[str] = Header(default=None),
     x_run_user_email: Optional[str] = Header(default=None),
 ) -> dict:
-    """Read user's drafts_created_log.csv and insert candidatures (draft_created). Optional run_id."""
+    """Sync candidatures from Gmail drafts (if OAuth provided) or from drafts_created_log.csv."""
     user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
     if not user_key:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
-    draft_log_path = PROJECT_ROOT / "outputs" / "logs" / user_key / "drafts_created_log.csv"
-    if not draft_log_path.exists():
-        return {"synced": 0, "message": "No draft log found."}
     run_id = (body.run_id if body else None) or ""
     entries: List[dict] = []
-    try:
-        import csv as csv_module
-        with draft_log_path.open("r", encoding="utf-8") as f:
-            reader = csv_module.DictReader(f)
-            for row in reader:
-                if (row.get("status") or "").strip().upper() == "OK":
-                    entries.append({
-                        "company": row.get("company"),
-                        "to": row.get("to"),
-                        "status": "OK",
-                        "draft_id": row.get("draft_id"),
-                    })
-    except (OSError, Exception):
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not read draft log.")
+
+    if body and (body.oauth_access_token or "").strip():
+        entries = _fetch_draft_entries_from_gmail(body)
+        if not entries:
+            pass
+    if not entries:
+        draft_log_path = PROJECT_ROOT / "outputs" / "logs" / user_key / "drafts_created_log.csv"
+        if draft_log_path.exists():
+            try:
+                import csv as csv_module
+                with draft_log_path.open("r", encoding="utf-8") as f:
+                    reader = csv_module.DictReader(f)
+                    for row in reader:
+                        if (row.get("status") or "").strip().upper() == "OK":
+                            entries.append({
+                                "company": row.get("company"),
+                                "to": row.get("to"),
+                                "status": "OK",
+                                "draft_id": row.get("draft_id"),
+                            })
+            except (OSError, Exception):
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not read draft log.")
+
     inserted = candidature_store.upsert_candidatures_from_draft_log(user_key, run_id, entries)
     return {"synced": inserted, "run_id": run_id or None}
