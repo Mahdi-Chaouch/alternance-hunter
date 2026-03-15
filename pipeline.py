@@ -164,6 +164,8 @@ def build_hunter_cmd(args: argparse.Namespace) -> List[str]:
     zone_filter = _zone_to_hunter_filter(args.zone)
     if zone_filter:
         cmd.extend(["--zones", zone_filter])
+    sector = getattr(args, "sector", "it") or "it"
+    cmd.extend(["--sector", sector])
     if args.enable_sitemap:
         cmd.append("--enable-sitemap")
     if args.insecure:
@@ -277,6 +279,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-found", type=int, default=100)
     parser.add_argument("--workers", type=int, default=20)
     parser.add_argument("--focus", choices=["web", "it", "all"], default="web")
+    parser.add_argument("--sector", type=str, default="it",
+                        help="Secteur d'activite pour le filtre Overpass (it, food, law, trade, health, construction, all)")
     parser.add_argument("--enable-sitemap", action="store_true")
     parser.add_argument("--insecure", action="store_true")
     parser.add_argument("--rh-only", action="store_true")

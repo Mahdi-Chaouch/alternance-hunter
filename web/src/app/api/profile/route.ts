@@ -45,6 +45,7 @@ export async function GET(): Promise<NextResponse> {
         body_template: "",
         run_mode: "pipeline",
         run_zone: "all",
+        run_sector: "it",
         run_dry_run: false,
         run_max_minutes: 30,
         run_max_sites: 1500,
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     body_template?: string;
     run_mode?: string;
     run_zone?: string;
+    run_sector?: string;
     run_dry_run?: boolean;
     run_max_minutes?: number;
     run_max_sites?: number;
@@ -109,6 +111,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const bodyTemplate = payload.body_template ?? "";
   const runMode = (payload.run_mode ?? "pipeline").toLowerCase();
   const runZone = (payload.run_zone ?? "all").toString();
+  const runSector = (payload.run_sector ?? "it").toString().toLowerCase();
   const runDryRun = payload.run_dry_run === true;
   const runMaxMinutes = Number(payload.run_max_minutes ?? 30);
   const runMaxSites = Number(payload.run_max_sites ?? 1500);
@@ -146,6 +149,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     bodyTemplate,
     runMode,
     runZone,
+    runSector,
     runDryRun,
     runMaxMinutes,
     runMaxSites,
