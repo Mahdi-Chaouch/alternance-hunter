@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+import queue
 import signal
 import subprocess
 import sys
@@ -11,11 +13,15 @@ import threading
 import time
 import re
 from collections import deque
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Deque, Dict, List, Literal, Optional
+from typing import Deque, Dict, List, Literal, Optional, Union
 from uuid import uuid4
+
+import run_store
+import candidature_store
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
@@ -27,6 +33,19 @@ RUN_LOG_DIR = PROJECT_ROOT / "outputs" / "logs" / "api_runs"
 RUN_LOG_DIR.mkdir(parents=True, exist_ok=True)
 MAX_IN_MEMORY_LOG_LINES = 500
 USER_ASSETS_DIR = PROJECT_ROOT / "data" / "user_assets"
+UPLOAD_QUOTA_FILE = PROJECT_ROOT / "data" / "upload_quota.json"
+
+# Upload guards: size (bytes), MIME allowlist, daily quota per user
+MAX_CV_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+MAX_TEMPLATE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
+ALLOWED_CV_MIME_TYPES = frozenset({"application/pdf"})
+ALLOWED_TEMPLATE_MIME_TYPES = frozenset({
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
+})
+UPLOAD_QUOTA_PER_USER_PER_DAY = 20
+UPLOAD_QUOTA_LOCK = threading.Lock()
+
 REDACTED_VALUE = "[REDACTED]"
 SENSITIVE_CLI_FLAGS = {
     "--oauth-access-token",
@@ -52,6 +71,10 @@ def _redact_openai_key(match: re.Match) -> str:
     return match.group(1) + REDACTED_VALUE
 
 
+def _is_production() -> bool:
+    return os.getenv("ENV") == "production" or os.getenv("PRODUCTION", "").lower() in ("1", "true", "yes")
+
+
 def _read_token_from_env_file(path: Path) -> Optional[str]:
     if not path.exists():
         return None
@@ -67,16 +90,25 @@ def _read_token_from_env_file(path: Path) -> Optional[str]:
     return None
 
 
-API_TOKEN = (
-    os.getenv("PIPELINE_API_TOKEN")
-    or os.getenv("API_TOKEN")
-    or _read_token_from_env_file(PROJECT_ROOT / ".env")
-    or _read_token_from_env_file(PROJECT_ROOT / "web" / ".env.local")
-)
-if not API_TOKEN:
-    raise RuntimeError(
-        "Missing API token. Set PIPELINE_API_TOKEN/API_TOKEN or define it in .env or web/.env.local."
-    )
+if _is_production():
+    API_TOKEN = (os.getenv("PIPELINE_API_TOKEN") or os.getenv("API_TOKEN") or "").strip()
+    if not API_TOKEN:
+        raise RuntimeError(
+            "In production, API token must be set via environment: "
+            "PIPELINE_API_TOKEN or API_TOKEN. Do not rely on .env files."
+        )
+else:
+    API_TOKEN = (
+        os.getenv("PIPELINE_API_TOKEN")
+        or os.getenv("API_TOKEN")
+        or _read_token_from_env_file(PROJECT_ROOT / ".env")
+        or _read_token_from_env_file(PROJECT_ROOT / "web" / ".env.local")
+        or ""
+    ).strip()
+    if not API_TOKEN:
+        raise RuntimeError(
+            "Missing API token. Set PIPELINE_API_TOKEN/API_TOKEN or define it in .env or web/.env.local."
+        )
 
 
 def utc_now_iso() -> str:
@@ -244,10 +276,35 @@ class RunState:
             fh.write(clean + "\n")
 
 
-app = FastAPI(title="Alternance Pipeline API", version="1.0.0")
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Start run-queue workers on startup; stop them gracefully on shutdown."""
+    for _ in range(NUM_WORKERS):
+        t = threading.Thread(target=_run_worker, daemon=False)
+        t.start()
+        _worker_threads.append(t)
+    yield
+    for _ in range(NUM_WORKERS):
+        RUN_QUEUE.put(RUN_QUEUE_SENTINEL)
+    for t in _worker_threads:
+        t.join(timeout=10)
+    _worker_threads.clear()
+
+
+app = FastAPI(title="Alternance Pipeline API", version="1.0.0", lifespan=_lifespan)
 
 RUNS: Dict[str, RunState] = {}
 RUNS_LOCK = threading.Lock()
+
+# Persistent run store (SQLite); init at startup so runs survive restarts
+run_store.init_run_store(PROJECT_ROOT / "data" / "runs.db")
+candidature_store.init_candidature_store(PROJECT_ROOT / "data" / "runs.db")
+
+# Job queue + workers for asynchronous run execution
+RUN_QUEUE: "queue.Queue[Optional[str]]" = queue.Queue()
+RUN_QUEUE_SENTINEL: Optional[str] = None  # None = stop worker
+NUM_WORKERS = max(1, int(os.getenv("RUN_WORKER_COUNT", "2")))
+_worker_threads: List[threading.Thread] = []
 
 
 def verify_token(
@@ -369,6 +426,12 @@ def run_in_background(run_id: str) -> None:
         run.status = "running"
         run.started_at = utc_now_iso()
         run.started_monotonic = time.monotonic()
+    try:
+        run_store.update_run_status(
+            run_id, "running", started_at=run.started_at
+        )
+    except (ValueError, KeyError):
+        pass  # already terminal or not in store
 
     # Avoid leaking sensitive CLI arguments (OAuth tokens/secrets) into run logs.
     run.append_log(f"[{utc_now_iso()}] Starting run.")
@@ -432,18 +495,70 @@ def run_in_background(run_id: str) -> None:
         run.pid = None
         run.openai_api_key = None  # clear key from memory immediately after run
 
+    try:
+        run_store.update_run_status(
+            run_id,
+            run.status,
+            finished_at=run.finished_at,
+            exit_code=run.exit_code,
+        )
+    except (ValueError, KeyError):
+        pass
+
     run.append_log(f"[{utc_now_iso()}] Run finished with exit code {exit_code}.")
 
 
-def get_run_or_404(run_id: str) -> RunState:
+def _run_worker() -> None:
+    """Worker thread: consume run_id from queue and execute run_in_background, or stop on sentinel."""
+    while True:
+        run_id = RUN_QUEUE.get()
+        if run_id is RUN_QUEUE_SENTINEL:
+            RUN_QUEUE.task_done()
+            return
+        try:
+            with RUNS_LOCK:
+                run = RUNS.get(run_id)
+            if run is None:
+                RUN_QUEUE.task_done()
+                continue
+            if run.status != "queued":
+                RUN_QUEUE.task_done()
+                continue
+            if run.cancel_requested:
+                run.status = "cancelled"
+                run.finished_at = utc_now_iso()
+                run.append_log(f"[{utc_now_iso()}] Run cancelled before start.")
+                try:
+                    run_store.update_run_status(
+                        run_id, "cancelled", finished_at=run.finished_at
+                    )
+                except (ValueError, KeyError):
+                    pass
+                RUN_QUEUE.task_done()
+                continue
+            run_in_background(run_id)
+        finally:
+            RUN_QUEUE.task_done()
+
+
+def enqueue_run(run_id: str) -> None:
+    """Enqueue a run for execution by a worker. Run must already be in RUNS with status 'queued'."""
+    RUN_QUEUE.put(run_id)
+
+
+def get_run_or_404(run_id: str) -> Union[RunState, run_store.StoredRun]:
+    """Return live RunState if in memory, else StoredRun from DB. 404 if not found."""
     with RUNS_LOCK:
         run = RUNS.get(run_id)
-        if run is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Run '{run_id}' not found.",
-            )
-        return run
+        if run is not None:
+            return run
+    stored = run_store.get_run_by_id(run_id)
+    if stored is not None:
+        return stored
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Run '{run_id}' not found.",
+    )
 
 
 def normalize_user_identifier(value: Optional[str]) -> Optional[str]:
@@ -484,7 +599,77 @@ def resolve_user_assets(user_key: Optional[str]) -> tuple[Optional[str], Optiona
     return cv_path, template_path
 
 
-def assert_run_access(run: RunState, actor_user_id: Optional[str]) -> None:
+def _upload_quota_today() -> Dict[str, Dict[str, int]]:
+    """Load quota file: { "YYYY-MM-DD": { "user_key": count } }."""
+    if not UPLOAD_QUOTA_FILE.exists():
+        return {}
+    try:
+        data = json.loads(UPLOAD_QUOTA_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _upload_quota_check_and_inc(user_key: str) -> None:
+    """Raise HTTP 429 if user has exceeded daily upload quota; otherwise increment."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    with UPLOAD_QUOTA_LOCK:
+        data = _upload_quota_today()
+        day_data = data.setdefault(today, {})
+        count = day_data.get(user_key, 0)
+        if count >= UPLOAD_QUOTA_PER_USER_PER_DAY:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Quota upload atteint ({UPLOAD_QUOTA_PER_USER_PER_DAY} par jour). Reessayez demain.",
+            )
+        day_data[user_key] = count + 1
+        UPLOAD_QUOTA_FILE.parent.mkdir(parents=True, exist_ok=True)
+        UPLOAD_QUOTA_FILE.write_text(json.dumps(data, indent=0), encoding="utf-8")
+
+
+async def _read_upload_with_size_limit(
+    file: UploadFile, max_bytes: int, label: str
+) -> bytes:
+    """Read file in chunks; raise HTTP 400 if size exceeds max_bytes."""
+    chunk_size = 256 * 1024  # 256 KB
+    buf = b""
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        buf += chunk
+        if len(buf) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{label} trop volumineux (max {max_bytes // (1024*1024)} Mo).",
+            )
+    return buf
+
+
+def _check_mime_or_extension(
+    content_type: Optional[str],
+    allowed_mimes: frozenset[str],
+    allowed_suffixes: set[str],
+    filename: str,
+    label: str,
+) -> None:
+    """Raise HTTP 400 if content_type (when set) or file extension is not allowed."""
+    suffix = (Path((filename or "").lower()).suffix or "").lower()
+    if content_type and content_type.split(";")[0].strip().lower() not in allowed_mimes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{label}: type MIME non autorise. Types acceptes: {', '.join(sorted(allowed_mimes))}.",
+        )
+    if suffix not in allowed_suffixes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{label}: extension non autorisee. Extensions acceptees: {', '.join(sorted(allowed_suffixes))}.",
+        )
+
+
+def assert_run_access(
+    run: Union[RunState, run_store.StoredRun], actor_user_id: Optional[str]
+) -> None:
     if not run.owner_user_id:
         return
     if not actor_user_id or actor_user_id != run.owner_user_id:
@@ -537,10 +722,21 @@ def create_run(
         if raw:
             openai_key = raw
 
+    display_command = redact_command(command)
+    run_store.insert_run(
+        run_id=run_id,
+        status="queued",
+        created_at=utc_now_iso(),
+        display_command=display_command,
+        log_file=str(log_file),
+        owner_user_id=owner_user_id,
+        owner_user_email=owner_user_email,
+    )
+
     run = RunState(
         run_id=run_id,
         command=command,
-        display_command=redact_command(command),
+        display_command=display_command,
         log_file=log_file,
         redaction_secrets=extract_command_secrets(command)
         + ([openai_key] if openai_key else []),
@@ -552,10 +748,9 @@ def create_run(
     with RUNS_LOCK:
         RUNS[run_id] = run
 
-    thread = threading.Thread(target=run_in_background, args=(run_id,), daemon=True)
-    thread.start()
+    enqueue_run(run_id)
 
-    return RunCreateResponse(run_id=run_id, status="running")
+    return RunCreateResponse(run_id=run_id, status="queued")
 
 
 @app.post("/uploads", dependencies=[Depends(verify_token)])
@@ -577,24 +772,40 @@ async def upload_user_assets(
             detail="No file provided. Upload cv and/or template.",
         )
 
+    _upload_quota_check_and_inc(user_key)
+
     target_dir = USER_ASSETS_DIR / user_key
     target_dir.mkdir(parents=True, exist_ok=True)
     uploaded: dict[str, str] = {}
 
     if cv is not None:
+        _check_mime_or_extension(
+            cv.content_type,
+            ALLOWED_CV_MIME_TYPES,
+            {".pdf"},
+            cv.filename or "",
+            "CV",
+        )
         cv_suffix = Path((cv.filename or "").lower()).suffix or ".pdf"
-        if cv_suffix != ".pdf":
-            raise HTTPException(status_code=400, detail="CV must be a .pdf file.")
         cv_path = target_dir / f"cv{cv_suffix}"
-        cv_path.write_bytes(await cv.read())
+        content = await _read_upload_with_size_limit(cv, MAX_CV_SIZE_BYTES, "CV")
+        cv_path.write_bytes(content)
         uploaded["cv"] = str(cv_path.relative_to(PROJECT_ROOT))
 
     if template is not None:
+        _check_mime_or_extension(
+            template.content_type,
+            ALLOWED_TEMPLATE_MIME_TYPES,
+            {".docx", ".doc"},
+            template.filename or "",
+            "Template LM",
+        )
         template_suffix = Path((template.filename or "").lower()).suffix or ".docx"
-        if template_suffix not in {".docx", ".doc"}:
-            raise HTTPException(status_code=400, detail="Template must be .docx or .doc.")
         template_path = target_dir / f"template_lm{template_suffix}"
-        template_path.write_bytes(await template.read())
+        content = await _read_upload_with_size_limit(
+            template, MAX_TEMPLATE_SIZE_BYTES, "Template LM"
+        )
+        template_path.write_bytes(content)
         uploaded["template"] = str(template_path.relative_to(PROJECT_ROOT))
 
     return {"ok": True, "user_key": user_key, "uploaded": uploaded}
@@ -648,7 +859,14 @@ def get_run_status(
     actor_user_id = normalize_user_identifier(x_run_user_id)
     run = get_run_or_404(run_id)
     assert_run_access(run, actor_user_id)
-    logs = list(run.logs_tail)[-tail:]
+    if isinstance(run, RunState):
+        logs = list(run.logs_tail)[-tail:]
+        log_file_str = str(run.log_file)
+        pid = run.pid
+    else:
+        logs = run_store.read_log_tail(run.log_file, tail)
+        log_file_str = run.log_file
+        pid = getattr(run, "pid", None)
     return RunStatusResponse(
         run_id=run.run_id,
         status=run.status,
@@ -657,11 +875,11 @@ def get_run_status(
         finished_at=run.finished_at,
         exit_code=run.exit_code,
         command=run.display_command,
-        pid=run.pid,
+        pid=pid,
         cancel_requested=run.cancel_requested,
         owner_user_id=run.owner_user_id,
         owner_user_email=run.owner_user_email,
-        log_file=str(run.log_file),
+        log_file=log_file_str,
         logs_tail=logs,
     )
 
@@ -677,18 +895,46 @@ def cancel_run(
     actor_user_id = normalize_user_identifier(x_run_user_id)
     run = get_run_or_404(run_id)
     assert_run_access(run, actor_user_id)
-    with RUNS_LOCK:
-        if run.status in {"succeeded", "failed", "cancelled"}:
-            return {"run_id": run_id, "status": run.status, "message": "Run already ended."}
-        run.cancel_requested = True
-        process = run.process
+    if run.status in {"succeeded", "failed", "cancelled"}:
+        return {"run_id": run_id, "status": run.status, "message": "Run already ended."}
 
-    if process and process.pid:
-        kill_process_tree(process.pid)
-        run.append_log(f"[{utc_now_iso()}] Cancellation requested.")
-        return {"run_id": run_id, "status": "cancelling"}
+    try:
+        run_store.set_cancel_requested(run_id)
+    except KeyError:
+        pass
 
-    return {"run_id": run_id, "status": run.status, "message": "Run not started yet."}
+    if isinstance(run, RunState):
+        with RUNS_LOCK:
+            run.cancel_requested = True
+            process = run.process
+        if process and process.pid:
+            kill_process_tree(process.pid)
+            run.append_log(f"[{utc_now_iso()}] Cancellation requested.")
+            return {"run_id": run_id, "status": "cancelling"}
+        return {"run_id": run_id, "status": run.status, "message": "Run not started yet."}
+
+    # Persisted-only run (no live process): DB already updated to cancelling if was running
+    return {"run_id": run_id, "status": "cancelling"}
+
+
+def _serialize_run_for_list(
+    run: Union[RunState, run_store.StoredRun],
+) -> dict:
+    """Build list-run dict from either live RunState or StoredRun."""
+    log_file = str(run.log_file) if hasattr(run.log_file, "__fspath__") else run.log_file
+    return {
+        "run_id": run.run_id,
+        "status": run.status,
+        "created_at": run.created_at,
+        "started_at": run.started_at,
+        "finished_at": run.finished_at,
+        "exit_code": run.exit_code,
+        "pid": getattr(run, "pid", None),
+        "cancel_requested": run.cancel_requested,
+        "owner_user_id": run.owner_user_id,
+        "owner_user_email": run.owner_user_email,
+        "log_file": log_file,
+    }
 
 
 @app.get("/runs", dependencies=[Depends(verify_token)])
@@ -697,25 +943,237 @@ def list_runs(
     x_run_user_id: Optional[str] = Header(default=None),
 ) -> dict:
     actor_user_id = normalize_user_identifier(x_run_user_id)
+    stored_list = run_store.list_runs(owner_user_id=actor_user_id, limit=limit)
+    serialized = []
     with RUNS_LOCK:
-        items = list(RUNS.values())
-        if actor_user_id:
-            items = [run for run in items if run.owner_user_id == actor_user_id]
-        items = items[-limit:]
-    serialized = [
-        {
-            "run_id": run.run_id,
-            "status": run.status,
-            "created_at": run.created_at,
-            "started_at": run.started_at,
-            "finished_at": run.finished_at,
-            "exit_code": run.exit_code,
-            "pid": run.pid,
-            "cancel_requested": run.cancel_requested,
-            "owner_user_id": run.owner_user_id,
-            "owner_user_email": run.owner_user_email,
-            "log_file": str(run.log_file),
-        }
-        for run in items
-    ]
+        runs_snapshot = dict(RUNS)
+    for stored in stored_list:
+        live = runs_snapshot.get(stored.run_id)
+        run = live if live is not None else stored
+        serialized.append(_serialize_run_for_list(run))
     return {"runs": serialized}
+
+
+# ---------------------------------------------------------------------------
+# Candidatures & analytics (Phase 4 product)
+# ---------------------------------------------------------------------------
+
+def _get_user_key_from_headers(
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> Optional[str]:
+    uid = normalize_user_identifier(x_run_user_id)
+    uem = normalize_user_identifier(x_run_user_email)
+    return sanitize_user_key(uid, uem)
+
+
+class CandidatureCreate(BaseModel):
+    company: str
+    email: str
+    status: str = "draft_created"
+    run_id: Optional[str] = None
+    draft_id: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
+
+
+class CandidatureUpdateStatus(BaseModel):
+    status: str
+
+    class Config:
+        extra = "forbid"
+
+
+class CandidatureSyncBody(BaseModel):
+    run_id: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
+
+
+@app.get("/analytics", dependencies=[Depends(verify_token)])
+def get_analytics(
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    """Product analytics: taux drafts créés, taux contacts valides, conversion réponse."""
+    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
+    if not user_key:
+        return {
+            "total_targets": 0,
+            "contacts_valides": 0,
+            "taux_contacts_valides": 0.0,
+            "drafts_crees": 0,
+            "taux_drafts_crees": 0.0,
+            "candidatures_sent": 0,
+            "reponses_positives": 0,
+            "reponses_negatives": 0,
+            "taux_conversion_reponse": 0.0,
+        }
+    total_targets = 0
+    contacts_valides = 0
+    companies_data: List[dict] = []
+    product_path = PROJECT_ROOT / "data" / "exports" / "users" / user_key / "product_companies.json"
+    if product_path.exists():
+        try:
+            data = json.loads(product_path.read_text(encoding="utf-8"))
+            companies_data = data.get("companies") or []
+        except (json.JSONDecodeError, OSError):
+            pass
+    for c in companies_data:
+        total_targets += 1
+        if (c.get("status") or "").strip().upper() == "FOUND":
+            contacts_valides += 1
+    taux_contacts = (contacts_valides / total_targets * 100) if total_targets else 0.0
+
+    drafts_crees = 0
+    draft_log_path = PROJECT_ROOT / "outputs" / "logs" / user_key / "drafts_created_log.csv"
+    if draft_log_path.exists():
+        try:
+            import csv
+            with draft_log_path.open("r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if (row.get("status") or "").strip().upper() == "OK":
+                        drafts_crees += 1
+        except (OSError, Exception):
+            pass
+    taux_drafts = (drafts_crees / contacts_valides * 100) if contacts_valides else 0.0
+
+    all_cand = candidature_store.list_candidatures(user_key, status_filter=None, limit=2000)
+    candidatures_sent = sum(1 for c in all_cand if c.status in ("sent", "relance", "reponse_positive", "reponse_negative", "no_reponse"))
+    reponses_positives = sum(1 for c in all_cand if c.status == "reponse_positive")
+    reponses_negatives = sum(1 for c in all_cand if c.status == "reponse_negative")
+    taux_conversion = (reponses_positives / candidatures_sent * 100) if candidatures_sent else 0.0
+
+    return {
+        "total_targets": total_targets,
+        "contacts_valides": contacts_valides,
+        "taux_contacts_valides": round(taux_contacts, 1),
+        "drafts_crees": drafts_crees,
+        "taux_drafts_crees": round(taux_drafts, 1),
+        "candidatures_sent": candidatures_sent,
+        "reponses_positives": reponses_positives,
+        "reponses_negatives": reponses_negatives,
+        "taux_conversion_reponse": round(taux_conversion, 1),
+    }
+
+
+@app.get("/candidatures", dependencies=[Depends(verify_token)])
+def list_candidatures_api(
+    status: Optional[str] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    status_filter = status if status and status in candidature_store.CANDIDATURE_STATUSES else None
+    items = candidature_store.list_candidatures(user_key, status_filter=status_filter, limit=limit)
+    return {
+        "candidatures": [
+            {
+                "id": c.id,
+                "run_id": c.run_id,
+                "company": c.company,
+                "email": c.email,
+                "status": c.status,
+                "draft_id": c.draft_id,
+                "created_at": c.created_at,
+                "updated_at": c.updated_at,
+            }
+            for c in items
+        ],
+    }
+
+
+@app.post("/candidatures", dependencies=[Depends(verify_token)], status_code=status.HTTP_201_CREATED)
+def create_candidature(
+    body: CandidatureCreate,
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    status_val = body.status if body.status in candidature_store.CANDIDATURE_STATUSES else "draft_created"
+    c = candidature_store.insert_candidature(
+        user_key=user_key,
+        company=(body.company or "").strip()[:500],
+        email=(body.email or "").strip()[:320],
+        status=status_val,
+        run_id=body.run_id,
+        draft_id=body.draft_id,
+    )
+    return {
+        "id": c.id,
+        "run_id": c.run_id,
+        "company": c.company,
+        "email": c.email,
+        "status": c.status,
+        "draft_id": c.draft_id,
+        "created_at": c.created_at,
+        "updated_at": c.updated_at,
+    }
+
+
+@app.patch("/candidatures/{candidature_id}", dependencies=[Depends(verify_token)])
+def update_candidature_status_api(
+    candidature_id: int,
+    body: CandidatureUpdateStatus,
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    if body.status not in candidature_store.CANDIDATURE_STATUSES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status.")
+    updated = candidature_store.update_candidature_status(candidature_id, user_key, body.status)
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidature not found.")
+    return {
+        "id": updated.id,
+        "run_id": updated.run_id,
+        "company": updated.company,
+        "email": updated.email,
+        "status": updated.status,
+        "draft_id": updated.draft_id,
+        "created_at": updated.created_at,
+        "updated_at": updated.updated_at,
+    }
+
+
+@app.post("/candidatures/sync", dependencies=[Depends(verify_token)])
+def sync_candidatures_from_draft_log(
+    body: Optional[CandidatureSyncBody] = None,
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    """Read user's drafts_created_log.csv and insert candidatures (draft_created). Optional run_id."""
+    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    draft_log_path = PROJECT_ROOT / "outputs" / "logs" / user_key / "drafts_created_log.csv"
+    if not draft_log_path.exists():
+        return {"synced": 0, "message": "No draft log found."}
+    run_id = (body.run_id if body else None) or ""
+    entries: List[dict] = []
+    try:
+        import csv as csv_module
+        with draft_log_path.open("r", encoding="utf-8") as f:
+            reader = csv_module.DictReader(f)
+            for row in reader:
+                if (row.get("status") or "").strip().upper() == "OK":
+                    entries.append({
+                        "company": row.get("company"),
+                        "to": row.get("to"),
+                        "status": "OK",
+                        "draft_id": row.get("draft_id"),
+                    })
+    except (OSError, Exception):
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not read draft log.")
+    inserted = candidature_store.upsert_candidatures_from_draft_log(user_key, run_id, entries)
+    return {"synced": inserted, "run_id": run_id or None}

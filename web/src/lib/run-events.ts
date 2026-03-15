@@ -1,8 +1,7 @@
 import { Pool } from "pg";
+import { getDatabaseUrl, isProduction } from "./env";
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ??
-  "postgres://postgres:postgres@127.0.0.1:5432/alternance_mails";
+const DATABASE_URL = getDatabaseUrl();
 
 const globalForRunEvents = globalThis as unknown as { runEventsPool?: Pool };
 
@@ -12,7 +11,7 @@ const runEventsPool =
     connectionString: DATABASE_URL,
   });
 
-if (process.env.NODE_ENV !== "production") {
+if (!isProduction) {
   globalForRunEvents.runEventsPool = runEventsPool;
 }
 

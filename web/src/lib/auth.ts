@@ -1,18 +1,28 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { Pool } from "pg";
+import { getRequiredEnv, isProduction } from "./env";
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ??
-  "postgres://postgres:postgres@127.0.0.1:5432/alternance_mails";
-const rawAuthUrl = process.env.BETTER_AUTH_URL ?? process.env.VERCEL_URL ?? "http://localhost:3000";
+const DATABASE_URL = getRequiredEnv(
+  "DATABASE_URL",
+  "postgres://postgres:postgres@127.0.0.1:5432/alternance_mails",
+);
+const authUrlRaw =
+  (process.env.BETTER_AUTH_URL ?? process.env.VERCEL_URL ?? "").trim();
+if (isProduction && !authUrlRaw) {
+  throw new Error(
+    "[Production] Set BETTER_AUTH_URL or VERCEL_URL in your environment.",
+  );
+}
+const rawAuthUrl = authUrlRaw || "http://localhost:3000";
 const BETTER_AUTH_URL =
   rawAuthUrl.startsWith("http://") || rawAuthUrl.startsWith("https://")
     ? rawAuthUrl
     : `https://${rawAuthUrl}`;
-const BETTER_AUTH_SECRET =
-  process.env.BETTER_AUTH_SECRET ??
-  "6e336476a781adb941ad19e299ed7d34761f794d13a6078ff367c040923184af";
+const BETTER_AUTH_SECRET = getRequiredEnv(
+  "BETTER_AUTH_SECRET",
+  "dev-secret-not-for-production",
+);
 
 const globalForAuth = globalThis as unknown as { authPool?: Pool };
 
@@ -22,12 +32,18 @@ const authPool =
     connectionString: DATABASE_URL,
   });
 
-if (process.env.NODE_ENV !== "production") {
+if (!isProduction) {
   globalForAuth.authPool = authPool;
 }
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID?.trim() || undefined;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined;
+
+if (isProduction && (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET)) {
+  throw new Error(
+    "[Production] GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required. Set them in your environment.",
+  );
+}
 const GOOGLE_GMAIL_SCOPES = [
   "openid",
   "email",

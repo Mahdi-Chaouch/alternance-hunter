@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { getAuthHeaders, getBackendConfig } from "@/lib/backend";
+import { isAdminEmail } from "@/lib/admin-guard";
 import { requireApiAuthorizedSession } from "@/lib/auth-guard";
 import { auth } from "@/lib/auth";
+import { isProduction } from "@/lib/env";
 import { readJsonSafely } from "@/lib/http";
+import {
+  checkRateLimit,
+  RATE_LIMIT_API_PER_MINUTE,
+  retryAfterSeconds,
+} from "@/lib/rate-limit";
+import { checkRunsQuota } from "@/lib/quotas";
 import { insertRunEvent } from "@/lib/run-events";
 import { getUserProfile } from "@/lib/user-profile";
 
@@ -214,13 +222,28 @@ async function resolveGoogleOAuthRunContext(): Promise<
         ? expiresRaw
         : "";
 
+  const oauthClientId = process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
+  const oauthClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
+  if (isProduction && (!oauthClientId || !oauthClientSecret)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          detail:
+            "Configuration OAuth manquante en production. Definissez GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET.",
+        },
+        { status: 503 },
+      ),
+    };
+  }
+
   return {
     ok: true,
     payload: {
       oauth_access_token: accessToken,
       oauth_refresh_token: "",
-      oauth_client_id: process.env.GOOGLE_CLIENT_ID?.trim() ?? "",
-      oauth_client_secret: process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "",
+      oauth_client_id: oauthClientId,
+      oauth_client_secret: oauthClientSecret,
       oauth_token_uri: process.env.GOOGLE_TOKEN_URI ?? "https://oauth2.googleapis.com/token",
       oauth_scope: tokenScopesString,
       oauth_account_id: googleAccount.accountId ?? "",
@@ -286,6 +309,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return authResult.response;
   }
 
+  const userId = authResult.value.user.id?.trim() ?? "";
+  const isAdmin = isAdminEmail(authResult.value.user.email);
+
+  if (!isAdmin) {
+    const rateLimit = checkRateLimit(userId, "api", RATE_LIMIT_API_PER_MINUTE);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          detail:
+            "Trop de requetes. Veuillez patienter avant de reessayer.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(retryAfterSeconds(rateLimit.resetAt)),
+          },
+        },
+      );
+    }
+
+    const runsQuota = await checkRunsQuota(userId);
+    if (!runsQuota.allowed) {
+      return NextResponse.json(
+        {
+          detail: `Quota de runs atteint (${runsQuota.limit} par jour). Reessayez demain.`,
+          current: runsQuota.current,
+          limit: runsQuota.limit,
+        },
+        { status: 429 },
+      );
+    }
+  }
+
   let payload: Record<string, unknown>;
   try {
     const parsed = (await request.json()) as unknown;
@@ -312,10 +368,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let bodyPayload: Record<string, unknown> = pickAllowedFields(payload, BACKEND_RUN_FIELDS);
 
-  const userId = authResult.value.user.id?.trim();
-  if (userId) {
+  const userIdForProfile = authResult.value.user.id?.trim();
+  if (userIdForProfile) {
     try {
-      const profile = await getUserProfile(userId);
+      const profile = await getUserProfile(userIdForProfile);
       if (profile) {
         bodyPayload = {
           ...bodyPayload,
@@ -352,6 +408,28 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!authResult.ok) {
     return authResult.response;
   }
+
+  const userId = authResult.value.user.id?.trim() ?? "";
+  const isAdmin = isAdminEmail(authResult.value.user.email);
+
+  if (!isAdmin) {
+    const rateLimit = checkRateLimit(userId, "api", RATE_LIMIT_API_PER_MINUTE);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          detail:
+            "Trop de requetes. Veuillez patienter avant de reessayer.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(retryAfterSeconds(rateLimit.resetAt)),
+          },
+        },
+      );
+    }
+  }
+
   const { searchParams } = new URL(request.url);
   const limit = searchParams.get("limit") ?? "20";
   return forward(`/runs?limit=${encodeURIComponent(limit)}`, authResult.value.user, {

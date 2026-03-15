@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server";
 import { getAuthHeaders, getBackendConfig } from "@/lib/backend";
+import { isAdminEmail } from "@/lib/admin-guard";
 import { requireApiAuthorizedSession } from "@/lib/auth-guard";
 import { readJsonSafely } from "@/lib/http";
+import {
+  checkRateLimit,
+  RATE_LIMIT_API_PER_MINUTE,
+  retryAfterSeconds,
+} from "@/lib/rate-limit";
+import { checkUploadsQuota, recordUploadEvent } from "@/lib/quotas";
+
+/** Max total request body for upload (CV 10 MB + template 5 MB + form overhead). */
+const MAX_UPLOAD_BODY_BYTES = 16 * 1024 * 1024; // 16 MB
 
 function buildUserScopedHeaders(user: { id?: string; email?: string | null }): HeadersInit {
   const scopedHeaders: Record<string, string> = {};
@@ -20,6 +30,52 @@ export async function POST(request: Request): Promise<NextResponse> {
     return authResult.response;
   }
 
+  const userId = authResult.value.user.id?.trim() ?? "";
+  const isAdmin = isAdminEmail(authResult.value.user.email);
+
+  if (!isAdmin) {
+    const rateLimit = checkRateLimit(userId, "api", RATE_LIMIT_API_PER_MINUTE);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          detail:
+            "Trop de requetes. Veuillez patienter avant de reessayer.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(retryAfterSeconds(rateLimit.resetAt)),
+          },
+        },
+      );
+    }
+
+    const uploadsQuota = await checkUploadsQuota(userId);
+    if (!uploadsQuota.allowed) {
+      return NextResponse.json(
+        {
+          detail: `Quota d'uploads atteint (${uploadsQuota.limit} par jour). Reessayez demain.`,
+          current: uploadsQuota.current,
+          limit: uploadsQuota.limit,
+        },
+        { status: 429 },
+      );
+    }
+  }
+
+  const contentLength = request.headers.get("content-length");
+  if (contentLength) {
+    const size = parseInt(contentLength, 10);
+    if (!Number.isNaN(size) && size > MAX_UPLOAD_BODY_BYTES) {
+      return NextResponse.json(
+        {
+          detail: `Requete trop volumineuse (max ${MAX_UPLOAD_BODY_BYTES / (1024 * 1024)} Mo). CV max 10 Mo, template max 5 Mo.`,
+        },
+        { status: 413 },
+      );
+    }
+  }
+
   try {
     const formData = await request.formData();
     const { baseUrl, token } = getBackendConfig();
@@ -33,6 +89,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       body: formData,
     });
     const body = await readJsonSafely(response);
+    if (response.ok) {
+      recordUploadEvent(userId).catch(() => {});
+    }
     return NextResponse.json(body, { status: response.status });
   } catch {
     return NextResponse.json(
@@ -49,6 +108,27 @@ export async function GET(): Promise<NextResponse> {
   const authResult = await requireApiAuthorizedSession();
   if (!authResult.ok) {
     return authResult.response;
+  }
+
+  const userId = authResult.value.user.id?.trim() ?? "";
+  const isAdmin = isAdminEmail(authResult.value.user.email);
+
+  if (!isAdmin) {
+    const rateLimit = checkRateLimit(userId, "api", RATE_LIMIT_API_PER_MINUTE);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          detail:
+            "Trop de requetes. Veuillez patienter avant de reessayer.",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(retryAfterSeconds(rateLimit.resetAt)),
+          },
+        },
+      );
+    }
   }
 
   try {
