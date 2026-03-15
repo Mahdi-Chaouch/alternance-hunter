@@ -680,6 +680,12 @@ def assert_run_access(
         )
 
 
+@app.get("/")
+def root() -> dict:
+    """Répond 200 pour les health checks (ex. Render) qui interrogent la racine."""
+    return {"status": "ok", "service": "alternance-pipeline-api"}
+
+
 @app.get("/healthz")
 def healthcheck() -> dict:
     return {"ok": True}
