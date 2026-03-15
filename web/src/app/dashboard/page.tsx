@@ -1235,7 +1235,7 @@ function DashboardContent() {
 
         <div className={styles.topGrid}>
           <section className={styles.panel} id="step-profil">
-            <h2>👤 Etape 1 – Profil & personnalisation</h2>
+            <h2>👤  Profil & personnalisation</h2>
             <p className={styles.sectionHint}>
               Renseignez votre profil et personnalisez vos emails avant de lancer une recherche.
             </p>
@@ -1375,63 +1375,73 @@ function DashboardContent() {
                 Choisissez une zone geographique pour affiner la recherche. Vous pouvez taper une
                 ville et selectionner une suggestion, ou laisser vide pour couvrir toute la France.
               </p>
-              <div className={styles.zoneFieldRow}>
-                <label className={styles.zoneField}>
+              <div className={styles.zoneSection}>
+                <label className={styles.zoneFieldLabel} htmlFor="zone-geo-input">
                   Zone geographique (optionnel)
-                  <div className={styles.zoneFieldInputWrapper}>
-                    <span className={styles.zoneFieldIcon} aria-hidden="true">
-                      📍
-                    </span>
-                    <input
-                      type="text"
-                      className={`${styles.zoneFieldInput} ${
-                        zoneValid ? styles.zoneFieldInputValid : ""
-                      }`}
-                      value={zoneQuery}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setZoneQuery(value);
-                        setZone(value);
-                        setZoneValid(false);
-                        const trimmed = value.trim().toLowerCase();
-                        if (!trimmed) {
-                          setZoneSuggestions([]);
-                          return;
-                        }
-                        setZoneSuggestions(
-                          KNOWN_ZONES.filter(
-                            (z) => z !== "all" && z.toLowerCase().includes(trimmed),
-                          ).slice(0, 8),
-                        );
-                      }}
-                      placeholder={ZONE_PLACEHOLDER}
-                      onFocus={() => {
-                        setIsZoneFocused(true);
-                        const trimmed = zoneQuery.trim().toLowerCase();
-                        if (!trimmed) {
-                          setZoneSuggestions([]);
-                          return;
-                        }
-                        setZoneSuggestions(
-                          KNOWN_ZONES.filter(
-                            (z) => z !== "all" && z.toLowerCase().includes(trimmed),
-                          ).slice(0, 8),
-                        );
-                      }}
-                      onBlur={() => {
-                        window.setTimeout(() => {
-                          setIsZoneFocused(false);
-                        }, 100);
-                      }}
-                      autoComplete="off"
-                    />
-                  </div>
-                  {isZoneFocused && zoneSuggestions.length > 0 ? (
-                    <ul className={styles.zoneSuggestions}>
-                      {zoneSuggestions.map((suggestion) => (
-                        <li key={suggestion}>
+                </label>
+                <div className={styles.zoneFieldRow}>
+                  <div className={styles.zoneFieldInputGroup}>
+                    <div className={styles.zoneFieldInputWrapper}>
+                      <span className={styles.zoneFieldIcon} aria-hidden="true">
+                        📍
+                      </span>
+                      <input
+                        id="zone-geo-input"
+                        type="text"
+                        aria-label="Zone géographique (optionnel)"
+                        className={`${styles.zoneFieldInput} ${
+                          zoneValid ? styles.zoneFieldInputValid : ""
+                        }`}
+                        value={zoneQuery}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setZoneQuery(value);
+                          setZone(value);
+                          setZoneValid(false);
+                          const trimmed = value.trim().toLowerCase();
+                          if (!trimmed) {
+                            setZoneSuggestions([]);
+                            return;
+                          }
+                          setZoneSuggestions(
+                            KNOWN_ZONES.filter(
+                              (z) => z !== "all" && z.toLowerCase().includes(trimmed),
+                            ).slice(0, 8),
+                          );
+                        }}
+                        placeholder={ZONE_PLACEHOLDER}
+                        onFocus={() => {
+                          setIsZoneFocused(true);
+                          const trimmed = zoneQuery.trim().toLowerCase();
+                          if (!trimmed) {
+                            setZoneSuggestions([]);
+                            return;
+                          }
+                          setZoneSuggestions(
+                            KNOWN_ZONES.filter(
+                              (z) => z !== "all" && z.toLowerCase().includes(trimmed),
+                            ).slice(0, 8),
+                          );
+                        }}
+                        onBlur={() => {
+                          window.setTimeout(() => {
+                            setIsZoneFocused(false);
+                          }, 100);
+                        }}
+                        autoComplete="off"
+                      />
+                    </div>
+                    {isZoneFocused && zoneSuggestions.length > 0 ? (
+                      <div
+                        className={styles.zoneSuggestions}
+                        role="listbox"
+                        aria-label="Suggestions de zone"
+                      >
+                        {zoneSuggestions.map((suggestion) => (
                           <button
+                            key={suggestion}
                             type="button"
+                            role="option"
                             className={styles.zoneSuggestionItem}
                             onClick={() => {
                               setZone(suggestion);
@@ -1443,16 +1453,16 @@ function DashboardContent() {
                           >
                             {suggestion}
                           </button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </label>
-                {zoneValid ? (
-                  <div className={styles.zoneValidBadge} aria-live="polite">
-                    ✅ Zone reconnue
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                  {zoneValid ? (
+                    <div className={styles.zoneValidBadge} aria-live="polite">
+                      ✅ Zone reconnue
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </section>
 
@@ -1820,19 +1830,19 @@ function DashboardContent() {
                           <div className={styles.progressBarLabel}>
                             <span>Alternance Hunter – emails trouvés</span>
                             <span className={styles.progressBarValue}>
-                              {progressCounts.companiesFound} (1 FOUND = 1 %)
+                              {progressCounts.companiesFound} / {targetFound}
                             </span>
                           </div>
                           <div className={styles.progressBarTrack}>
                             <div
                               className={styles.progressBarFill}
                               style={{
-                                width: `${Math.min(100, progressCounts.companiesFound)}%`,
+                                width: `${Math.min(100, (progressCounts.companiesFound / Math.max(1, targetFound)) * 100)}%`,
                               }}
                             />
                           </div>
                           <span className={styles.progressBarPct}>
-                            {Math.min(100, progressCounts.companiesFound)} %
+                            {Math.round(Math.min(100, (progressCounts.companiesFound / Math.max(1, targetFound)) * 100))} %
                           </span>
                         </div>
                       )}
@@ -1885,19 +1895,19 @@ function DashboardContent() {
                         <div className={styles.progressBarLabel}>
                           <span>Alternance Hunter – emails trouvés</span>
                           <span className={styles.progressBarValue}>
-                            {progressCounts.companiesFound} (1 FOUND = 1 %)
+                            {progressCounts.companiesFound} / {targetFound}
                           </span>
                         </div>
                         <div className={styles.progressBarTrack}>
                           <div
                             className={styles.progressBarFill}
                             style={{
-                              width: `${Math.min(100, progressCounts.companiesFound)}%`,
+                              width: `${Math.min(100, (progressCounts.companiesFound / Math.max(1, targetFound)) * 100)}%`,
                             }}
                           />
                         </div>
                         <span className={styles.progressBarPct}>
-                          {Math.min(100, progressCounts.companiesFound)} %
+                          {Math.round(Math.min(100, (progressCounts.companiesFound / Math.max(1, targetFound)) * 100))} %
                         </span>
                       </div>
                       <div className={styles.progressBarItem}>
