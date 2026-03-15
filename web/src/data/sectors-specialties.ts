@@ -72,14 +72,15 @@ export const SECTORS_SPECIALTIES: Record<SectorId, string[]> = {
   all: [],
 };
 
+/** Libellés uniques par secteur (format "Catégorie / Domaine") pour l’UI et les emails. */
 export const SECTOR_LABELS: Record<SectorId, string> = {
-  it: "Informatique / Digital",
-  food: "Alimentation / Restauration",
-  law: "Droit / Finance / Assurance",
-  trade: "Commerce / Retail",
-  health: "Santé / Médical",
-  construction: "BTP / Construction / Artisanat",
-  marketing: "Commerce / Marketing",
-  finance: "Finance",
+  it: "Informatique / Digital & IT",
+  food: "Alimentation / Food & Restauration",
+  law: "Droit / Juridique & Assurance",
+  trade: "Commerce / Retail & Distribution",
+  health: "Santé / Médical & Paramédical",
+  construction: "BTP / Construction & Artisanat",
+  marketing: "Marketing / Communication & Médias",
+  finance: "Finance / Comptabilité & Audit",
   all: "Tous secteurs",
 };

@@ -182,16 +182,16 @@ _OVERPASS_FILTERS = {
 
 KNOWN_SECTORS = list(_OVERPASS_FILTERS.keys())
 
-# Libellés secteur pour l'objet et le corps du mail (candidature stage/alternance).
+# Libellés secteur uniques (format "Catégorie / Domaine") pour l'objet et le corps du mail.
 SECTOR_LABELS: dict = {
-    "it": "Informatique / Digital",
-    "food": "Alimentation / Restauration",
-    "law": "Droit / Finance / Assurance",
-    "trade": "Commerce / Retail",
-    "health": "Santé / Médical",
-    "construction": "BTP / Construction",
-    "marketing": "Commerce / Marketing",
-    "finance": "Finance",
+    "it": "Informatique / Digital & IT",
+    "food": "Alimentation / Food & Restauration",
+    "law": "Droit / Juridique & Assurance",
+    "trade": "Commerce / Retail & Distribution",
+    "health": "Santé / Médical & Paramédical",
+    "construction": "BTP / Construction & Artisanat",
+    "marketing": "Marketing / Communication & Médias",
+    "finance": "Finance / Comptabilité & Audit",
     "all": "Tous secteurs",
 }
 
@@ -1011,7 +1011,9 @@ def fetch_html(url: str) -> Tuple[Optional[str], Optional[int]]:
 def render_template(text: str, variables: Dict[str, str]) -> str:
     out = text
     for key, value in variables.items():
+        # Replace both {{KEY}} and {KEY} so custom templates work either way
         out = out.replace(f"{{{{{key}}}}}", value)
+        out = out.replace(f"{{{key}}}", value)
     return out
 
 

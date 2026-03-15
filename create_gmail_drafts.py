@@ -26,6 +26,24 @@ BLOCK_SPLIT = "=============================="
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 EMAIL_EXTRACT_REGEX = re.compile(r"[A-Za-z0-9._%+\-']+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
+# Default date used when replacing {DATE} in drafts
+DEFAULT_DATE_LABEL = "Septembre 2026"
+
+
+def replace_draft_placeholders(text: str, company: str, date_label: str = DEFAULT_DATE_LABEL) -> str:
+    """Replace {KEY} and {{KEY}} placeholders so drafts never show raw placeholders in Gmail."""
+    if not text:
+        return text
+    replacements = {
+        "ENTREPRISE": company,
+        "DATE": date_label,
+    }
+    out = text
+    for key, value in replacements.items():
+        out = out.replace(f"{{{{{key}}}}}", value)
+        out = out.replace(f"{{{key}}}", value)
+    return out
+
 
 def sanitize_user_key(raw: str) -> str:
     cleaned = re.sub(r"[^a-zA-Z0-9._-]+", "-", (raw or "").strip().lower())
@@ -448,10 +466,12 @@ def main():
                     lm_attached = "MISSING"
 
             try:
+                subject = replace_draft_placeholders(it["subject"], it["company"])
+                body = replace_draft_placeholders(it["body"], it["company"])
                 draft_body = make_message(
                     it["to"],
-                    it["subject"],
-                    it["body"],
+                    subject,
+                    body,
                     attachments,
                     attachment_cache,
                 )
