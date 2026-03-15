@@ -166,6 +166,8 @@ def build_hunter_cmd(args: argparse.Namespace) -> List[str]:
         cmd.extend(["--zones", zone_filter])
     sector = getattr(args, "sector", "it") or "it"
     cmd.extend(["--sector", sector])
+    specialty = getattr(args, "specialty", "") or ""
+    cmd.extend(["--specialty", specialty])
     if args.enable_sitemap:
         cmd.append("--enable-sitemap")
     if args.insecure:
@@ -187,6 +189,10 @@ def build_generate_cmd(args: argparse.Namespace) -> List[str]:
         args.out_dir,
         "--ai-model",
         args.ai_model,
+        "--sector",
+        getattr(args, "sector", "it") or "it",
+        "--specialty",
+        getattr(args, "specialty", "") or "",
     ]
     if args.use_ai:
         cmd.append("--use-ai")
@@ -281,6 +287,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--focus", choices=["web", "it", "all"], default="web")
     parser.add_argument("--sector", type=str, default="it",
                         help="Secteur d'activite pour le filtre Overpass (it, food, law, trade, health, construction, all)")
+    parser.add_argument("--specialty", type=str, default="",
+                        help="Metier / specialite pour les lettres de motivation (ex: Developpement web)")
     parser.add_argument("--enable-sitemap", action="store_true")
     parser.add_argument("--insecure", action="store_true")
     parser.add_argument("--rh-only", action="store_true")

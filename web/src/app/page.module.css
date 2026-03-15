@@ -1512,3 +1512,110 @@
     width: 100%;
   }
 }
+
+/* Admin dashboard */
+.adminSection {
+  margin-top: 1.5rem;
+}
+
+.adminTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.adminStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.adminStatCard {
+  padding: 1rem;
+  border-radius: 10px;
+  background: var(--secondary-bg);
+  border: 1px solid var(--panel-border);
+}
+
+.adminStatLabel {
+  font-size: 0.8rem;
+  color: var(--subtle-text);
+}
+
+.adminStatValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.adminChartLabel {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--subtle-text);
+}
+
+.adminChartContainer {
+  width: 100%;
+  height: 280px;
+}
+
+.adminError {
+  color: var(--danger);
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.adminForm {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.adminEmailInput {
+  max-width: 280px;
+  padding-left: 1rem;
+}
+
+.adminTableWrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.adminTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.adminTh {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.adminThRight {
+  width: 100px;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.adminTd {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.adminTdMuted {
+  padding: 0.5rem 0.75rem;
+  color: var(--subtle-text);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.adminBtnSmall {
+  font-size: 0.8rem;
+}
+
+.adminHintMargin {
+  margin-top: 1rem;
+}
