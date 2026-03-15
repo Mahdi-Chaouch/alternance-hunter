@@ -265,11 +265,11 @@ function DashboardContent() {
   const [cvUploaded, setCvUploaded] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [mode, setMode] = useState<RunMode>("pipeline");
-  const [zone, setZone] = useState<Zone>("all");
+  const [zones, setZones] = useState<Zone[]>([]);
   const [zoneQuery, setZoneQuery] = useState("");
   const [zoneSuggestions, setZoneSuggestions] = useState<Zone[]>([]);
   const [isZoneFocused, setIsZoneFocused] = useState(false);
-  const [zoneValid, setZoneValid] = useState(false);
+  const MAX_ZONES = 5;
   const [sector, setSector] = useState("it");
   const [specialty, setSpecialty] = useState("");
   const [dryRun, setDryRun] = useState(false);
@@ -541,15 +541,14 @@ function DashboardContent() {
           setMode(data.profile.run_mode);
         }
         if (data.profile?.run_zone) {
-          setZone(data.profile.run_zone);
-          setZoneQuery(data.profile.run_zone);
-          const trimmedZone = data.profile.run_zone.trim().toLowerCase();
-          if (
-            trimmedZone &&
-            KNOWN_ZONES.some((z) => z.toLowerCase() === trimmedZone) &&
-            trimmedZone !== "all"
-          ) {
-            setZoneValid(true);
+          const raw = (data.profile.run_zone as string).trim();
+          if (raw && raw.toLowerCase() !== "all") {
+            const list = raw
+              .split(",")
+              .map((z) => z.trim())
+              .filter((z) => z.length > 0)
+              .slice(0, MAX_ZONES);
+            setZones(list);
           }
         }
         if (data.profile?.run_sector) {
@@ -771,7 +770,7 @@ function DashboardContent() {
     try {
       const payload = {
         mode,
-        zone,
+        zone: zones.length ? zones.join(", ") : "all",
         sector,
         specialty: specialty || undefined,
         dry_run: dryRun,
@@ -963,7 +962,7 @@ function DashboardContent() {
           subject_template: mailSubjectTemplate,
           body_template: mailBodyTemplate,
           run_mode: mode,
-          run_zone: zone,
+          run_zone: zones.length ? zones.join(", ") : "all",
           run_sector: sector,
           run_specialty: specialty.trim() || "",
           run_dry_run: dryRun,
@@ -1062,7 +1061,7 @@ function DashboardContent() {
           subject_template: mailSubjectTemplate,
           body_template: mailBodyTemplate,
           run_mode: mode,
-          run_zone: zone,
+          run_zone: zones.length ? zones.join(", ") : "all",
           run_sector: sector,
           run_specialty: specialty.trim() || "",
           run_dry_run: dryRun,
@@ -1381,13 +1380,30 @@ function DashboardContent() {
                 </div>
               </div>
               <p className={styles.stepDescription}>
-                Choisissez une zone geographique pour affiner la recherche. Vous pouvez taper une
-                ville et selectionner une suggestion, ou laisser vide pour couvrir toute la France.
+                Ajoutez jusqu’à {MAX_ZONES} zones géographiques pour affiner la recherche. Tapez une
+                ville et sélectionnez une suggestion, ou laissez la liste vide pour couvrir toute la France.
               </p>
               <div className={styles.zoneSection}>
                 <label className={styles.zoneFieldLabel} htmlFor="zone-geo-input">
-                  Zone geographique (optionnel)
+                  Zones géographiques (max. {MAX_ZONES})
                 </label>
+                {zones.length > 0 ? (
+                  <ul className={styles.zoneChipList} aria-label="Zones sélectionnées">
+                    {zones.map((z) => (
+                      <li key={z} className={styles.zoneChipItem}>
+                        <span className={styles.zoneChipLabel}>{z}</span>
+                        <button
+                          type="button"
+                          className={styles.zoneChipRemove}
+                          onClick={() => setZones((prev) => prev.filter((x) => x !== z))}
+                          aria-label={`Retirer ${z}`}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 <div className={styles.zoneFieldRow}>
                   <div className={styles.zoneFieldInputGroup}>
                     <div className={styles.zoneFieldInputWrapper}>
@@ -1397,16 +1413,13 @@ function DashboardContent() {
                       <input
                         id="zone-geo-input"
                         type="text"
-                        aria-label="Zone géographique (optionnel)"
-                        className={`${styles.zoneFieldInput} ${
-                          zoneValid ? styles.zoneFieldInputValid : ""
-                        }`}
+                        aria-label="Ajouter une zone (ville)"
+                        disabled={zones.length >= MAX_ZONES}
+                        className={styles.zoneFieldInput}
                         value={zoneQuery}
                         onChange={(e) => {
                           const value = e.target.value;
                           setZoneQuery(value);
-                          setZone(value);
-                          setZoneValid(false);
                           const trimmed = value.trim().toLowerCase();
                           if (!trimmed) {
                             setZoneSuggestions([]);
@@ -1414,33 +1427,48 @@ function DashboardContent() {
                           }
                           setZoneSuggestions(
                             KNOWN_ZONES.filter(
-                              (z) => z !== "all" && z.toLowerCase().includes(trimmed),
+                              (z) =>
+                                z !== "all" &&
+                                z.toLowerCase().includes(trimmed) &&
+                                !zones.map((x) => x.toLowerCase()).includes(z.toLowerCase()),
                             ).slice(0, 8),
                           );
                         }}
-                        placeholder={ZONE_PLACEHOLDER}
+                        placeholder={
+                          zones.length >= MAX_ZONES
+                            ? `Maximum ${MAX_ZONES} zones atteint`
+                            : ZONE_PLACEHOLDER
+                        }
                         onFocus={() => {
+                          if (zones.length >= MAX_ZONES) return;
                           setIsZoneFocused(true);
                           const trimmed = zoneQuery.trim().toLowerCase();
                           if (!trimmed) {
-                            setZoneSuggestions([]);
-                            return;
+                            setZoneSuggestions(
+                              KNOWN_ZONES.filter(
+                                (z) =>
+                                  z !== "all" &&
+                                  !zones.map((x) => x.toLowerCase()).includes(z.toLowerCase()),
+                              ).slice(0, 12),
+                            );
+                          } else {
+                            setZoneSuggestions(
+                              KNOWN_ZONES.filter(
+                                (z) =>
+                                  z !== "all" &&
+                                  z.toLowerCase().includes(trimmed) &&
+                                  !zones.map((x) => x.toLowerCase()).includes(z.toLowerCase()),
+                              ).slice(0, 8),
+                            );
                           }
-                          setZoneSuggestions(
-                            KNOWN_ZONES.filter(
-                              (z) => z !== "all" && z.toLowerCase().includes(trimmed),
-                            ).slice(0, 8),
-                          );
                         }}
                         onBlur={() => {
-                          window.setTimeout(() => {
-                            setIsZoneFocused(false);
-                          }, 100);
+                          window.setTimeout(() => setIsZoneFocused(false), 100);
                         }}
                         autoComplete="off"
                       />
                     </div>
-                    {isZoneFocused && zoneSuggestions.length > 0 ? (
+                    {isZoneFocused && zoneSuggestions.length > 0 && zones.length < MAX_ZONES ? (
                       <div
                         className={styles.zoneSuggestions}
                         role="listbox"
@@ -1453,11 +1481,13 @@ function DashboardContent() {
                             role="option"
                             className={styles.zoneSuggestionItem}
                             onClick={() => {
-                              setZone(suggestion);
-                              setZoneQuery(suggestion);
+                              if (zones.length >= MAX_ZONES) return;
+                              if (!zones.map((x) => x.toLowerCase()).includes(suggestion.toLowerCase())) {
+                                setZones((prev) => [...prev, suggestion].slice(0, MAX_ZONES));
+                              }
+                              setZoneQuery("");
                               setZoneSuggestions([]);
                               setIsZoneFocused(false);
-                              setZoneValid(true);
                             }}
                           >
                             {suggestion}
@@ -1466,10 +1496,10 @@ function DashboardContent() {
                       </div>
                     ) : null}
                   </div>
-                  {zoneValid ? (
-                    <div className={styles.zoneValidBadge} aria-live="polite">
-                      ✅ Zone reconnue
-                    </div>
+                  {zones.length > 0 ? (
+                    <p className={styles.zoneHint}>
+                      {zones.length}/{MAX_ZONES} zones
+                    </p>
                   ) : null}
                 </div>
               </div>

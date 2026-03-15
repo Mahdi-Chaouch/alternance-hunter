@@ -182,6 +182,20 @@ _OVERPASS_FILTERS = {
 
 KNOWN_SECTORS = list(_OVERPASS_FILTERS.keys())
 
+# Libellés secteur pour l'objet et le corps du mail (candidature stage/alternance).
+SECTOR_LABELS: dict = {
+    "it": "Informatique / Digital",
+    "food": "Alimentation / Restauration",
+    "law": "Droit / Finance / Assurance",
+    "trade": "Commerce / Retail",
+    "health": "Santé / Médical",
+    "construction": "BTP / Construction",
+    "marketing": "Commerce / Marketing",
+    "finance": "Finance",
+    "all": "Tous secteurs",
+}
+
+
 def get_overpass_filter(sector: str) -> str:
     return _OVERPASS_FILTERS.get(sector, _OVERPASS_FILTERS["it"])
 
@@ -1009,9 +1023,14 @@ def build_email_draft(
     sender_portfolio_url: str,
     custom_subject_template: str,
     custom_body_template: str,
+    sector: str = "it",
+    specialty: str = "",
 ) -> Tuple[str, str]:
     full_name = " ".join(part for part in [sender_first_name.strip(), sender_last_name.strip()] if part).strip()
     display_name = full_name or "Candidat"
+    sector_label = SECTOR_LABELS.get(sector, "Informatique / Digital")
+    domain_label = (specialty or sector_label).strip()
+
     variables = {
         "ENTREPRISE": company,
         "PRENOM": sender_first_name.strip(),
@@ -1020,9 +1039,11 @@ def build_email_draft(
         "LINKEDIN": sender_linkedin_url.strip(),
         "PORTFOLIO": sender_portfolio_url.strip(),
         "DATE": "Septembre 2026",
+        "SECTEUR": sector_label,
+        "SPECIALITE": domain_label,
     }
 
-    default_subject = "Candidature spontanee - Alternance Developpeur Web - {{DATE}} - {{ENTREPRISE}}"
+    default_subject = f"Candidature stage {sector_label} - {{DATE}} - {{ENTREPRISE}}"
 
     footer_lines = [
         "Cordialement,",
@@ -1037,7 +1058,7 @@ def build_email_draft(
 
     default_body = f"""Madame, Monsieur,
 
-Je suis a la recherche d'une alternance en developpement web a partir de {{DATE}}.
+Je suis a la recherche d'une alternance en {domain_label} a partir de {{DATE}}.
 
 Je souhaite rejoindre {{ENTREPRISE}} afin de contribuer a des projets concrets et progresser au contact d'une equipe.
 
@@ -1142,6 +1163,8 @@ def run_email_finder(
     mail_body_template: str,
     sender_portfolio_url: str,
     rh_only: bool = False,
+    sector: str = "it",
+    specialty: str = "",
 ) -> None:
     fieldnames = ["entreprise", "zone", "ville", "site", "score", "status", "email", "source_url", "contact_urls", "reason"]
 
@@ -1230,6 +1253,8 @@ def run_email_finder(
                                     sender_portfolio_url=sender_portfolio_url,
                                     custom_subject_template=mail_subject_template,
                                     custom_body_template=mail_body_template,
+                                    sector=sector,
+                                    specialty=specialty,
                                 )
                                 fdraft.write(
                                     f"{SEP}\n"
@@ -1369,6 +1394,8 @@ def main():
         mail_subject_template=args.mail_subject_template,
         mail_body_template=args.mail_body_template,
         rh_only=args.rh_only,
+        sector=getattr(args, "sector", "it") or "it",
+        specialty=getattr(args, "specialty", "") or "",
     )
 
     print(f"\n✅ emails: {args.emails_found_csv}")

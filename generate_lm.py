@@ -62,7 +62,7 @@ def extract_company_info(draft_file: str) -> list[dict]:
     result = []
 
     for block in blocks:
-        m_company = re.search(r"Entreprise:\s*(.+)", block)
+        m_company = re.search(r"Entreprise:\s*(.+)", block, re.IGNORECASE)
         m_zone = re.search(r"Zone:\s*(.+)", block)
         m_ville = re.search(r"Ville:\s*(.+)", block)
         m_site = re.search(r"Site:\s*(.+)", block)
@@ -239,7 +239,11 @@ def main() -> None:
     companies_info = extract_company_info(str(draft))
     print("Entreprises trouvées:", len(companies_info))
     if not companies_info:
-        raise SystemExit("❌ Aucun bloc entreprise valide trouvé dans le fichier draft.")
+        raise SystemExit(
+            "❌ Aucun bloc entreprise valide trouvé dans le fichier draft.\n"
+            "   Lancez d'abord l'étape « Recherche d'entreprises » (hunter) pour générer des brouillons "
+            "avec des entreprises ayant un email trouvé, puis relancez la génération des lettres."
+        )
 
     use_ai = args.use_ai
     api_key = os.environ.get("OPENAI_API_KEY", "").strip() if use_ai else ""
