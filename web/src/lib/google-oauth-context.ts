@@ -99,7 +99,7 @@ export async function resolveGoogleOAuthContextForSync(): Promise<
             "Impossible de recuperer un token Google. Reconnectez Google puis reessayez.",
         },
         { status: 400 },
-      );
+      ),
     };
   }
   const accessToken = accessTokenPayload?.accessToken?.trim();
@@ -109,7 +109,7 @@ export async function resolveGoogleOAuthContextForSync(): Promise<
       response: NextResponse.json(
         { detail: "Token Google manquant. Reconnectez Google." },
         { status: 400 },
-      );
+      ),
     };
   }
   const tokenScopes =
