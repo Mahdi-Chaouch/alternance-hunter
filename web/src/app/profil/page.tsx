@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { SuiviCandidatures, type CandidatureItem } from "@/app/components/SuiviCandidatures";
 import styles from "../page.module.css";
 
 type ThemeMode = "light" | "dark";
@@ -27,6 +28,16 @@ type AnalyticsData = {
   taux_conversion_reponse: number;
 };
 
+async function safeJson<T>(response: Response): Promise<T | Record<string, unknown>> {
+  const raw = await response.text();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return {};
+  }
+}
+
 export default function ProfilPage() {
   const router = useRouter();
   const { data: session, isPending: isSessionPending } = authClient.useSession();
@@ -36,6 +47,13 @@ export default function ProfilPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
+
+  const [candidaturesList, setCandidaturesList] = useState<CandidatureItem[]>([]);
+  const [candidatureStatusFilter, setCandidatureStatusFilter] = useState<string>("");
+  const [isRefreshingCandidatures, setIsRefreshingCandidatures] = useState(false);
+  const [isSyncingCandidatures, setIsSyncingCandidatures] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("alternance-ui-theme");
@@ -108,6 +126,105 @@ export default function ProfilPage() {
       cancelled = true;
     };
   }, [session?.user?.email, isSessionPending, router]);
+
+  const refreshAnalytics = useCallback(async () => {
+    try {
+      const response = await fetch("/api/analytics", { cache: "no-store" });
+      const data = (await safeJson<AnalyticsData>(response)) as AnalyticsData;
+      if (response.ok && data && typeof data.total_targets === "number") {
+        setAnalyticsData(data);
+      } else {
+        setAnalyticsData(null);
+      }
+    } catch {
+      setAnalyticsData(null);
+    }
+  }, []);
+
+  const refreshCandidatures = useCallback(async () => {
+    setIsRefreshingCandidatures(true);
+    try {
+      const q = new URLSearchParams();
+      if (candidatureStatusFilter) q.set("status", candidatureStatusFilter);
+      q.set("limit", "300");
+      const response = await fetch(`/api/candidatures?${q.toString()}`, { cache: "no-store" });
+      const data = (await safeJson<{ candidatures?: CandidatureItem[] }>(response)) as {
+        candidatures?: CandidatureItem[];
+      };
+      if (response.ok && Array.isArray(data?.candidatures)) {
+        setCandidaturesList(data.candidatures);
+      } else {
+        setCandidaturesList([]);
+      }
+    } catch {
+      setCandidaturesList([]);
+    } finally {
+      setIsRefreshingCandidatures(false);
+    }
+  }, [candidatureStatusFilter]);
+
+  const syncCandidatures = useCallback(
+    async (runId?: string) => {
+      setSyncError(null);
+      setSyncMessage(null);
+      setIsSyncingCandidatures(true);
+      try {
+        const response = await fetch("/api/candidatures/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ run_id: runId ?? null }),
+        });
+        const data = (await safeJson<{ synced?: number; detail?: string }>(response)) as {
+          synced?: number;
+          detail?: string;
+        };
+        if (response.ok) {
+          await refreshCandidatures();
+          await refreshAnalytics();
+          setSyncMessage(
+            data.synced != null ? `${data.synced} candidature(s) importée(s) depuis les brouillons.` : "Synchronisation terminée.",
+          );
+        } else {
+          setSyncError(
+            typeof data.detail === "string" && data.detail.trim()
+              ? data.detail.trim()
+              : "Échec de la synchronisation. Vérifiez que le backend est démarré.",
+          );
+        }
+      } catch {
+        setSyncError("Impossible de contacter le serveur. Vérifiez votre connexion et que le backend est démarré.");
+      } finally {
+        setIsSyncingCandidatures(false);
+      }
+    },
+    [refreshCandidatures, refreshAnalytics],
+  );
+
+  const updateCandidatureStatus = useCallback(
+    async (id: number, newStatus: string) => {
+      try {
+        const response = await fetch(`/api/candidatures/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (response.ok) {
+          setCandidaturesList((prev) =>
+            prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c)),
+          );
+          void refreshAnalytics();
+        }
+      } catch {
+        setSyncError("Impossible de mettre à jour le statut.");
+      }
+    },
+    [refreshAnalytics],
+  );
+
+  useEffect(() => {
+    if (accessDenied || !session?.user?.email) return;
+    void refreshCandidatures();
+  }, [accessDenied, session?.user?.email, candidatureStatusFilter, refreshCandidatures]);
 
   if (isSessionPending || (!session?.user && !accessDenied)) {
     return (
@@ -207,8 +324,8 @@ export default function ProfilPage() {
           )}
         </section>
 
-        <section className={styles.panel}>
-          <h2>Statistiques personnelles</h2>
+        <section className={styles.panel} id="analytics">
+          <h2>Analyse produit</h2>
           <p className={styles.sectionHint}>
             Vue d&apos;ensemble de vos candidatures et de votre activité (après synchronisation des brouillons).
           </p>
@@ -250,40 +367,42 @@ export default function ProfilPage() {
             </div>
           ) : (
             <p className={styles.emptyState}>
-              Aucune donnée pour le moment. Lancez une recherche depuis le dashboard puis synchronisez les candidatures.
+              Aucune donnée pour le moment. Lancez une recherche depuis le dashboard puis synchronisez les candidatures ci-dessous.
             </p>
           )}
         </section>
 
+        <SuiviCandidatures
+          candidaturesList={candidaturesList}
+          candidatureStatusFilter={candidatureStatusFilter}
+          setCandidatureStatusFilter={setCandidatureStatusFilter}
+          isRefreshingCandidatures={isRefreshingCandidatures}
+          isSyncingCandidatures={isSyncingCandidatures}
+          refreshCandidatures={refreshCandidatures}
+          syncCandidatures={syncCandidatures}
+          updateCandidatureStatus={updateCandidatureStatus}
+          isGranted={!accessDenied && Boolean(session?.user?.email)}
+          syncMessage={syncMessage}
+          syncError={syncError}
+        />
+
         <section className={styles.panel}>
           <h2>Liens utiles</h2>
           <p className={styles.sectionHint}>
-            Accès rapide au tableau de bord, au suivi des candidatures et aux documents.
+            Accès rapide au tableau de bord et aux documents.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
             <Link href="/dashboard" className={styles.primaryBtn} style={{ display: "inline-block", textDecoration: "none" }}>
               Tableau de bord
             </Link>
-            <Link
-              href="/dashboard#candidatures"
-              className={styles.secondaryBtn}
-              style={{ display: "inline-block", textDecoration: "none" }}
-            >
+            <Link href="/profil#analytics" className={`${styles.secondaryBtn} ${styles.profilLinkBtn}`}>
+              Analyse produit
+            </Link>
+            <Link href="/profil#candidatures" className={`${styles.secondaryBtn} ${styles.profilLinkBtn}`}>
               Suivi de candidatures
             </Link>
-            <Link
-              href="/dashboard#step-documents"
-              className={styles.secondaryBtn}
-              style={{ display: "inline-block", textDecoration: "none" }}
-            >
+            <Link href="/dashboard#step-documents" className={`${styles.secondaryBtn} ${styles.profilLinkBtn}`}>
               Documents & templates
-            </Link>
-            <Link
-              href="/dashboard#analytics"
-              className={styles.secondaryBtn}
-              style={{ display: "inline-block", textDecoration: "none" }}
-            >
-              Analyse produit
             </Link>
           </div>
         </section>
