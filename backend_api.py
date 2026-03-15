@@ -1007,6 +1007,174 @@ class CandidatureSyncBody(BaseModel):
         extra = "forbid"
 
 
+class CandidatureAnalyzeInboxBody(BaseModel):
+    """Same OAuth fields as sync, for Gmail inbox read."""
+    oauth_access_token: Optional[str] = None
+    oauth_refresh_token: Optional[str] = None
+    oauth_client_id: Optional[str] = None
+    oauth_client_secret: Optional[str] = None
+    oauth_token_uri: Optional[str] = None
+    oauth_scope: Optional[str] = None
+    oauth_access_token_expires_at: Optional[str] = None
+    oauth_account_id: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
+
+
+def _classify_reply_sentiment(text: str) -> Optional[str]:
+    """Classify email body as reponse_positive, reponse_negative, or None (unknown).
+    Uses French keywords typical of recruitment replies."""
+    if not (text or "").strip():
+        return None
+    t = text.lower().strip()
+    negative_phrases = [
+        "refus", "ne retenons pas", "non retenue", "non retenu", "malheureusement",
+        "pas retenu", "candidature non retenue", "ne pouvons pas", "ne sera pas",
+        "n'avons pas retenu", "n’avons pas retenu", "candidature non acceptée",
+        "ne correspond pas", "pas retenue", "décline", "décliner",
+    ]
+    positive_phrases = [
+        "entretien", "convocation", "retenons", "favorable", "acceptée", "accepté",
+        "bien reçu", "étudier votre candidature", "vous convier", "rendez-vous",
+        "candidature retenue", "vous invitons", "candidature a retenu notre attention",
+        "prochaine étape", "vous contacterons", "vous recontacterons",
+    ]
+    for phrase in negative_phrases:
+        if phrase in t:
+            return "reponse_negative"
+    for phrase in positive_phrases:
+        if phrase in t:
+            return "reponse_positive"
+    return None
+
+
+def _extract_sender_email_from_header(from_header: str) -> str:
+    """Extract first email address from From header (e.g. 'Name <a@b.com>' or 'a@b.com')."""
+    email_re = re.compile(r"[A-Za-z0-9._%+\-']+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+    if not from_header:
+        return ""
+    m = email_re.search(from_header)
+    if m:
+        return m.group(0).lower().strip()
+    for token in from_header.replace(",", " ").split():
+        m = email_re.search(token)
+        if m:
+            return m.group(0).lower().strip()
+    return ""
+
+
+def _analyze_inbox_from_gmail(
+    body: CandidatureAnalyzeInboxBody,
+    user_key: str,
+) -> tuple[dict, Optional[str]]:
+    """List INBOX messages, match to candidatures by sender email, classify and update. Returns (stats, error)."""
+    at = (body.oauth_access_token or "").strip()
+    if not at:
+        return {"analyzed": 0, "updated": 0, "positive": 0, "negative": 0}, None
+    try:
+        from create_gmail_drafts import get_gmail_service_from_oauth_tokens
+    except ImportError as e:
+        return {"analyzed": 0, "updated": 0, "positive": 0, "negative": 0}, f"Module Gmail: {e}"
+    try:
+        service = get_gmail_service_from_oauth_tokens(
+            access_token=at,
+            refresh_token=(body.oauth_refresh_token or "").strip(),
+            client_id=(body.oauth_client_id or "").strip(),
+            client_secret=(body.oauth_client_secret or "").strip(),
+            token_uri=(body.oauth_token_uri or "https://oauth2.googleapis.com/token").strip(),
+            scope=(body.oauth_scope or "https://www.googleapis.com/auth/gmail.readonly").strip(),
+            access_token_expires_at=(body.oauth_access_token_expires_at or "").strip(),
+        )
+    except Exception as e:
+        return {"analyzed": 0, "updated": 0, "positive": 0, "negative": 0}, f"Connexion Gmail: {e!s}"
+
+    try:
+        from googleapiclient.errors import HttpError
+    except ImportError:
+        HttpError = Exception  # type: ignore[misc, assignment]
+
+    analyzed = 0
+    updated = 0
+    positive = 0
+    negative = 0
+    seen_candidature_ids: set = set()  # avoid updating same candidature twice (multiple emails from same sender)
+    max_messages = 150
+    page_token: Optional[str] = None
+
+    try:
+        while max_messages > 0:
+            list_params: Dict[str, Union[str, int]] = {
+                "userId": "me",
+                "labelIds": ["INBOX"],
+                "maxResults": min(50, max_messages),
+            }
+            if page_token:
+                list_params["pageToken"] = page_token
+            result = service.users().messages().list(**list_params).execute()
+            messages = result.get("messages") or []
+            if not messages:
+                break
+            for msg_ref in messages:
+                if max_messages <= 0:
+                    break
+                max_messages -= 1
+                msg_id = msg_ref.get("id")
+                if not msg_id:
+                    continue
+                try:
+                    msg = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
+                    payload = msg.get("payload") or {}
+                    from_header = _get_header(msg, "From")
+                    sender_email = _extract_sender_email_from_header(from_header)
+                    if not sender_email:
+                        continue
+                    body_text = _get_message_body_text(payload)
+                    if not body_text and msg.get("snippet"):
+                        body_text = (msg.get("snippet") or "").strip()
+                    analyzed += 1
+                    cand = candidature_store.get_candidature_by_contact_email(user_key, sender_email)
+                    if not cand or cand.id in seen_candidature_ids:
+                        continue
+                    if cand.status not in ("sent", "relance"):
+                        continue
+                    sentiment = _classify_reply_sentiment(body_text)
+                    if not sentiment:
+                        continue
+                    seen_candidature_ids.add(cand.id)
+                    candidature_store.update_candidature_status(cand.id, user_key, sentiment)
+                    updated += 1
+                    if sentiment == "reponse_positive":
+                        positive += 1
+                    else:
+                        negative += 1
+                except Exception:
+                    continue
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                break
+        return (
+            {"analyzed": analyzed, "updated": updated, "positive": positive, "negative": negative},
+            None,
+        )
+    except HttpError as e:
+        err_msg = "Permissions Gmail insuffisantes."
+        if getattr(e, "resp", None) and getattr(e.resp, "status", None) == 403:
+            err_msg = "Gmail: accès refusé. Reconnectez Google avec l'autorisation de lecture des e-mails."
+        try:
+            err_content = getattr(e, "content", b"")
+            if err_content:
+                err_data = json.loads(err_content.decode("utf-8", errors="replace"))
+                err_inner = (err_data.get("error") or {}).get("message", err_msg)
+                if err_inner:
+                    err_msg = err_inner
+        except Exception:
+            pass
+        return {"analyzed": 0, "updated": 0, "positive": 0, "negative": 0}, err_msg
+    except Exception as e:
+        return {"analyzed": 0, "updated": 0, "positive": 0, "negative": 0}, f"Erreur: {e!s}"
+
+
 @app.get("/analytics", dependencies=[Depends(verify_token)])
 def get_analytics(
     x_run_user_id: Optional[str] = Header(default=None),
@@ -1073,6 +1241,18 @@ def get_analytics(
         "reponses_negatives": reponses_negatives,
         "taux_conversion_reponse": round(taux_conversion, 1),
     }
+
+
+@app.get("/candidatures/counts", dependencies=[Depends(verify_token)])
+def get_candidature_counts_api(
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    """Return counts per status (draft_created, sent, relance, reponse_positive, reponse_negative, no_reponse) and total."""
+    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    return candidature_store.get_counts_by_status(user_key)
 
 
 @app.get("/candidatures", dependencies=[Depends(verify_token)])
@@ -1342,3 +1522,27 @@ def sync_candidatures_from_draft_log(
     if message:
         out["message"] = message
     return out
+
+
+@app.post("/candidatures/analyze-inbox", dependencies=[Depends(verify_token)])
+def analyze_inbox_replies(
+    body: Optional[CandidatureAnalyzeInboxBody] = None,
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    """Read INBOX via Gmail API, match replies to candidatures by sender email, classify positive/negative and update status."""
+    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    if not body or not (body.oauth_access_token or "").strip():
+        return {
+            "analyzed": 0,
+            "updated": 0,
+            "positive": 0,
+            "negative": 0,
+            "message": "Connectez votre compte Google pour analyser les réponses reçues.",
+        }
+    stats, err = _analyze_inbox_from_gmail(body, user_key)
+    if err:
+        return {**stats, "message": err}
+    return stats
