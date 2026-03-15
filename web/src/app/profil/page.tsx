@@ -54,6 +54,10 @@ export default function ProfilPage() {
   const [isSyncingCandidatures, setIsSyncingCandidatures] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [isAnalyzingInbox, setIsAnalyzingInbox] = useState(false);
+  const [analyzeMessage, setAnalyzeMessage] = useState<string | null>(null);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [countsByStatus, setCountsByStatus] = useState<Record<string, number> | null>(null);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("alternance-ui-theme");
@@ -141,23 +145,47 @@ export default function ProfilPage() {
     }
   }, []);
 
+  const refreshCounts = useCallback(async () => {
+    try {
+      const response = await fetch("/api/candidatures/counts", { cache: "no-store" });
+      const data = (await safeJson<Record<string, number>>(response)) as Record<string, number>;
+      if (response.ok && data && typeof data === "object") {
+        setCountsByStatus(data);
+      } else {
+        setCountsByStatus(null);
+      }
+    } catch {
+      setCountsByStatus(null);
+    }
+  }, []);
+
   const refreshCandidatures = useCallback(async () => {
     setIsRefreshingCandidatures(true);
     try {
       const q = new URLSearchParams();
       if (candidatureStatusFilter) q.set("status", candidatureStatusFilter);
       q.set("limit", "300");
-      const response = await fetch(`/api/candidatures?${q.toString()}`, { cache: "no-store" });
-      const data = (await safeJson<{ candidatures?: CandidatureItem[] }>(response)) as {
+      const [listRes, countsRes] = await Promise.all([
+        fetch(`/api/candidatures?${q.toString()}`, { cache: "no-store" }),
+        fetch("/api/candidatures/counts", { cache: "no-store" }),
+      ]);
+      const listData = (await safeJson<{ candidatures?: CandidatureItem[] }>(listRes)) as {
         candidatures?: CandidatureItem[];
       };
-      if (response.ok && Array.isArray(data?.candidatures)) {
-        setCandidaturesList(data.candidatures);
+      const countsData = (await safeJson<Record<string, number>>(countsRes)) as Record<string, number>;
+      if (listRes.ok && Array.isArray(listData?.candidatures)) {
+        setCandidaturesList(listData.candidatures);
       } else {
         setCandidaturesList([]);
       }
+      if (countsRes.ok && countsData && typeof countsData === "object") {
+        setCountsByStatus(countsData);
+      } else {
+        setCountsByStatus(null);
+      }
     } catch {
       setCandidaturesList([]);
+      setCountsByStatus(null);
     } finally {
       setIsRefreshingCandidatures(false);
     }
@@ -220,13 +248,66 @@ export default function ProfilPage() {
             prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c)),
           );
           void refreshAnalytics();
+          void refreshCounts();
         }
       } catch {
         setSyncError("Impossible de mettre à jour le statut.");
       }
     },
-    [refreshAnalytics],
+    [refreshAnalytics, refreshCounts],
   );
+
+  const analyzeInbox = useCallback(async () => {
+    setAnalyzeError(null);
+    setAnalyzeMessage(null);
+    setIsAnalyzingInbox(true);
+    try {
+      const response = await fetch("/api/candidatures/analyze-inbox", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = (await safeJson<{
+        analyzed?: number;
+        updated?: number;
+        positive?: number;
+        negative?: number;
+        message?: string;
+        detail?: string;
+      }>(response)) as {
+        analyzed?: number;
+        updated?: number;
+        positive?: number;
+        negative?: number;
+        message?: string;
+        detail?: string;
+      };
+      if (response.ok) {
+        await refreshCandidatures();
+        await refreshAnalytics();
+        const updated = data.updated ?? 0;
+        const pos = data.positive ?? 0;
+        const neg = data.negative ?? 0;
+        const msg =
+          typeof data.message === "string" && data.message.trim()
+            ? data.message.trim()
+            : updated > 0
+              ? `${updated} réponse(s) analysée(s) : ${pos} positive(s), ${neg} négative(s).`
+              : "Aucune nouvelle réponse détectée dans la boîte de réception.";
+        setAnalyzeMessage(msg);
+      } else {
+        setAnalyzeError(
+          typeof data.detail === "string" && data.detail.trim()
+            ? data.detail.trim()
+            : "Échec de l'analyse des réponses.",
+        );
+      }
+    } catch {
+      setAnalyzeError("Impossible de contacter le serveur.");
+    } finally {
+      setIsAnalyzingInbox(false);
+    }
+  }, [refreshCandidatures, refreshAnalytics]);
 
   useEffect(() => {
     if (accessDenied || !session?.user?.email) return;
@@ -391,6 +472,11 @@ export default function ProfilPage() {
           isGranted={!accessDenied && Boolean(session?.user?.email)}
           syncMessage={syncMessage}
           syncError={syncError}
+          isAnalyzingInbox={isAnalyzingInbox}
+          analyzeInbox={analyzeInbox}
+          analyzeMessage={analyzeMessage}
+          analyzeError={analyzeError}
+          countsByStatus={countsByStatus}
         />
 
         <section className={styles.panel}>

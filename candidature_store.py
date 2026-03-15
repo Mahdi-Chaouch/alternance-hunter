@@ -11,7 +11,7 @@ import sqlite3
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 CANDIDATURE_STATUSES = frozenset({
     "draft_created",
@@ -143,6 +143,35 @@ def list_candidatures(
             conn.close()
 
 
+def get_counts_by_status(user_key: str) -> Dict[str, int]:
+    """Return count of candidatures per status for a user. Includes 'total'."""
+    with _LOCK:
+        conn = _get_conn()
+        try:
+            cursor = conn.execute(
+                """
+                SELECT status, COUNT(*) AS cnt
+                FROM candidatures
+                WHERE user_key = ?
+                GROUP BY status
+                """,
+                (user_key,),
+            )
+            rows = cursor.fetchall()
+            counts: Dict[str, int] = {s: 0 for s in CANDIDATURE_STATUSES}
+            total = 0
+            for row in rows:
+                status = (row[0] or "").strip()
+                cnt = row[1] or 0
+                if status in CANDIDATURE_STATUSES:
+                    counts[status] = cnt
+                total += cnt
+            counts["total"] = total
+            return counts
+        finally:
+            conn.close()
+
+
 def insert_candidature(
     user_key: str,
     company: str,
@@ -211,6 +240,26 @@ def get_candidature(candidature_id: int, user_key: str) -> Optional[Candidature]
             row = conn.execute(
                 "SELECT id, user_key, run_id, company, email, status, draft_id, created_at, updated_at FROM candidatures WHERE id = ? AND user_key = ?",
                 (candidature_id, user_key),
+            ).fetchone()
+            return _row_to_candidature(row) if row else None
+        finally:
+            conn.close()
+
+
+def get_candidature_by_contact_email(user_key: str, contact_email: str) -> Optional[Candidature]:
+    """Find a candidature by user_key and contact email (the person we sent the application to).
+    Returns the most recently updated one if several match."""
+    if not (user_key and (contact_email or "").strip()):
+        return None
+    email_normalized = contact_email.strip().lower()
+    with _LOCK:
+        conn = _get_conn()
+        try:
+            row = conn.execute(
+                """SELECT id, user_key, run_id, company, email, status, draft_id, created_at, updated_at
+                   FROM candidatures WHERE user_key = ? AND LOWER(TRIM(email)) = ?
+                   ORDER BY updated_at DESC LIMIT 1""",
+                (user_key, email_normalized),
             ).fetchone()
             return _row_to_candidature(row) if row else None
         finally:

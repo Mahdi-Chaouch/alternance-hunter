@@ -75,6 +75,11 @@ type SuiviCandidaturesProps = {
   activeRunId?: string | null;
   syncMessage?: string | null;
   syncError?: string | null;
+  isAnalyzingInbox?: boolean;
+  analyzeInbox?: () => void | Promise<void>;
+  analyzeMessage?: string | null;
+  analyzeError?: string | null;
+  countsByStatus?: Record<string, number> | null;
 };
 
 export function SuiviCandidatures({
@@ -90,6 +95,11 @@ export function SuiviCandidatures({
   activeRunId = null,
   syncMessage = null,
   syncError = null,
+  isAnalyzingInbox = false,
+  analyzeInbox,
+  analyzeMessage = null,
+  analyzeError = null,
+  countsByStatus = null,
 }: SuiviCandidaturesProps) {
   const onSync = useCallback(
     () => void syncCandidatures(activeRunId ?? undefined),
@@ -114,6 +124,16 @@ export function SuiviCandidatures({
           >
             {isSyncingCandidatures ? "Synchronisation…" : "Importer depuis les brouillons"}
           </button>
+          {analyzeInbox ? (
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={() => void analyzeInbox()}
+              disabled={isAnalyzingInbox || !isGranted}
+            >
+              {isAnalyzingInbox ? "Analyse…" : "Analyser les réponses reçues"}
+            </button>
+          ) : null}
           <button
             type="button"
             className={styles.secondaryBtn}
@@ -134,6 +154,15 @@ export function SuiviCandidatures({
           {syncMessage}
         </div>
       ) : null}
+      {analyzeError ? (
+        <div className={styles.candidatureSyncError} role="alert">
+          {analyzeError}
+        </div>
+      ) : analyzeMessage ? (
+        <div className={styles.candidatureSyncMessage} role="status">
+          {analyzeMessage}
+        </div>
+      ) : null}
 
       <div className={styles.candidaturePillsWrap}>
         <span className={styles.candidaturePillsLabel}>Filtrer par statut</span>
@@ -143,7 +172,7 @@ export function SuiviCandidatures({
             className={candidatureStatusFilter === "" ? styles.candidaturePillActive : styles.candidaturePill}
             onClick={() => setCandidatureStatusFilter("")}
           >
-            Tous
+            Tous {countsByStatus && typeof countsByStatus.total === "number" ? `(${countsByStatus.total})` : ""}
           </button>
           {CANDIDATURE_STATUSES.map((s) => (
             <button
@@ -153,6 +182,7 @@ export function SuiviCandidatures({
               onClick={() => setCandidatureStatusFilter(s)}
             >
               {CANDIDATURE_LABELS[s]}
+              {countsByStatus && typeof countsByStatus[s] === "number" ? ` (${countsByStatus[s]})` : ""}
             </button>
           ))}
         </div>
