@@ -1364,6 +1364,161 @@
   color: var(--status-neutral-text);
 }
 
+/* Suivi candidatures – badges par statut */
+.badgeCandidatureDraft {
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
+}
+
+.badgeCandidatureSent {
+  background: var(--status-running-bg);
+  color: var(--status-running-text);
+}
+
+.badgeCandidaturePositive {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.badgeCandidatureNegative {
+  background: var(--status-failed-bg);
+  color: var(--status-failed-text);
+}
+
+.badgeCandidatureNoReponse {
+  background: var(--status-neutral-bg);
+  color: var(--muted-text);
+}
+
+/* Suivi candidatures – header */
+.candidaturesTitle {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.candidaturesSubtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted-text);
+  max-width: 52ch;
+}
+
+/* Pills filtre */
+.candidaturePillsWrap {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.candidaturePillsLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--subtle-text);
+}
+
+.candidaturePills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.candidaturePill,
+.candidaturePillActive {
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--panel-border);
+  background: color-mix(in srgb, var(--panel-bg) 95%, var(--bg) 5%);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.candidaturePill:hover {
+  background: color-mix(in srgb, var(--primary) 12%, var(--panel-bg));
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.candidaturePillActive {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.candidaturePillActive:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  color: #fff;
+}
+
+/* État vide candidatures */
+.candidatureEmptyBlock {
+  text-align: center;
+  padding: 2rem 1.5rem;
+  border-radius: 12px;
+  border: 1px dashed var(--panel-border);
+  background: color-mix(in srgb, var(--panel-bg) 98%, var(--bg) 2%);
+}
+
+.candidatureEmptyTitle {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.candidatureEmptyText {
+  margin: 0 0 1.25rem;
+  font-size: 0.95rem;
+  color: var(--muted-text);
+  max-width: 42ch;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.5;
+}
+
+.candidatureEmptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.candidatureEmptyLink {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+/* Table candidatures – cellules */
+.candidatureCellCompany {
+  font-weight: 600;
+}
+
+.candidatureCellEmail {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+}
+
+.candidatureCellDate {
+  font-size: 0.85rem;
+  color: var(--subtle-text);
+}
+
+.candidatureStatusSelect {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  color: var(--text);
+  min-width: 140px;
+}
+
 .metaGrid {
   display: grid;
   gap: 0.85rem;
@@ -1381,6 +1536,28 @@
 
 .metaGrid dd {
   margin-top: 0.35rem;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.profilDefList {
+  display: grid;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1rem;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+}
+
+.profilDefList dt {
+  font-weight: 700;
+  color: var(--subtle-text);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.profilDefList dd {
+  margin: 0;
   color: var(--text);
   word-break: break-word;
 }
