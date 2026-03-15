@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import styles from "../page.module.css";
 import { authClient } from "@/lib/auth-client";
 import { GoogleLogo } from "@/app/components/GoogleLogo";
-import { SuiviCandidatures, type CandidatureItem } from "@/app/components/SuiviCandidatures";
 import { COMMUNES_FRANCE } from "@/data/communes-france";
 import {
   SECTOR_LABELS,
@@ -58,18 +57,6 @@ type RunStatusResponse = {
 
 const END_STATUSES = new Set(["succeeded", "failed", "cancelled"]);
 type ThemeMode = "light" | "dark";
-
-type AnalyticsData = {
-  total_targets: number;
-  contacts_valides: number;
-  taux_contacts_valides: number;
-  drafts_crees: number;
-  taux_drafts_crees: number;
-  candidatures_sent: number;
-  reponses_positives: number;
-  reponses_negatives: number;
-  taux_conversion_reponse: number;
-};
 
 const MODE_LABELS: Record<RunMode, string> = {
   pipeline: "Recherche complète",
@@ -310,12 +297,6 @@ function DashboardContent() {
   const [isTypingLogs, setIsTypingLogs] = useState(false);
   const [showLogsSection, setShowLogsSection] = useState(false);
   const [isDraggingDocs, setIsDraggingDocs] = useState(false);
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
-  const [candidaturesList, setCandidaturesList] = useState<CandidatureItem[]>([]);
-  const [candidatureStatusFilter, setCandidatureStatusFilter] = useState<string>("");
-  const [isRefreshingAnalytics, setIsRefreshingAnalytics] = useState(false);
-  const [isRefreshingCandidatures, setIsRefreshingCandidatures] = useState(false);
-  const [isSyncingCandidatures, setIsSyncingCandidatures] = useState(false);
   const logsRef = useRef<HTMLPreElement | null>(null);
   const typingTimerRef = useRef<number | null>(null);
   const animatedLogsRef = useRef("");
@@ -478,102 +459,17 @@ function DashboardContent() {
     [activeRunId],
   );
 
-  const refreshAnalytics = useCallback(async () => {
-    setIsRefreshingAnalytics(true);
-    try {
-      const response = await fetch("/api/analytics", { cache: "no-store" });
-      const data = (await safeJson<AnalyticsData>(response)) as AnalyticsData;
-      if (response.ok && data && typeof data.total_targets === "number") {
-        setAnalyticsData(data);
-      } else {
-        setAnalyticsData(null);
-      }
-    } catch {
-      setAnalyticsData(null);
-    } finally {
-      setIsRefreshingAnalytics(false);
-    }
-  }, []);
-
-  const refreshCandidatures = useCallback(async () => {
-    setIsRefreshingCandidatures(true);
-    try {
-      const q = new URLSearchParams();
-      if (candidatureStatusFilter) q.set("status", candidatureStatusFilter);
-      q.set("limit", "300");
-      const response = await fetch(`/api/candidatures?${q.toString()}`, { cache: "no-store" });
-      const data = (await safeJson<{ candidatures?: CandidatureItem[] }>(response)) as {
-        candidatures?: CandidatureItem[];
-      };
-      if (response.ok && Array.isArray(data?.candidatures)) {
-        setCandidaturesList(data.candidatures);
-      } else {
-        setCandidaturesList([]);
-      }
-    } catch {
-      setCandidaturesList([]);
-    } finally {
-      setIsRefreshingCandidatures(false);
-    }
-  }, [candidatureStatusFilter]);
-
-  const syncCandidatures = useCallback(async (runId?: string) => {
-    setIsSyncingCandidatures(true);
-    try {
-      const response = await fetch("/api/candidatures/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ run_id: runId ?? null }),
-      });
-      const data = (await safeJson<{ synced?: number }>(response)) as { synced?: number };
-      if (response.ok) {
-        await refreshCandidatures();
-        await refreshAnalytics();
-        setInfo(data.synced != null ? `${data.synced} candidature(s) importée(s) depuis les brouillons.` : "Sync terminé.");
-      }
-    } catch {
-      setError("Impossible de synchroniser les candidatures.");
-    } finally {
-      setIsSyncingCandidatures(false);
-    }
-  }, [refreshCandidatures, refreshAnalytics]);
-
-  const updateCandidatureStatus = useCallback(
-    async (id: number, newStatus: string) => {
-      try {
-        const response = await fetch(`/api/candidatures/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: newStatus }),
-        });
-        if (response.ok) {
-          setCandidaturesList((prev) =>
-            prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c)),
-          );
-          void refreshAnalytics();
-        }
-      } catch {
-        setError("Impossible de mettre à jour le statut.");
-      }
-    },
-    [refreshAnalytics],
-  );
-
   const refreshAll = useCallback(async () => {
     setError("");
     try {
       const latestRuns = await refreshRuns();
       const runIdToLoad = activeRunId ?? latestRuns[0]?.run_id ?? null;
       await refreshRunDetails(runIdToLoad);
-      if (accessState === "granted") {
-        void refreshAnalytics();
-        void refreshCandidatures();
-      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur inconnue.";
       setError(message);
     }
-  }, [activeRunId, refreshRuns, refreshRunDetails, accessState, refreshAnalytics, refreshCandidatures]);
+  }, [activeRunId, refreshRuns, refreshRunDetails, accessState]);
 
   useEffect(() => {
     if (accessState !== "granted") {
@@ -581,11 +477,6 @@ function DashboardContent() {
     }
     void refreshAll();
   }, [accessState, refreshAll]);
-
-  useEffect(() => {
-    if (accessState !== "granted") return;
-    void refreshCandidatures();
-  }, [accessState, candidatureStatusFilter, refreshCandidatures]);
 
   useEffect(() => {
     if (accessState !== "granted") {
@@ -1922,63 +1813,6 @@ function DashboardContent() {
             </div>
           )}
         </section>
-
-        <section className={styles.panel} id="analytics">
-          <div className={styles.panelHeader}>
-            <h2>Analytics produit</h2>
-            {isRefreshingAnalytics ? <span className={styles.loadingText}>Mise à jour...</span> : null}
-          </div>
-          <p className={styles.sectionHint}>
-            Taux de contacts valides, brouillons créés et conversion réponse (après synchronisation des candidatures).
-          </p>
-          {analyticsData ? (
-            <div className={styles.metaGrid} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "1rem", marginTop: "0.75rem" }}>
-              <div className={styles.stepCard} style={{ padding: "0.75rem" }}>
-                <div style={{ fontSize: "0.85rem", color: "var(--color-text-secondary, #555)" }}>Cibles totales</div>
-                <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{analyticsData.total_targets}</div>
-              </div>
-              <div className={styles.stepCard} style={{ padding: "0.75rem" }}>
-                <div style={{ fontSize: "0.85rem", color: "var(--color-text-secondary, #555)" }}>Contacts valides</div>
-                <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{analyticsData.contacts_valides}</div>
-                <div style={{ fontSize: "0.8rem" }}>{analyticsData.taux_contacts_valides} %</div>
-              </div>
-              <div className={styles.stepCard} style={{ padding: "0.75rem" }}>
-                <div style={{ fontSize: "0.85rem", color: "var(--color-text-secondary, #555)" }}>Brouillons créés</div>
-                <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{analyticsData.drafts_crees}</div>
-                <div style={{ fontSize: "0.8rem" }}>{analyticsData.taux_drafts_crees} %</div>
-              </div>
-              <div className={styles.stepCard} style={{ padding: "0.75rem" }}>
-                <div style={{ fontSize: "0.85rem", color: "var(--color-text-secondary, #555)" }}>Envoyés / relances</div>
-                <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{analyticsData.candidatures_sent}</div>
-              </div>
-              <div className={styles.stepCard} style={{ padding: "0.75rem" }}>
-                <div style={{ fontSize: "0.85rem", color: "var(--color-text-secondary, #555)" }}>Réponses +</div>
-                <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "var(--color-success, #0a7ea4)" }}>{analyticsData.reponses_positives}</div>
-              </div>
-              <div className={styles.stepCard} style={{ padding: "0.75rem" }}>
-                <div style={{ fontSize: "0.85rem", color: "var(--color-text-secondary, #555)" }}>Conversion réponse</div>
-                <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{analyticsData.taux_conversion_reponse} %</div>
-              </div>
-            </div>
-          ) : (
-            <p className={styles.emptyState}>
-              Aucune donnée pour le moment. Lancez une recherche puis synchronisez les candidatures ci-dessous.
-            </p>
-          )}
-        </section>
-
-        <SuiviCandidatures
-          candidaturesList={candidaturesList}
-          candidatureStatusFilter={candidatureStatusFilter}
-          setCandidatureStatusFilter={setCandidatureStatusFilter}
-          isRefreshingCandidatures={isRefreshingCandidatures}
-          isSyncingCandidatures={isSyncingCandidatures}
-          refreshCandidatures={refreshCandidatures}
-          syncCandidatures={syncCandidatures}
-          updateCandidatureStatus={updateCandidatureStatus}
-          isGranted={accessState === "granted"}
-          activeRunId={activeRunId}
-        />
 
         <section className={styles.panel} id="step-logs">
           <div className={styles.panelHeader}>

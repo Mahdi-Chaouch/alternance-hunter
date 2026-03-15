@@ -167,7 +167,7 @@ export function AppHeader() {
                     👤 Mon profil
                   </Link>
                   <Link
-                    href="/dashboard#candidatures"
+                    href="/profil#candidatures"
                     className="app-header-profil-dropdown-item"
                     role="menuitem"
                     onClick={() => setProfilDropdownOpen(false)}
@@ -233,7 +233,7 @@ export function AppHeader() {
                 <Link href="/profil" className="app-mobile-nav-link" onClick={closeMenu}>
                   👤 Mon profil
                 </Link>
-                <Link href="/dashboard#candidatures" className="app-mobile-nav-link" onClick={closeMenu}>
+                <Link href="/profil#candidatures" className="app-mobile-nav-link" onClick={closeMenu}>
                   📋 Suivi de candidatures
                 </Link>
                 <button

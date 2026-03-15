@@ -72,7 +72,9 @@ type SuiviCandidaturesProps = {
   syncCandidatures: (runId?: string) => void | Promise<void>;
   updateCandidatureStatus: (id: number, newStatus: string) => void | Promise<void>;
   isGranted: boolean;
-  activeRunId: string | null;
+  activeRunId?: string | null;
+  syncMessage?: string | null;
+  syncError?: string | null;
 };
 
 export function SuiviCandidatures({
@@ -85,9 +87,14 @@ export function SuiviCandidatures({
   syncCandidatures,
   updateCandidatureStatus,
   isGranted,
-  activeRunId,
+  activeRunId = null,
+  syncMessage = null,
+  syncError = null,
 }: SuiviCandidaturesProps) {
-  const onSync = useCallback(() => void syncCandidatures(activeRunId ?? undefined), [syncCandidatures, activeRunId]);
+  const onSync = useCallback(
+    () => void syncCandidatures(activeRunId ?? undefined),
+    [syncCandidatures, activeRunId],
+  );
 
   return (
     <section className={styles.panel} id="candidatures">
@@ -117,6 +124,16 @@ export function SuiviCandidatures({
           </button>
         </div>
       </div>
+
+      {syncError ? (
+        <div className={styles.candidatureSyncError} role="alert">
+          {syncError}
+        </div>
+      ) : syncMessage ? (
+        <div className={styles.candidatureSyncMessage} role="status">
+          {syncMessage}
+        </div>
+      ) : null}
 
       <div className={styles.candidaturePillsWrap}>
         <span className={styles.candidaturePillsLabel}>Filtrer par statut</span>
