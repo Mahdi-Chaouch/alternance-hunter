@@ -13,6 +13,8 @@ export type SectorId =
   | "construction"
   | "marketing"
   | "finance"
+  | "digital"
+  | "restauration"
   | "all";
 
 export const SECTORS_SPECIALTIES: Record<SectorId, string[]> = {
@@ -69,18 +71,49 @@ export const SECTORS_SPECIALTIES: Record<SectorId, string[]> = {
     "Architecture",
     "Gros œuvre",
   ],
+  digital: [
+    "Développement web",
+    "Développement logiciel",
+    "DevOps",
+    "Data / IA",
+    "UX/UI",
+    "Product management",
+  ],
+  restauration: [
+    "Restauration",
+    "Cuisine",
+    "Boulangerie / Pâtisserie",
+    "Traiteur",
+  ],
   all: [],
 };
 
-/** Libellés uniques par secteur (format "Catégorie / Domaine") pour l’UI et les emails. */
+/** Une option = un secteur (libellé unique par choix). */
 export const SECTOR_LABELS: Record<SectorId, string> = {
-  it: "Informatique / Digital & IT",
-  food: "Alimentation / Food & Restauration",
-  law: "Droit / Juridique & Assurance",
-  trade: "Commerce / Retail & Distribution",
-  health: "Santé / Médical & Paramédical",
-  construction: "BTP / Construction & Artisanat",
-  marketing: "Marketing / Communication & Médias",
-  finance: "Finance / Comptabilité & Audit",
+  it: "Informatique",
+  food: "Alimentation",
+  law: "Droit",
+  trade: "Commerce",
+  health: "Santé",
+  construction: "BTP",
+  marketing: "Marketing",
+  finance: "Finance",
+  digital: "Digital",
+  restauration: "Restauration",
   all: "Tous secteurs",
 };
+
+/** Ordre d’affichage : Digital et Restauration plus bas (pas à côté d’Informatique / Alimentation). */
+export const SECTOR_ORDER: SectorId[] = [
+  "it",
+  "food",
+  "law",
+  "trade",
+  "health",
+  "construction",
+  "marketing",
+  "finance",
+  "digital",
+  "restauration",
+  "all",
+];

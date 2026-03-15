@@ -9,6 +9,7 @@ import { GoogleLogo } from "@/app/components/GoogleLogo";
 import { COMMUNES_FRANCE } from "@/data/communes-france";
 import {
   SECTOR_LABELS,
+  SECTOR_ORDER,
   SECTORS_SPECIALTIES,
   type SectorId,
 } from "@/data/sectors-specialties";
@@ -1550,7 +1551,7 @@ function DashboardContent() {
                       }}
                       aria-label="Secteur d'activité"
                     >
-                      {(Object.keys(SECTOR_LABELS) as SectorId[]).map((key) => (
+                      {SECTOR_ORDER.map((key) => (
                         <option key={key} value={key}>
                           {SECTOR_LABELS[key]}
                         </option>
