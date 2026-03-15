@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
 import re
 import sys
@@ -561,7 +562,7 @@ def should_exclude_company(name: str) -> bool:
 def score_company(name: str, website: str, focus: str) -> int:
     """
     focus: web | it | all
-    Renvoie un score pour trier/prioriser.
+    Renvoie un score pour trier/prioriser (pertinence alternance / secteur).
     """
     n = (name or "").lower()
     s = (website or "").lower()
@@ -591,6 +592,48 @@ def score_company(name: str, website: str, focus: str) -> int:
         pass
 
     return base
+
+
+def alternance_relevance_score(name: str, website: str, focus: str) -> int:
+    """
+    Score 0-10: pertinence pour une recherche alternance (secteur, domaine).
+    Utilisé pour analytics et scoring produit.
+    """
+    raw = score_company(name, website, focus)
+    return min(10, max(0, raw + 5))  # map roughly to 0-10
+
+
+# Villes / zones prioritaires pour le scoring (grands bassins d'emploi).
+PREFERRED_ZONE_KEYWORDS = frozenset({
+    "paris", "lyon", "marseille", "toulouse", "nice", "nantes", "strasbourg",
+    "montpellier", "bordeaux", "lille", "rennes", "grenoble", "cannes",
+    "fontainebleau", "auxerre",
+})
+
+
+def zone_score(ville: str, zone: str) -> int:
+    """
+    Score 0-10: attractivité de la zone (grandes métropoles = 10, autres = 5).
+    """
+    v = (ville or "").strip().lower()
+    z = (zone or "").strip().lower()
+    combined = f"{v} {z}"
+    if any(kw in combined for kw in PREFERRED_ZONE_KEYWORDS):
+        return 10
+    return 5
+
+
+def contact_quality_score(email: Optional[str], status: str, is_hr: bool, is_support: bool) -> int:
+    """
+    Score 0-10: qualité du contact pour candidature (RH = 10, générique = 5, support = 0).
+    """
+    if not email or status != "FOUND":
+        return 0
+    if is_hr:
+        return 10
+    if is_support:
+        return 0
+    return 5
 
 
 def _search_zone(
@@ -1185,8 +1228,13 @@ def run_email_finder(
     rh_only: bool = False,
     sector: str = "it",
     specialty: str = "",
+    product_export_path: str = "",
 ) -> None:
-    fieldnames = ["entreprise", "zone", "ville", "site", "score", "status", "email", "source_url", "contact_urls", "reason"]
+    fieldnames = [
+        "entreprise", "zone", "ville", "site", "score",
+        "alternance_relevance", "contact_quality", "zone_score",
+        "status", "email", "source_url", "contact_urls", "reason",
+    ]
 
     done_sites = load_done_sites(emails_found_csv)
     if done_sites:
@@ -1308,12 +1356,21 @@ def run_email_finder(
                             status = "FORM_ONLY"
                             form_only += 1
 
+                        alt_relevance = alternance_relevance_score(t.entreprise, t.site, focus)
+                        z_score = zone_score(t.ville, t.zone)
+                        is_hr = bool(email and is_hr_email(email))
+                        is_support = bool(email and is_support_like_email(email))
+                        c_quality = contact_quality_score(email, status, is_hr, is_support)
+
                         row = {
                             "entreprise": t.entreprise,
                             "zone": t.zone,
                             "ville": t.ville,
                             "site": t.site,
                             "score": str(t.score),
+                            "alternance_relevance": str(alt_relevance),
+                            "contact_quality": str(c_quality),
+                            "zone_score": str(z_score),
                             "status": status,
                             "email": email or "",
                             "source_url": source_url or "",
@@ -1357,6 +1414,33 @@ def run_email_finder(
     print(f"UNSTABLE:   {unstable}")
     print("=========================")
 
+    if product_export_path and os.path.exists(emails_found_csv):
+        try:
+            companies: List[Dict] = []
+            with open(emails_found_csv, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for r in reader:
+                    companies.append({
+                        "company": (r.get("entreprise") or "").strip(),
+                        "zone": (r.get("zone") or "").strip(),
+                        "ville": (r.get("ville") or "").strip(),
+                        "site": (r.get("site") or "").strip(),
+                        "score": int(r.get("score") or 0),
+                        "alternance_relevance": int(r.get("alternance_relevance") or 0),
+                        "contact_quality": int(r.get("contact_quality") or 0),
+                        "zone_score": int(r.get("zone_score") or 0),
+                        "status": (r.get("status") or "").strip(),
+                        "email": (r.get("email") or "").strip(),
+                        "source_url": (r.get("source_url") or "").strip(),
+                        "contact_urls": (r.get("contact_urls") or "").strip(),
+                    })
+            os.makedirs(os.path.dirname(product_export_path) or ".", exist_ok=True)
+            with open(product_export_path, "w", encoding="utf-8") as out:
+                json.dump({"companies": companies}, out, ensure_ascii=False, indent=2)
+            print(f"Product export: {product_export_path}")
+        except Exception as e:
+            print(f"Warning: could not write product export: {e}")
+
 
 # ============================================================
 # MAIN
@@ -1385,6 +1469,8 @@ def parse_args():
                    help="Chemin du CSV des emails trouvés.")
     p.add_argument("--drafts-txt", type=str, default=DEFAULT_DRAFT_EMAILS_TXT,
                    help="Chemin du fichier de brouillons générés.")
+    p.add_argument("--product-export", type=str, default="",
+                   help="Chemin JSON de sortie pour exploitation produit (companies + scores).")
     p.add_argument("--sender-first-name", type=str, default="", help="Prenom du candidat.")
     p.add_argument("--sender-last-name", type=str, default="", help="Nom du candidat.")
     p.add_argument("--sender-linkedin-url", type=str, default="", help="Profil LinkedIn du candidat.")
@@ -1434,6 +1520,7 @@ def main():
         rh_only=args.rh_only,
         sector=getattr(args, "sector", "it") or "it",
         specialty=getattr(args, "specialty", "") or "",
+        product_export_path=getattr(args, "product_export", "") or "",
     )
 
     print(f"\n✅ emails: {args.emails_found_csv}")

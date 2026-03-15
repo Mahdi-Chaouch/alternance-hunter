@@ -1,17 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthHeaders, getBackendConfig } from "@/lib/backend";
-import { isAdminEmail } from "@/lib/admin-guard";
 import { requireApiAuthorizedSession } from "@/lib/auth-guard";
 import { readJsonSafely } from "@/lib/http";
-import {
-  checkRateLimit,
-  RATE_LIMIT_CANCEL_PER_MINUTE,
-  retryAfterSeconds,
-} from "@/lib/rate-limit";
-
-type Params = {
-  params: Promise<{ runId: string }>;
-};
 
 function buildUserScopedHeaders(user: { id?: string; email?: string | null }): HeadersInit {
   const scopedHeaders: Record<string, string> = {};
@@ -24,42 +14,16 @@ function buildUserScopedHeaders(user: { id?: string; email?: string | null }): H
   return scopedHeaders;
 }
 
-export async function POST(
-  _request: Request,
-  { params }: Params,
-): Promise<NextResponse> {
+export async function GET(): Promise<NextResponse> {
   const authResult = await requireApiAuthorizedSession();
   if (!authResult.ok) {
     return authResult.response;
   }
 
-  const userId = authResult.value.user.id?.trim() ?? "";
-  const isAdmin = isAdminEmail(authResult.value.user.email);
-
-  if (!isAdmin) {
-    const rateLimit = checkRateLimit(userId, "cancel", RATE_LIMIT_CANCEL_PER_MINUTE);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        {
-          detail:
-            "Trop de demandes d'annulation. Veuillez patienter avant de reessayer.",
-        },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(retryAfterSeconds(rateLimit.resetAt)),
-          },
-        },
-      );
-    }
-  }
-
   try {
-    const { runId } = await params;
     const { baseUrl, token } = getBackendConfig();
-
-    const response = await fetch(`${baseUrl}/runs/${encodeURIComponent(runId)}/cancel`, {
-      method: "POST",
+    const response = await fetch(`${baseUrl}/analytics`, {
+      method: "GET",
       cache: "no-store",
       headers: {
         ...getAuthHeaders(token),

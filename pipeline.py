@@ -99,6 +99,7 @@ def _apply_user_scoped_defaults(args: argparse.Namespace) -> None:
         args.out_dir = f"outputs/letters/{user_key}"
     if args.resume_log == "outputs/logs/drafts_created_log.csv":
         args.resume_log = f"outputs/logs/{user_key}/drafts_created_log.csv"
+    setattr(args, "product_export", f"data/exports/users/{user_key}/product_companies.json")
 
 
 def _has_any_letter(out_dir: str, suffix: str) -> bool:
@@ -176,6 +177,8 @@ def build_hunter_cmd(args: argparse.Namespace) -> List[str]:
         cmd.append("--insecure")
     if args.rh_only:
         cmd.append("--rh-only")
+    if getattr(args, "product_export", ""):
+        cmd.extend(["--product-export", args.product_export])
     return cmd
 
 
@@ -329,6 +332,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max", type=int, default=999999)
     parser.add_argument("--console-auth", action="store_true")
     parser.add_argument("--resume-log", default="outputs/logs/drafts_created_log.csv")
+    parser.add_argument("--product-export", default="", help="JSON sortie produit (companies + scores).")
 
     return parser.parse_args()
 

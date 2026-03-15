@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { getDatabaseUrl, isProduction } from "./env";
 
 type StoredUserProfile = {
   user_id: string;
@@ -41,9 +42,7 @@ type UserProfileInput = {
   runUseAi: boolean;
 };
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ??
-  "postgres://postgres:postgres@127.0.0.1:5432/alternance_mails";
+const DATABASE_URL = getDatabaseUrl();
 
 const globalForProfile = globalThis as unknown as { userProfilePool?: Pool };
 
@@ -53,7 +52,7 @@ const userProfilePool =
     connectionString: DATABASE_URL,
   });
 
-if (process.env.NODE_ENV !== "production") {
+if (!isProduction) {
   globalForProfile.userProfilePool = userProfilePool;
 }
 

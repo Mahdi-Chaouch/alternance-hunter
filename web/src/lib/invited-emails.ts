@@ -1,8 +1,7 @@
 import { Pool } from "pg";
+import { getDatabaseUrl, isProduction } from "./env";
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ??
-  "postgres://postgres:postgres@127.0.0.1:5432/alternance_mails";
+const DATABASE_URL = getDatabaseUrl();
 
 const INVITED_EMAILS_ENV_KEYS = ["AUTH_ALLOWED_EMAILS", "INVITED_EMAILS"] as const;
 
@@ -14,7 +13,7 @@ const invitedEmailsPool =
     connectionString: DATABASE_URL,
   });
 
-if (process.env.NODE_ENV !== "production") {
+if (!isProduction) {
   globalForInvited.invitedEmailsPool = invitedEmailsPool;
 }
 
