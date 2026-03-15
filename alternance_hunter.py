@@ -1202,6 +1202,9 @@ def run_email_finder(
             email, source_url, contact_urls, reason = None, None, [], "ERROR"
         return t, email, source_url, contact_urls, reason
 
+    # Submit in batches so that when we hit target_found we only wait for this batch, not all targets
+    batch_size = max(workers, 20)
+
     with open(emails_found_csv, "a", newline="", encoding="utf-8") as fcsv, \
          open(drafts_txt, "a", encoding="utf-8") as fdraft:
 
@@ -1210,114 +1213,119 @@ def run_email_finder(
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         with ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
-            futures = {}
-            for t in pending:
-                if time.time() >= deadline:
-                    break
-                futures[ex.submit(job, t)] = t
-
-            for fut in as_completed(futures):
+            stop_requested = False
+            offset = 0
+            while offset < len(pending) and not stop_requested:
                 if time.time() >= deadline:
                     print("\n⏱️  STOP: limite de temps atteinte (max-minutes).")
                     break
+                batch = pending[offset : offset + batch_size]
+                offset += len(batch)
+                futures = {ex.submit(job, t): t for t in batch}
 
-                t, email, source_url, contact_urls, reason = fut.result()
-
-                with lock:
-                    processed += 1
-                    status = "NOT_FOUND"
-
-                    if reason == "BLOCKED":
-                        blocked += 1
-                    elif reason == "UNSTABLE":
-                        unstable += 1
-
-                    # v6: email propre + même domaine ; option --rh-only : brouillon seulement si email RH
-                    if email and source_url and allowed_source_domain(t.site, source_url):
-                        if not looks_like_fake_email(email):
-                            write_draft = True
-                            if rh_only and not is_hr_email(email):
-                                status = "FORM_ONLY"
-                                form_only += 1
-                                write_draft = False
-                            else:
-                                status = "FOUND"
-                                found += 1
-
-                            if write_draft:
-                                subj, body = build_email_draft(
-                                    company=t.entreprise,
-                                    sender_first_name=sender_first_name,
-                                    sender_last_name=sender_last_name,
-                                    sender_linkedin_url=sender_linkedin_url,
-                                    sender_portfolio_url=sender_portfolio_url,
-                                    custom_subject_template=mail_subject_template,
-                                    custom_body_template=mail_body_template,
-                                    sector=sector,
-                                    specialty=specialty,
-                                )
-                                fdraft.write(
-                                    f"{SEP}\n"
-                                    f"Entreprise: {t.entreprise}\n"
-                                    f"Zone: {t.zone}\n"
-                                    f"Ville: {t.ville}\n"
-                                    f"Site: {t.site}\n"
-                                    f"Score: {t.score}\n"
-                                    f"Email: {email}\n"
-                                    f"Source: {source_url}\n"
-                                    f"Sujet: {subj}\n\n"
-                                    f"{body}\n"
-                                )
-                                fdraft.flush()
-                        else:
-                            # email rejeté => on garde plutôt les urls de contact
-                            if contact_urls:
-                                status = "FORM_ONLY"
-                                form_only += 1
-                            else:
-                                status = "NOT_FOUND"
-
-                    elif contact_urls:
-                        status = "FORM_ONLY"
-                        form_only += 1
-
-                    row = {
-                        "entreprise": t.entreprise,
-                        "zone": t.zone,
-                        "ville": t.ville,
-                        "site": t.site,
-                        "score": str(t.score),
-                        "status": status,
-                        "email": email or "",
-                        "source_url": source_url or "",
-                        "contact_urls": " | ".join(contact_urls) if contact_urls else "",
-                        "reason": reason,
-                    }
-                    writer.writerow(row)
-                    fcsv.flush()
-                    done_sites.add(t.site)
-
-                    # log
-                    print(f"\n[+] {t.entreprise} ({t.zone}) -> {t.site} [score={t.score}]")
-                    if status == "FOUND":
-                        print(f"    ✅ FOUND {email} (source: {source_url})")
-                    elif status == "FORM_ONLY":
-                        print(f"    📨 FORM_ONLY ({len(contact_urls)} url(s) contact/career)")
-                    else:
-                        print(f"    ❌ NOT_FOUND (reason={reason})")
-
-                    if found >= target_found:
-                        print(f"\n🎯 STOP: target-found atteint ({found}/{target_found}).")
+                for fut in as_completed(futures):
+                    if time.time() >= deadline:
+                        print("\n⏱️  STOP: limite de temps atteinte (max-minutes).")
+                        stop_requested = True
                         break
 
-            # Cancel pending futures so the executor can exit quickly (otherwise it waits for all 291)
-            for f in futures:
-                if not f.done():
-                    f.cancel()
-            try:
-                ex.shutdown(cancel_futures=True)
-            except TypeError:
-                pass  # Python < 3.9 has no cancel_futures
+                    t, email, source_url, contact_urls, reason = fut.result()
+
+                    with lock:
+                        processed += 1
+                        status = "NOT_FOUND"
+
+                        if reason == "BLOCKED":
+                            blocked += 1
+                        elif reason == "UNSTABLE":
+                            unstable += 1
+
+                        # v6: email propre + même domaine ; option --rh-only : brouillon seulement si email RH
+                        if email and source_url and allowed_source_domain(t.site, source_url):
+                            if not looks_like_fake_email(email):
+                                write_draft = True
+                                if rh_only and not is_hr_email(email):
+                                    status = "FORM_ONLY"
+                                    form_only += 1
+                                    write_draft = False
+                                else:
+                                    status = "FOUND"
+                                    found += 1
+
+                                if write_draft:
+                                    subj, body = build_email_draft(
+                                        company=t.entreprise,
+                                        sender_first_name=sender_first_name,
+                                        sender_last_name=sender_last_name,
+                                        sender_linkedin_url=sender_linkedin_url,
+                                        sender_portfolio_url=sender_portfolio_url,
+                                        custom_subject_template=mail_subject_template,
+                                        custom_body_template=mail_body_template,
+                                        sector=sector,
+                                        specialty=specialty,
+                                    )
+                                    fdraft.write(
+                                        f"{SEP}\n"
+                                        f"Entreprise: {t.entreprise}\n"
+                                        f"Zone: {t.zone}\n"
+                                        f"Ville: {t.ville}\n"
+                                        f"Site: {t.site}\n"
+                                        f"Score: {t.score}\n"
+                                        f"Email: {email}\n"
+                                        f"Source: {source_url}\n"
+                                        f"Sujet: {subj}\n\n"
+                                        f"{body}\n"
+                                    )
+                                    fdraft.flush()
+                            else:
+                                if contact_urls:
+                                    status = "FORM_ONLY"
+                                    form_only += 1
+                                else:
+                                    status = "NOT_FOUND"
+
+                        elif contact_urls:
+                            status = "FORM_ONLY"
+                            form_only += 1
+
+                        row = {
+                            "entreprise": t.entreprise,
+                            "zone": t.zone,
+                            "ville": t.ville,
+                            "site": t.site,
+                            "score": str(t.score),
+                            "status": status,
+                            "email": email or "",
+                            "source_url": source_url or "",
+                            "contact_urls": " | ".join(contact_urls) if contact_urls else "",
+                            "reason": reason,
+                        }
+                        writer.writerow(row)
+                        fcsv.flush()
+                        done_sites.add(t.site)
+
+                        print(f"\n[+] {t.entreprise} ({t.zone}) -> {t.site} [score={t.score}]")
+                        if status == "FOUND":
+                            print(f"    ✅ FOUND {email} (source: {source_url})")
+                        elif status == "FORM_ONLY":
+                            print(f"    📨 FORM_ONLY ({len(contact_urls)} url(s) contact/career)")
+                        else:
+                            print(f"    ❌ NOT_FOUND (reason={reason})")
+
+                        if found >= target_found:
+                            print(f"\n🎯 STOP: target-found atteint ({found}/{target_found}).")
+                            stop_requested = True
+                            break
+
+                if stop_requested:
+                    for f in futures:
+                        if not f.done():
+                            f.cancel()
+                    try:
+                        ex.shutdown(cancel_futures=True)
+                    except TypeError:
+                        pass
+                    break
 
     print("\n===== STATS SESSION =====")
     print(f"Focus:      {focus}")
