@@ -20,6 +20,7 @@ export default function SignupPage() {
       const formData = new FormData(event.currentTarget);
       const email = (formData.get("email") ?? "").toString().trim();
       const password = (formData.get("password") ?? "").toString();
+      const name = email ? email.split("@")[0] ?? "" : "";
 
       if (!email || !password) {
         setError("Merci de renseigner un email et un mot de passe.");
@@ -28,6 +29,7 @@ export default function SignupPage() {
 
       const { error: authError } = await authClient.signUp.email({
         email,
+        name,
         password,
         callbackURL: "/dashboard",
       });
