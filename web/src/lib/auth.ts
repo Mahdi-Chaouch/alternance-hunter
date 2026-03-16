@@ -182,17 +182,6 @@ export const auth = betterAuth({
             accessType: "offline",
             prompt: "consent",
             scope: GOOGLE_GMAIL_SCOPES,
-            allowSignup: async ({ profile }) => {
-              const email =
-                (profile.email_verified && profile.email) || profile.email;
-              const allowed = await isEmailAllowed(email);
-              if (!allowed) {
-                throw new Error(
-                  "Ce compte Google n'est pas autorisé pour le moment. Contactez l'équipe Alternance Hunter.",
-                );
-              }
-              return true;
-            },
           },
         }
       : undefined,
