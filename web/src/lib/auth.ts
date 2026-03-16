@@ -135,18 +135,6 @@ export const auth = betterAuth({
     },
     sendOnSignUp: true,
   },
-  user: {
-    beforeCreate: async ({ data }) => {
-      const email = data.email ?? undefined;
-      const allowed = await isEmailAllowed(email);
-      if (!allowed) {
-        throw new Error(
-          "Cette adresse email n'est pas autorisée pour le moment. Contactez l'équipe Alternance Hunter.",
-        );
-      }
-      return data;
-    },
-  },
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
