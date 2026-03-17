@@ -31,14 +31,14 @@ export default function SignupPage() {
         email,
         name,
         password,
-        callbackURL: "/dashboard",
+        callbackURL: "/verify",
       });
 
       if (authError?.message) {
         setError(authError.message);
       } else {
         setSuccessMessage(
-          "Compte créé avec succès. Redirection vers le dashboard en cours..."
+          "Compte créé avec succès. Va vérifier tes emails pour activer ton compte, puis utilise le code sur la page /verify."
         );
       }
     } catch {
