@@ -67,7 +67,7 @@ export function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    fetchWaitlist();
+    fetchWhitelist();
   }, [fetchWaitlist]);
 
   useEffect(() => {

@@ -137,6 +137,9 @@ export const auth = betterAuth({
         return;
       }
 
+      const verifyCode = token;
+      const manualVerifyUrl = `${BETTER_AUTH_URL}/verify`;
+
       await resendClient.emails.send({
         from: RESEND_FROM_EMAIL,
         to: user.email,
@@ -144,8 +147,18 @@ export const auth = betterAuth({
         html: `
           <p>Bonjour,</p>
           <p>Merci de votre inscription à Alternance Hunter.</p>
-          <p>Cliquez sur le lien ci-dessous pour <strong>activer votre compte</strong>&nbsp;:</p>
-          <p><a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a></p>
+          <p>Tu peux activer ton compte de deux façons&nbsp;:</p>
+          <ol>
+            <li>
+              <strong>En cliquant sur le lien suivant</strong>&nbsp;:<br />
+              <a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>
+            </li>
+            <li>
+              <strong>Ou en copiant ce code</strong> puis en le collant sur la page
+              <a href="${manualVerifyUrl}" target="_blank" rel="noopener noreferrer">${manualVerifyUrl}</a>&nbsp;:<br />
+              <code style="font-size:16px;font-weight:bold;">${verifyCode}</code>
+            </li>
+          </ol>
           <p>Si vous n'êtes pas à l'origine de cette inscription, vous pouvez ignorer cet email.</p>
           <p>À bientôt,<br/>L'équipe Alternance Hunter</p>
         `,
