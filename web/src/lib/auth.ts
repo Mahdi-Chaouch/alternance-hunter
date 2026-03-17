@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { createAuthMiddleware, APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { Resend } from "resend";
 import { Pool } from "pg";
@@ -104,6 +105,23 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
+  },
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/sign-up/email") return;
+
+      const rawEmail = (ctx.body as any)?.email ?? "";
+      const email =
+        typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
+
+      const allowed = await isEmailAllowed(email);
+      if (!allowed) {
+        throw new APIError("FORBIDDEN", {
+          message:
+            "Cette adresse email n'est pas autorisée pour le moment. Contactez l'équipe Alternance Hunter.",
+        });
+      }
+    }),
   },
   emailVerification: {
     sendVerificationEmail: async ({ user, url, token }) => {
