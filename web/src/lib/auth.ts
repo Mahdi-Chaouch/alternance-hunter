@@ -58,8 +58,12 @@ function isEmailWhitelisted(email: string | null | undefined): boolean {
 
 async function isEmailAllowed(email: string | null | undefined): Promise<boolean> {
   if (!AUTH_WHITELIST_ENABLED) return true;
-  if (isEmailWhitelisted(email)) return true;
-  return isInvitedEmail(email);
+
+  // Priorité à la table "invited_emails" (panel admin)
+  if (await isInvitedEmail(email)) return true;
+
+  // Puis aux listes d'emails / domaines configurées via les variables d'environnement
+  return isEmailWhitelisted(email);
 }
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim();
