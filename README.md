@@ -42,6 +42,7 @@ Variables principales:
 - `OPENAI_API_KEY`: requis uniquement si `--use-ai` est active
 - `PIPELINE_API_BASE_URL`: URL du backend (utile pour tooling local)
 - `AUTH_ALLOWED_EMAILS`: allowlist invite-only des emails autorises sur le dashboard web
+- `FRANCE_TRAVAIL_CLIENT_ID` / `FRANCE_TRAVAIL_CLIENT_SECRET` / `FRANCE_TRAVAIL_SCOPE`: credentials API Offres France Travail
 
 ## Lancement local
 
@@ -69,6 +70,7 @@ Voir `web/README.md` pour le detail.
 
 Guide public/prive: `docs/PUBLIC_PRIVATE_SETUP.md`.
 Decision backend: `docs/BACKEND_HOSTING_DECISION.md`.
+Acces API Offres FT: `docs/FRANCE_TRAVAIL_OFFRES_ACCESS.md`.
 
 ## Securite et publication
 
