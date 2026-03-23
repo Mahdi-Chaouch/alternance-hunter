@@ -42,10 +42,15 @@ export default function RootLayout({
           <AppHeader />
           <div className="app-main">{children}</div>
           <footer className="app-footer">
-            <div className="app-footer-inner">
+            <div className="app-footer-inner" style={{ flexWrap: 'wrap' }}>
               <p className="app-footer-meta">
                 ©️ {new Date().getFullYear()} Alternance Hunter. Tous droits réservés.
               </p>
+              <div style={{ display: 'flex', gap: '1.5rem', opacity: 0.8 }}>
+                <Link href="/mentions-legales" className="app-nav-link" style={{ fontSize: '0.85rem' }}>Mentions Légales</Link>
+                <Link href="/cgu" className="app-nav-link" style={{ fontSize: '0.85rem' }}>CGU</Link>
+                <Link href="/confidentialite" className="app-nav-link" style={{ fontSize: '0.85rem' }}>Confidentialité</Link>
+              </div>
             </div>
           </footer>
           <FloatingActions />
