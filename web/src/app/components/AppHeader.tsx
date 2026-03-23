@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
@@ -99,9 +100,14 @@ export function AppHeader() {
       <div className="app-header-inner">
         <div className="app-brand">
           <Link href="/" className="app-brand-link" onClick={closeMenu}>
-            <span className="app-brand-mark" aria-hidden="true">
-              AH
-            </span>
+            <Image
+              src="/logo.png"
+              alt="Alternance Hunter"
+              className="app-brand-logo"
+              width={36}
+              height={36}
+              priority
+            />
             <span className="app-brand-text">Alternance Hunter</span>
           </Link>
         </div>

@@ -19,6 +19,10 @@ export const metadata: Metadata = {
   title: "Alternance Hunter",
   description:
     "Automatisez vos candidatures d'alternance avec un pipeline Gmail suivi par un dashboard temps reel.",
+  icons: {
+    icon: [{ url: "/logo.png", type: "image/png" }],
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

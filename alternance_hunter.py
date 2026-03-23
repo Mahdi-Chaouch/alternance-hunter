@@ -15,6 +15,11 @@ Améliorations v6:
 - Option --rh-only : n'écrit un brouillon que si un email RH est trouvé (sinon FORM_ONLY)
 - BAD_LOCAL: newsletter, unsubscribe, bounce, mailer-daemon
 
+Améliorations v7 (efficacité):
+- Fetch des liens carrière/contact découverts sur la page (même site, hors ATS) avant les chemins fixes
+- FAST_PATHS réordonnés (RH avant contact / légal) + dédoublonnage des GET
+- Pool HTTP élargi par thread ; lots plus grands dans run_email_finder pour mieux saturer les workers
+
 Exemples:
   python3 alternance_hunter.py
   python3 alternance_hunter.py --max-minutes 30 --max-sites 1500 --workers 20 --target-found 120 --insecure
@@ -37,6 +42,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse, urljoin
 
 import requests
+from requests.adapters import HTTPAdapter
 from bs4 import BeautifulSoup
 
 
@@ -92,12 +98,20 @@ MAX_BYTES = 900_000  # limite de taille page (évite de télécharger 20MB)
 SLEEP_BETWEEN_REQUESTS_SEC = 0.0  # si tu veux ralentir un peu : 0.05
 CHUNK_SIZE_HTTP = 65536  # lecture HTTP par blocs (64k = moins d’appels système)
 
-# Session HTTP par thread pour réutiliser les connexions TCP (plus rapide).
+# Session HTTP par thread : pool élargi pour beaucoup de domaines / redirections (meilleure réutilisation TCP).
 _thread_local = threading.local()
+_HTTP_POOL_SIZE = 32
 
 def _get_web_session() -> requests.Session:
     if not getattr(_thread_local, "session", None):
         s = requests.Session()
+        adapter = HTTPAdapter(
+            pool_connections=_HTTP_POOL_SIZE,
+            pool_maxsize=_HTTP_POOL_SIZE,
+            max_retries=0,
+        )
+        s.mount("http://", adapter)
+        s.mount("https://", adapter)
         s.headers.update(HEADERS_WEB)
         s.verify = not INSECURE_SSL
         _thread_local.session = s
@@ -433,12 +447,21 @@ SUPPORT_LIKE_PREFIXES = ("support", "help", "service", "admin", "newsletter", "m
 
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 
+# Ordre : pages carrière / RH d’abord (souvent recrut@), contact ensuite, légales en dernier (moins de requêtes inutiles).
 FAST_PATHS = [
-    "/", "/contact", "/contact/", "/nous-contacter", "/nous-contacter/",
-    "/recrutement", "/recrutement/", "/carriere", "/carriere/", "/carrieres", "/carrieres/",
-    "/careers", "/careers/", "/jobs", "/jobs/", "/alternance", "/alternance/",
-    "/stages", "/stages/", "/mentions-legales", "/mentions-legales/",
+    "/",
+    "/recrutement", "/recrutement/",
+    "/carrieres", "/carrieres/", "/carriere", "/carriere/",
+    "/careers", "/careers/", "/jobs", "/jobs/",
+    "/alternance", "/alternance/", "/stages", "/stages/",
+    "/postuler", "/candidatures", "/candidature",
+    "/join-us", "/join", "/nous-rejoindre", "/equipe", "/team",
+    "/contact", "/contact/", "/nous-contacter", "/nous-contacter/",
+    "/mentions-legales", "/mentions-legales/",
 ]
+
+# Liens découverts sur la page d’accueil : combien en suivre au max avant les chemins fixes (évite le plafond FAST_PATHS seul).
+MAX_DISCOVERED_URL_FETCH = 10
 
 ATS_HINTS = (
     "teamtailor", "lever.co", "greenhouse.io", "smartrecruiters", "workable",
@@ -903,6 +926,59 @@ def allowed_source_domain(site: str, source_url: str) -> bool:
         return False
     return (udom == sdom) or udom.endswith("." + sdom)
 
+
+def _canonical_fetch_key(url: str) -> str:
+    """Clé stable pour dédoublonner les GET (slash, fragment, www)."""
+    try:
+        p = urlparse(url)
+        scheme = (p.scheme or "https").lower()
+        netloc = (p.netloc or "").lower()
+        if netloc.startswith("www."):
+            netloc = netloc[4:]
+        path = p.path or "/"
+        if len(path) > 1 and path.endswith("/"):
+            path = path.rstrip("/")
+        return f"{scheme}://{netloc}{path}"
+    except Exception:
+        return (url or "").split("#")[0].strip().lower()
+
+
+def _discovered_url_fetch_priority(u: str) -> int:
+    """Plus le score est élevé, plus on fetch tôt (carrière avant légal)."""
+    low = u.lower()
+    for kw in (
+        "mentions-legales", "legal", "privacy", "cookies", "rgpd",
+        "politique-de-confidentialite", "politique-confidentialite",
+    ):
+        if kw in low:
+            return 0
+    for kw in (
+        "recrut", "career", "carriere", "job", "alternance", "stage",
+        "postuler", "candidature", "talent", "hiring", "join", "offre",
+    ):
+        if kw in low:
+            return 100
+    for kw in ("contact", "nous-contacter", "contactez", "about", "equipe", "team"):
+        if kw in low:
+            return 50
+    return 25
+
+
+def sort_discovered_urls_for_fetch(site: str, urls: List[str]) -> List[str]:
+    """Même site que l’entreprise, hors ATS ; tri par pertinence recrutement puis ordre d’apparition."""
+    seen: Set[str] = set()
+    scored: List[Tuple[int, int, str]] = []
+    for i, u in enumerate(urls):
+        if not u or not allowed_source_domain(site, u):
+            continue
+        key = _canonical_fetch_key(u)
+        if key in seen:
+            continue
+        seen.add(key)
+        scored.append((-_discovered_url_fetch_priority(u), i, u))
+    scored.sort()
+    return [t[2] for t in scored]
+
 def deobfuscate_text(s: str) -> str:
     s = s.replace("[at]", "@").replace("(at)", "@").replace(" at ", "@")
     s = s.replace("[dot]", ".").replace("(dot)", ".").replace(" dot ", ".")
@@ -1197,7 +1273,16 @@ def try_urls_for_site(site: str, enable_sitemap: bool = False) -> Tuple[Optional
     Retourne: (email, source_url, contact_urls, reason)
     reason: FOUND | NOT_FOUND | BLOCKED | UNSTABLE
     """
+    fetched: Set[str] = set()
+
+    def mark_fetched(u: str) -> None:
+        fetched.add(_canonical_fetch_key(u))
+
+    def was_fetched(u: str) -> bool:
+        return _canonical_fetch_key(u) in fetched
+
     html0, st0 = fetch_html(site)
+    mark_fetched(site)
     if st0 in (403, 429):
         return None, None, [], "BLOCKED"
     if html0 is None:
@@ -1210,9 +1295,31 @@ def try_urls_for_site(site: str, enable_sitemap: bool = False) -> Tuple[Optional
     if best:
         return best, site, contact_urls[:20], "FOUND"
 
-    # fast paths
+    # Liens réels du site (carrière, contact…) — avant les chemins fixes : souvent moins de requêtes, meilleure cible RH.
+    for u in sort_discovered_urls_for_fetch(site, contact_urls)[:MAX_DISCOVERED_URL_FETCH]:
+        if was_fetched(u):
+            continue
+        mark_fetched(u)
+        html, st = fetch_html(u)
+        if st in (403, 429):
+            continue
+        if not html:
+            continue
+        more = find_contact_like_urls(html, u)
+        for x in more:
+            if x not in contact_urls:
+                contact_urls.append(x)
+        emails = extract_mailtos_from_html(html) + extract_emails_from_text(html)
+        best = pick_best_email(emails)
+        if best:
+            return best, u, contact_urls[:25], "FOUND"
+
+    # Chemins usuels (sans refaire une URL déjà téléchargée)
     for p in FAST_PATHS[1:]:
         url = urljoin(site, p)
+        if was_fetched(url):
+            continue
+        mark_fetched(url)
         html, st = fetch_html(url)
         if st in (403, 429):
             continue
@@ -1220,9 +1327,9 @@ def try_urls_for_site(site: str, enable_sitemap: bool = False) -> Tuple[Optional
             continue
 
         more = find_contact_like_urls(html, url)
-        for u in more:
-            if u not in contact_urls:
-                contact_urls.append(u)
+        for x in more:
+            if x not in contact_urls:
+                contact_urls.append(x)
 
         emails = extract_mailtos_from_html(html) + extract_emails_from_text(html)
         best = pick_best_email(emails)
@@ -1244,6 +1351,11 @@ def try_urls_for_site(site: str, enable_sitemap: bool = False) -> Tuple[Optional
                 if len(urls) >= 20:
                     break
             for u in urls:
+                if not allowed_source_domain(site, u):
+                    continue
+                if was_fetched(u):
+                    continue
+                mark_fetched(u)
                 html, st = fetch_html(u)
                 if not html:
                     continue
@@ -1324,7 +1436,7 @@ def run_email_finder(
         return t, email, source_url, contact_urls, reason
 
     # Submit in batches so that when we hit target_found we only wait for this batch, not all targets
-    batch_size = max(workers, 20)
+    batch_size = max(workers * 2, 40)
 
     with open(emails_found_csv, "a", newline="", encoding="utf-8") as fcsv, \
          open(drafts_txt, "a", encoding="utf-8") as fdraft:

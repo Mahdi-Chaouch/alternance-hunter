@@ -304,7 +304,16 @@ candidature_store.init_candidature_store(PROJECT_ROOT / "data" / "runs.db")
 # Job queue + workers for asynchronous run execution
 RUN_QUEUE: "queue.Queue[Optional[str]]" = queue.Queue()
 RUN_QUEUE_SENTINEL: Optional[str] = None  # None = stop worker
-NUM_WORKERS = max(1, int(os.getenv("RUN_WORKER_COUNT", "2")))
+def _default_api_run_workers() -> int:
+    """Plusieurs runs en file : défaut lié au CPU, plafonné pour éviter la surcharge."""
+    try:
+        cpu = os.cpu_count() or 2
+        return max(2, min(6, max(1, cpu // 2)))
+    except Exception:
+        return 2
+
+
+NUM_WORKERS = max(1, min(8, int(os.getenv("RUN_WORKER_COUNT", str(_default_api_run_workers())))))
 _worker_threads: List[threading.Thread] = []
 
 
