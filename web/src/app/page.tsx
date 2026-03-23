@@ -1,230 +1,178 @@
 import Link from "next/link";
 import { GoogleLogo } from "@/app/components/GoogleLogo";
-import styles from "./page.module.css";
+import styles from "./landing.module.css";
 
 export default function Home() {
   return (
     <div className={styles.page}>
       <main className={styles.main}>
+        {/* HERO SECTION */}
         <section className={styles.hero}>
-          <div className={styles.heroContent}>
-            <p className={styles.eyebrow}>Alternance Hunter</p>
-            <h1 className={styles.heroTitle}>
-              Automatise tes candidatures d&apos;alternance, garde le contrôle.
-            </h1>
-            <p className={styles.heroSubtitle}>
-              Prépare ton profil, importe tes documents, configure ton ciblage et laisse le
-              pipeline générer et suivre tes candidatures dans Gmail avec des logs détaillés.
-            </p>
-            <div className={styles.heroActions}>
-              <Link href="/dashboard" className={styles.primaryBtn}>
-                📊 Ouvrir le dashboard
-              </Link>
-              <Link href="/dashboard?demo=1" className={styles.secondaryBtn}>
-                👀 Voir le dashboard en démo
-              </Link>
-              <Link href="/login" className={styles.secondaryBtn}>
-                <GoogleLogo size={18} />
-                Se connecter avec Google
-              </Link>
-              <Link
-                href="https://github.com/Mahdi-Chaouch/alternance-killer"
-                target="_blank"
-                rel="noreferrer noopener"
-                className={styles.ghostLink}
-              >
-                📦 Voir le code sur GitHub
-              </Link>
-            </div>
-            <p className={styles.heroMeta}>
-              Pensé pour les étudiants dev qui veulent industrialiser leurs candidatures, sans
-              perdre la personnalisation.
-            </p>
+          <div className={styles.heroBackground} />
+          <div className={styles.eyebrow}>SaaS Orienté Développeurs</div>
+          <h1 className={styles.heroTitle}>
+            Automatisez vos candidatures, <br />
+            <span className={styles.textGradient}>gardez le contrôle absolu.</span>
+          </h1>
+          <p className={styles.heroSubtitle}>
+            Générez des dizaines de brouillons ciblés directement dans votre boîte Gmail. 
+            Vous gardez la main sur le cliquage final. Zéro spam, 100% de pertinence.
+          </p>
+          <div className={styles.heroActions}>
+            <Link href="/dashboard" className={styles.primaryBtn}>
+              🚀 Commencer gratuitement
+            </Link>
+            <Link href="/login" className={styles.secondaryBtn}>
+              <GoogleLogo size={20} />
+              Continuer avec Google
+            </Link>
           </div>
         </section>
 
-        <section className={styles.section}>
+        {/* FEATURES SECTION */}
+        <section className={styles.section} id="features">
           <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>✨ Ce que fait l&apos;app</h2>
+            <h2 className={styles.sectionTitle}>Conçu pour l'efficacité</h2>
             <p className={styles.sectionLead}>
-              Alternance Hunter automatise la partie répétitive de tes candidatures tout en gardant
-              un contrôle fin sur le contenu envoyé.
+              Fini les copier-coller interminables. Industrialisez votre recherche d'alternance.
             </p>
           </div>
           <div className={styles.benefitsGrid}>
             <article className={styles.card}>
-              <h3 className={styles.cardTitle}>⏱️ Gagne un temps précieux</h3>
+              <div className={styles.cardIcon}>⚡</div>
+              <h3 className={styles.cardTitle}>Gagnez un temps précieux</h3>
               <p className={styles.cardText}>
-                Centralise ton profil, ton CV, ta lettre et ton template d&apos;email pour lancer
-                des dizaines de brouillons Gmail en quelques minutes.
+                Centralisez votre profil et votre CV une seule fois. Lancez un run et obtenez 
+                des dizaines de brouillons en quelques secondes.
               </p>
             </article>
             <article className={styles.card}>
-              <h3 className={styles.cardTitle}>🎯 Personnalisation maîtrisée</h3>
+              <div className={styles.cardIcon}>🎯</div>
+              <h3 className={styles.cardTitle}>Personnalisation absolue</h3>
               <p className={styles.cardText}>
-                Ajoute des variables dynamiques et des filtres de ciblage pour adapter tes messages
-                à chaque entreprise ou offre.
+                Variables dynamiques et ciblage intelligent. Chaque recruteur aura l'impression 
+                que l'email n'a été rédigé que pour lui.
               </p>
             </article>
             <article className={styles.card}>
-              <h3 className={styles.cardTitle}>📋 Logs & suivi détaillés</h3>
+              <div className={styles.cardIcon}>🛡️</div>
+              <h3 className={styles.cardTitle}>Contrôle Anti-Spam (Brouillons)</h3>
               <p className={styles.cardText}>
-                Suis chaque exécution dans un dashboard dédié, avec un terminal temps réel pour
-                comprendre exactement ce qui se passe.
+                Notre philosophie : nous générons les brouillons, vous validez. Aucun email 
+                ne part sans votre approbation finale sur Gmail.
               </p>
             </article>
           </div>
         </section>
 
-        <section className={styles.section} id="comment-ca-marche">
+        {/* HOW IT WORKS */}
+        <section className={styles.section} id="how-it-works">
           <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>🚀 Comment ça marche ?</h2>
-            <p className={styles.sectionLead}>
-              Un flux clair en 5 étapes, de la connexion Gmail au suivi des logs.
-            </p>
+            <h2 className={styles.sectionTitle}>Comment ça marche ?</h2>
           </div>
-          <ol className={styles.stepsList}>
-            <li className={styles.stepItem}>
-              <span className={styles.stepBadge}>1</span>
+          <div className={styles.stepsList}>
+            <div className={styles.stepItem}>
+              <div className={styles.stepBadge}>1</div>
               <div>
-                <h3 className={styles.stepTitle}>📧 Connecte ton compte Gmail</h3>
-                <p className={styles.stepText}>
-                  Authentifie-toi via Google pour permettre à l&apos;app de créer des brouillons
-                  d&apos;emails dans ta boîte, sans envoyer automatiquement.
-                </p>
+                <h3 className={styles.stepTitle}>Connectez votre compte</h3>
+                <p className={styles.stepText}>Connexion sécurisée via l'API officielle Gmail pour créer des brouillons.</p>
               </div>
-            </li>
-            <li className={styles.stepItem}>
-              <span className={styles.stepBadge}>2</span>
+            </div>
+            <div className={styles.stepItem}>
+              <div className={styles.stepBadge}>2</div>
               <div>
-                <h3 className={styles.stepTitle}>📁 Upload tes documents</h3>
-                <p className={styles.stepText}>
-                  Uploade ton CV, ta lettre de motivation et ton template d&apos;email pour les
-                  réutiliser sur tous tes runs.
-                </p>
+                <h3 className={styles.stepTitle}>Importez vos documents</h3>
+                <p className={styles.stepText}>Uploadez votre CV en PDF et rédigez votre template d'email avec des variables dynamiques.</p>
               </div>
-            </li>
-            <li className={styles.stepItem}>
-              <span className={styles.stepBadge}>3</span>
+            </div>
+            <div className={styles.stepItem}>
+              <div className={styles.stepBadge}>3</div>
               <div>
-                <h3 className={styles.stepTitle}>⚙️ Configure ton ciblage</h3>
-                <p className={styles.stepText}>
-                  Choisis ton mode (dry-run ou réel), tes mots-clés, la zone géographique et les
-                  limites pour éviter le spam.
-                </p>
+                <h3 className={styles.stepTitle}>Lancez le bot</h3>
+                <p className={styles.stepText}>Les brouillons sont instantanément créés dans votre boîte mail.</p>
               </div>
-            </li>
-            <li className={styles.stepItem}>
-              <span className={styles.stepBadge}>4</span>
-              <div>
-                <h3 className={styles.stepTitle}>▶️ Lance un run</h3>
-                <p className={styles.stepText}>
-                  Le pipeline génère les emails, crée les brouillons Gmail et enregistre chaque
-                  étape dans la base.
-                </p>
-              </div>
-            </li>
-            <li className={styles.stepItem}>
-              <span className={styles.stepBadge}>5</span>
-              <div>
-                <h3 className={styles.stepTitle}>✉️ Relis, personnalise, envoie</h3>
-                <p className={styles.stepText}>
-                  Tu gardes la main sur l&apos;envoi final depuis Gmail, avec tous les brouillons
-                  prêts et les logs à portée de main.
-                </p>
-              </div>
-            </li>
-          </ol>
-        </section>
-
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>🛠️ Stack technique</h2>
-            <p className={styles.sectionLead}>
-              Une stack moderne, orientée développeurs, pensée pour être lisible et extensible.
-            </p>
-          </div>
-          <div className={styles.techGrid}>
-            <article className={styles.techCard}>
-              <h3 className={styles.cardTitle}>🐍 Python & Gmail API</h3>
-              <p className={styles.cardText}>
-                Un backend Python qui orchestre la génération des emails et la création de
-                brouillons via l&apos;API Gmail officielle.
-              </p>
-            </article>
-            <article className={styles.techCard}>
-              <h3 className={styles.cardTitle}>⚛️ Next.js & React</h3>
-              <p className={styles.cardText}>
-                Une interface en Next.js App Router, typée et structurée comme un vrai produit SaaS
-                moderne.
-              </p>
-            </article>
-            <article className={styles.techCard}>
-              <h3 className={styles.cardTitle}>📊 Logs & observabilité</h3>
-              <p className={styles.cardText}>
-                Stockage structuré des exécutions, terminal temps réel et logs détaillés pour
-                comprendre chaque run.
-              </p>
-            </article>
+            </div>
           </div>
         </section>
 
-        <section className={styles.section}>
+        {/* PRICING */}
+        <section className={styles.section} id="pricing">
           <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>👋 À propos & contact</h2>
-            <p className={styles.sectionLead}>
-              Alternance Hunter est un projet personnel de Mahdi, pensé comme un vrai outil produit
-              pour valoriser son profil de développeur.
-            </p>
+            <h2 className={styles.sectionTitle}>Tarification simple</h2>
+            <p className={styles.sectionLead}>L'outil est actuellement un projet personnel. Profitez-en !</p>
           </div>
-          <div className={styles.aboutLayout}>
+          <div className={`${styles.card} ${styles.pricingCard}`}>
+            <span className={styles.pricingBadge}>Beta Accès Libre</span>
+            <h3 className={styles.cardTitle}>Plan Étudiant</h3>
+            <div className={styles.pricingPrice}>
+              <span className={styles.pricingCurrency}>0€</span>
+              <span className={styles.pricingPeriod}>/ mois</span>
+            </div>
+            <ul className={styles.pricingFeatures}>
+              <li className={styles.pricingFeature}><span className={styles.pricingCheck}>✔</span> Accès complet au dashboard</li>
+              <li className={styles.pricingFeature}><span className={styles.pricingCheck}>✔</span> Stockage CV & Templates</li>
+              <li className={styles.pricingFeature}><span className={styles.pricingCheck}>✔</span> Création de brouillons illimitée (limite Google)</li>
+              <li className={styles.pricingFeature}><span className={styles.pricingCheck}>✔</span> Live logs & Terminal</li>
+            </ul>
+            <Link href="/dashboard" className={styles.primaryBtn} style={{ width: '100%' }}>
+              Commencer gratuitement
+            </Link>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section className={styles.section} id="faq">
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Questions Fréquentes</h2>
+          </div>
+          <div className={styles.faqList}>
+            <details className={styles.faqItem}>
+              <summary className={styles.faqSummary}>Est-ce que l'application envoie les emails toute seule ?</summary>
+              <div className={styles.faqContent}>
+                Non. Alternance Hunter ne fait que <b>créer des brouillons</b> dans votre boîte Gmail. 
+                C'est une volonté stricte de notre part pour vous garantir de ne jamais spammer d'entreprises par erreur et de relire avant d'appuyer sur "Envoyer".
+              </div>
+            </details>
+            <details className={styles.faqItem}>
+              <summary className={styles.faqSummary}>Mes données et mon mot de passe sont-ils en sécurité ?</summary>
+              <div className={styles.faqContent}>
+                Totalement. Nous ne stockons ni ne voyons jamais votre mot de passe Gmail. Nous utilisons le système d'authentification officiel de Google (OAuth2). 
+                L'accès est restreint techniquement à la seule création de brouillons.
+              </div>
+            </details>
+            <details className={styles.faqItem}>
+              <summary className={styles.faqSummary}>Est-ce vraiment gratuit ?</summary>
+              <div className={styles.faqContent}>
+                Dans sa version actuelle en beta, oui. C'est un outil créé par un étudiant en recherche d'alternance, pour d'autres personnes dans le besoin. L'hébergement est payé par le créateur.
+              </div>
+            </details>
+          </div>
+        </section>
+
+        {/* ABOUT & CONTACT */}
+        <section className={styles.section} id="about">
+          <div className={`${styles.card} ${styles.aboutLayout}`}>
             <div>
-              <p className={styles.aboutText}>
-                Développeur orienté produit, j&apos;ai construit cet outil pour automatiser mes
-                propres candidatures d&apos;alternance, tout en gardant un contrôle total sur ce
-                qui part à chaque entreprise.
+              <h2 className={styles.cardTitle}>Le Projet & Développeur</h2>
+              <p className={styles.cardText} style={{ marginBottom: '1rem' }}>
+                Alternance Hunter est développé par <strong>Mahdi Chaouch</strong>. C'est une solution 
+                née d'un besoin réel lors de ma recherche d'alternance.
               </p>
-              <p className={styles.aboutText}>
-                Le projet met en avant ma capacité à concevoir un pipeline complet : ingestion de
-                données, orchestration, intégration API et interface utilisateur orientée
-                développeurs.
+              <p className={styles.cardText}>
+                L'infrastructure robuste s'appuie sur Vercel pour le frontend React/Next.js et Render 
+                pour l'orchestration backend, garantissant fluidité et fiabilité à chaque "Run".
               </p>
             </div>
-            <div className={styles.contactLinks}>
-              <p className={styles.contactTitle}>📬 Me contacter</p>
-              <ul>
-                <li>
-                  <a href="mailto:mahdi@example.com" className={styles.contactLink}>
-                    Email
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://www.linkedin.com"
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className={styles.contactLink}
-                  >
-                    LinkedIn
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/Mahdi-Chaouch/alternance-killer"
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className={styles.contactLink}
-                  >
-                    GitHub
-                  </a>
-                </li>
+            <div>
+              <ul className={styles.contactLinks}>
+                <li><a href="mailto:mahdi@example.com" className={styles.contactLink}>✉️ Envoyer un email</a></li>
+                <li><a href="https://linkedin.com" className={styles.contactLink}>💼 Profil LinkedIn</a></li>
+                <li><a href="https://github.com/Mahdi-Chaouch/alternance-killer" className={styles.contactLink}>📦 Code Source (GitHub)</a></li>
               </ul>
-              <Link href="/dashboard" className={styles.primaryBtn}>
-                📊 Essayer le dashboard
-              </Link>
             </div>
           </div>
         </section>
+
       </main>
     </div>
   );
