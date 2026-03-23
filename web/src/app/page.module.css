@@ -1955,3 +1955,73 @@
   border-color: rgba(51, 65, 85, 0.8);
   color: #f8fafc;
 }
+
+/* Sharper dashboard radii */
+:global(body) .page {
+  --radius-surface: 16px;
+  --radius-soft: 12px;
+  --radius-input: 10px;
+}
+
+.hero,
+.headerCard,
+.section,
+.card,
+.techCard,
+.contactLinks,
+.panel,
+.stepCard,
+.progressSteps,
+.tableWrap,
+.terminalFullscreen {
+  border-radius: var(--radius-surface);
+}
+
+.uploadCard,
+.profileCard,
+.switchGroup,
+.openaiKeyBlock,
+.gmailStatusCard,
+.candidatureEmptyBlock,
+.info,
+.error,
+.dropZone {
+  border-radius: 14px;
+}
+
+.primaryBtn,
+.secondaryBtn,
+.dangerBtn,
+.stepNav,
+.stepNavItem,
+.stepNavNumber,
+.zoneFieldInput,
+.zoneSuggestions,
+.zoneSuggestionItem,
+.zoneChipItem,
+.zoneChipRemove,
+.zoneValidBadge,
+.profileCard input,
+.profileCard textarea,
+.form input,
+.form select,
+.openaiKeyInput,
+.progressStepBadge,
+.progressBarTrack,
+.progressBarFill,
+.candidaturePill,
+.candidaturePillActive,
+.candidatureSyncMessage,
+.candidatureSyncError,
+.candidatureStatusSelect,
+.logs,
+.terminalShell {
+  border-radius: var(--radius-soft);
+}
+
+.openaiKeyInput,
+.form input,
+.form select,
+.zoneFieldInput {
+  border-radius: var(--radius-input);
+}
