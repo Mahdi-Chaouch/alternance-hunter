@@ -14,8 +14,12 @@ export const metadata: Metadata = {
   description:
     "Automatisez vos candidatures d'alternance avec un pipeline Gmail suivi par un dashboard temps reel.",
   icons: {
-    icon: [{ url: "/logo.png", type: "image/png" }],
+    icon: [
+      { url: "/favicon.ico", type: "image/x-icon", sizes: "any" },
+      { url: "/logo.png", type: "image/png", sizes: "192x192" },
+    ],
     apple: "/logo.png",
+    shortcut: "/favicon.ico",
   },
 };
 

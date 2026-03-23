@@ -1,7 +1,8 @@
 from PIL import Image
 import sys
+import os
 
-def make_transparent(input_path, output_path, tolerance=10):
+def make_transparent(input_path, output_path, tolerance=15):
     img = Image.open(input_path).convert("RGBA")
     data = img.getdata()
 
@@ -23,4 +24,17 @@ def make_transparent(input_path, output_path, tolerance=10):
     print(f"Saved transparent image to {output_path}")
 
 if __name__ == "__main__":
-    make_transparent("logo.png", "logo_transparent.png")
+    input_file = sys.argv[1] if len(sys.argv) > 1 else "logo_new.png"
+    make_transparent(input_file, "logo.png", tolerance=20)
+    
+    # Also create a favicon.ico version
+    img = Image.open("logo.png").convert("RGBA")
+    # For favicon, resize to 32x32
+    favicon = img.resize((32, 32), Image.LANCZOS)
+    favicon.save("favicon.ico", format="ICO", sizes=[(32, 32)])
+    print("favicon.ico created!")
+    
+    # Also create a 192x192 for apple icon
+    apple = img.resize((192, 192), Image.LANCZOS)
+    apple.save("logo.png", "PNG")
+    print("logo.png updated to 192x192!")
