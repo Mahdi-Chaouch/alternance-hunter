@@ -38,7 +38,7 @@ export default function SignupPage() {
         setError(authError.message);
       } else {
         setSuccessMessage(
-          "Compte créé avec succès. Va vérifier tes emails pour activer ton compte, puis utilise le code sur la page /verify."
+          "Compte créé avec succès. Tu peux maintenant vérifier ton compte avec le code reçu par email."
         );
       }
     } catch {
@@ -119,7 +119,14 @@ export default function SignupPage() {
             </p>
           ) : null}
           {successMessage ? (
-            <p className={styles.cardHint}>{successMessage}</p>
+            <div className={styles.cardHint}>
+              <p>{successMessage}</p>
+              <p>
+                <Link href="/verify" className={styles.formLink}>
+                  Vérifier mon compte
+                </Link>
+              </p>
+            </div>
           ) : (
             <p className={styles.cardHint}>
               Tu as déjà un compte ?{" "}
