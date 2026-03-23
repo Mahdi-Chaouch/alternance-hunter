@@ -1348,7 +1348,12 @@ function DashboardContent() {
                     ? "Connectez-vous pour enregistrer"
                     : isProfileLoading
                       ? "Chargement du profil..."
-                      : "<Save size={16} style={{marginRight: '0.4rem'}} /> Enregistrer mon profil"}
+                      : (
+                        <>
+                          <Save size={16} style={{ marginRight: "0.4rem" }} />
+                          Enregistrer mon profil
+                        </>
+                      )}
               </button>
               {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
             </div>
