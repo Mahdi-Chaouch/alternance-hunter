@@ -6,6 +6,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import styles from "../page.module.css";
 import { authClient } from "@/lib/auth-client";
 import { GoogleLogo } from "@/app/components/GoogleLogo";
+import { 
+  LayoutDashboard, User, FolderOpen, Settings, Terminal as TerminalIcon, 
+  Save, LogOut, MapPin, Search, FileText, Mail, Play, Square, X, RefreshCw
+} from "lucide-react";
+
 import { COMMUNES_FRANCE } from "@/data/communes-france";
 import {
   SECTOR_LABELS,
@@ -149,9 +154,9 @@ function getPipelineStepsFromLogs(logsTail: string[], runStatus: string): Pipeli
   const text = logsTail.join("\n");
   const normalizedStatus = runStatus.toLowerCase();
   const steps: PipelineStep[] = [
-    { id: "hunter", label: "Recherche d'entreprises", status: "pending", icon: "🔍" },
-    { id: "generate", label: "Génération des lettres de motivation", status: "pending", icon: "📄" },
-    { id: "drafts", label: "Création des brouillons Gmail", status: "pending", icon: "✉️" },
+    { id: "hunter", label: "Recherche d'entreprises", status: "pending", icon: "Search" },
+    { id: "generate", label: "Génération des lettres de motivation", status: "pending", icon: "FileText" },
+    { id: "drafts", label: "Création des brouillons Gmail", status: "pending", icon: "Mail" },
   ];
   const hunterStarted = /ETAPE:\s*hunter/i.test(text);
   const generateStarted = /ETAPE:\s*generate/i.test(text);
@@ -653,7 +658,7 @@ function DashboardContent() {
         ? "Template LM requis (déposez un fichier ci-dessus)"
         : cvRequired && !cvUploaded
           ? "CV obligatoire (déposez votre CV ci-dessus)"
-          : "▶️ Lancer la recherche";
+          : "<Play size={16} style={{marginRight: '0.4rem'}} /> Lancer la recherche";
   const demoLaunchDisabled = showDemoBanner || launchDisabled;
   const demoLaunchLabel = showDemoBanner ? "Connectez-vous pour lancer une recherche" : launchButtonLabel;
 
@@ -1175,7 +1180,7 @@ function DashboardContent() {
         ) : null}
         <header className={styles.headerCard}>
           <div>
-            <p className={styles.eyebrow}>📊 Tableau de bord</p>
+            <p className={styles.eyebrow}><span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><LayoutDashboard size={18} /> Tableau de bord</span></p>
             <h1>Tableau de bord Alternance Hunter</h1>
             <p className={styles.panelHint}>
               Suivez les étapes : profil, documents, paramètres, puis lancez une recherche et suivez l’avancement.
@@ -1192,7 +1197,7 @@ function DashboardContent() {
             {!showDemoBanner ? (
               <>
                 <button className={styles.secondaryBtn} type="button" onClick={onSaveWorkInProgress}>
-                  💾 Enregistrer le travail
+                  <Save size={16} style={{marginRight: '0.4rem'}} /> Enregistrer le travail
                 </button>
                 <button
                   className={styles.secondaryBtn}
@@ -1200,7 +1205,7 @@ function DashboardContent() {
                   onClick={onSignOut}
                   disabled={isSigningOut}
                 >
-                  {isSigningOut ? "Deconnexion..." : "🚪 Se deconnecter"}
+                  {isSigningOut ? "Deconnexion..." : "<LogOut size={16} style={{marginRight: '0.4rem'}} /> Se déconnecter"}
                 </button>
               </>
             ) : (
@@ -1217,19 +1222,19 @@ function DashboardContent() {
             <li>
               <a className={styles.stepNavItem} href="#step-profil">
                 <span className={styles.stepNavNumber}>1</span>
-                <span>👤 Profil expediteur</span>
+                <span><span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><User size={18} /> Profil expediteur</span></span>
               </a>
             </li>
             <li>
               <a className={styles.stepNavItem} href="#step-documents">
                 <span className={styles.stepNavNumber}>2</span>
-                <span>📁 Documents & templates</span>
+                <span><span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><FolderOpen size={18} /> Documents & templates</span></span>
               </a>
             </li>
             <li>
               <a className={styles.stepNavItem} href="#step-config">
                 <span className={styles.stepNavNumber}>3</span>
-                <span>⚙️ Options de recherche</span>
+                <span><span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><Settings size={18} /> Options de recherche</span></span>
               </a>
             </li>
             <li>
@@ -1241,7 +1246,7 @@ function DashboardContent() {
             <li>
               <a className={styles.stepNavItem} href="#step-logs">
                 <span className={styles.stepNavNumber}>5</span>
-                <span>🖥️ Logs & terminal</span>
+                <span><span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><TerminalIcon size={18} /> Logs & terminal</span></span>
               </a>
             </li>
           </ul>
@@ -1249,12 +1254,12 @@ function DashboardContent() {
 
         <div className={styles.topGrid}>
           <section className={styles.panel} id="step-profil">
-            <h2>👤  Profil & personnalisation</h2>
+            <h2><span style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><User size={24} /> Profil & personnalisation</span></h2>
             <p className={styles.sectionHint}>
               Renseignez votre profil et personnalisez vos emails avant de lancer une recherche.
             </p>
             <form id="profile-form" className={styles.profileCard} onSubmit={onSaveProfile}>
-              <p className={styles.uploadTitle}>👤 Profil expediteur</p>
+              <p className={styles.uploadTitle}><span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><User size={18} /> Profil expediteur</span></p>
               <p className={styles.uploadHint}>
                 Premiere connexion: renseignez votre prenom/nom. Vous pouvez personnaliser le sujet et
                 le corps complet du mail avec des placeholders ({`{{ENTREPRISE}}`},{" "}
@@ -1319,7 +1324,7 @@ function DashboardContent() {
               </label>
             </form>
             <form className={styles.uploadCard} onSubmit={onUploadAssets} id="step-documents">
-              <p className={styles.uploadTitle}>📁 Vos documents</p>
+              <p className={styles.uploadTitle}><span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><FolderOpen size={18} /> Vos documents</span></p>
               <p className={styles.uploadHint}>
                 Déposez votre <strong>CV (PDF, obligatoire)</strong> et votre <strong>template de lettre de motivation</strong> (.docx). Sans CV, vous ne pourrez pas lancer de recherche.
                 {cvUploaded || templateUploaded ? " Vos documents sont enregistrés et conservés pour vos prochaines visites. Vous pouvez en déposer de nouveaux pour les remplacer." : ""}
@@ -1351,7 +1356,7 @@ function DashboardContent() {
                   }
                 }}
               >
-                <span className={styles.dropZoneIcon} aria-hidden="true">📁</span>
+                <span className={styles.dropZoneIcon} aria-hidden="true"><FolderOpen size={32} /></span>
                 <span className={styles.dropZoneText}>
                   {cvFile || templateFile
                     ? [cvFile?.name, templateFile?.name].filter(Boolean).join(" • ")
@@ -1374,7 +1379,7 @@ function DashboardContent() {
                     ? "Connectez-vous pour enregistrer"
                     : isProfileLoading
                       ? "Chargement du profil..."
-                      : "💾 Enregistrer mon profil"}
+                      : "<Save size={16} style={{marginRight: '0.4rem'}} /> Enregistrer mon profil"}
               </button>
               {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
             </div>
@@ -1382,7 +1387,7 @@ function DashboardContent() {
               <div className={styles.stepCardHeader}>
                 <div className={styles.stepTitle} id="step-zone">
                   <span className={styles.stepBadge}>3</span>
-                  <span>🗺️ Zone geographique</span>
+                  <span><span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><MapPin size={18} /> Zone geographique</span></span>
                 </div>
               </div>
               <p className={styles.stepDescription}>
@@ -1414,7 +1419,7 @@ function DashboardContent() {
                   <div className={styles.zoneFieldInputGroup}>
                     <div className={styles.zoneFieldInputWrapper}>
                       <span className={styles.zoneFieldIcon} aria-hidden="true">
-                        📍
+                        <MapPin size={18} style={{position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.5}} />
                       </span>
                       <input
                         id="zone-geo-input"
@@ -1515,7 +1520,7 @@ function DashboardContent() {
               <div className={styles.stepCardHeader}>
                 <div className={styles.stepTitle} id="step-config">
                   <span className={styles.stepBadge}>4</span>
-                  <span>⚙️ Options de recherche</span>
+                  <span><span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><Settings size={18} /> Options de recherche</span></span>
                 </div>
               </div>
               <p className={styles.stepDescription}>
