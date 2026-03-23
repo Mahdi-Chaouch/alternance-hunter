@@ -10,12 +10,12 @@
   --secondary-bg: #ffffff;
   --secondary-text: #1f2937;
   --btn-border: #c7d4e6;
-  --primary: #01B2B2;
-  --primary-hover: #009B9B;
+  --primary: #8b5cf6;
+  --primary-hover: #7c3aed;
   --danger: #dc2626;
   --danger-hover: #b91c1c;
   --status-running-bg: #E0F7F7;
-  --status-running-text: #009B9B;
+  --status-running-text: #7c3aed;
   --status-success-bg: #dcfce7;
   --status-success-text: #166534;
   --status-failed-bg: #fee2e2;
@@ -30,9 +30,9 @@
 
 /* Page d'accueil : dark mode quand le thème global est dark */
 :global(:root[data-theme="dark"]) .page {
-  --bg: #030712;
+  --bg: #0f172a;
   --text: #e5e7eb;
-  --panel-bg: #0b1220;
+  --panel-bg: #1e293b;
   --panel-border: #1f2b3d;
   --input-bg: #0b1324;
   --input-border: #30445d;
@@ -41,12 +41,12 @@
   --secondary-bg: #0f172a;
   --secondary-text: #E0F7F7;
   --btn-border: #32475f;
-  --primary: #01B2B2;
-  --primary-hover: #81DC4D;
+  --primary: #8b5cf6;
+  --primary-hover: #d946ef;
   --danger: #ef4444;
   --danger-hover: #f87171;
   --status-running-bg: #003333;
-  --status-running-text: #81DC4D;
+  --status-running-text: #d946ef;
   --status-success-bg: #14532d;
   --status-success-text: #bbf7d0;
   --status-failed-bg: #7f1d1d;
@@ -62,9 +62,9 @@
 }
 
 .pageDark {
-  --bg: #030712;
+  --bg: #0f172a;
   --text: #e5e7eb;
-  --panel-bg: #0b1220;
+  --panel-bg: #1e293b;
   --panel-border: #1f2b3d;
   --input-bg: #0b1324;
   --input-border: #30445d;
@@ -73,12 +73,12 @@
   --secondary-bg: #0f172a;
   --secondary-text: #E0F7F7;
   --btn-border: #32475f;
-  --primary: #01B2B2;
-  --primary-hover: #81DC4D;
+  --primary: #8b5cf6;
+  --primary-hover: #d946ef;
   --danger: #ef4444;
   --danger-hover: #f87171;
   --status-running-bg: #003333;
-  --status-running-text: #81DC4D;
+  --status-running-text: #d946ef;
   --status-success-bg: #14532d;
   --status-success-text: #bbf7d0;
   --status-failed-bg: #7f1d1d;
@@ -95,7 +95,7 @@
 }
 
 .hero {
-  border-radius: 20px;
+  border-radius: 36px;
   padding: 2.5rem 2.2rem;
   background: radial-gradient(circle at top left, #E0F7F7 0, #e5e7eb 32%, #f3f4f6 70%);
   border: 1px solid rgba(148, 163, 184, 0.35);
@@ -145,7 +145,7 @@
   justify-content: space-between;
   gap: 1.25rem;
   align-items: flex-start;
-  border-radius: 18px;
+  border-radius: 36px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: radial-gradient(circle at top left, color-mix(in srgb, var(--panel-bg) 70%, #020617 30%), var(--panel-bg));
   padding: 1.6rem 1.5rem;
@@ -173,7 +173,7 @@
 }
 
 .section {
-  border-radius: 18px;
+  border-radius: 36px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: var(--panel-bg);
   padding: 1.8rem 1.7rem 1.9rem;
@@ -204,7 +204,7 @@
 }
 
 .card {
-  border-radius: 16px;
+  border-radius: 36px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   background: rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(12px);
@@ -270,7 +270,7 @@
 }
 
 .techCard {
-  border-radius: 14px;
+  border-radius: 36px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: color-mix(in srgb, var(--panel-bg) 92%, var(--bg) 8%);
   padding: 1.1rem 1rem 1.15rem;
@@ -291,7 +291,7 @@
 }
 
 .contactLinks {
-  border-radius: 14px;
+  border-radius: 36px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: color-mix(in srgb, var(--panel-bg) 90%, var(--bg) 10%);
   padding: 1rem 1rem 1.1rem;
@@ -345,7 +345,7 @@
 
 .panel {
   border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 20px;
+  border-radius: 36px;
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -355,7 +355,7 @@
 }
 
 .stepNav {
-  border-radius: 14px;
+  border-radius: 36px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: color-mix(in srgb, var(--panel-bg) 92%, var(--bg) 8%);
   padding: 0.85rem 0.9rem;
@@ -437,7 +437,7 @@
 
 .uploadCard {
   border: 1px dashed var(--panel-border);
-  border-radius: 12px;
+  border-radius: 9999px;
   padding: 0.9rem;
   margin-bottom: 1rem;
   display: grid;
@@ -446,7 +446,7 @@
 
 .profileCard {
   border: 1px dashed var(--panel-border);
-  border-radius: 12px;
+  border-radius: 9999px;
   padding: 0.9rem;
   margin-bottom: 1rem;
   display: grid;
@@ -456,10 +456,10 @@
 /* Zone & options cards */
 
 .stepCard {
-  border-radius: 18px;
+  border-radius: 36px;
   padding: 1.35rem 1.4rem;
   background:
-    radial-gradient(circle at top left, rgba(1, 178, 178, 0.08), transparent 55%),
+    radial-gradient(circle at top left, rgba(139, 92, 246, 0.08), transparent 55%),
     radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.06), transparent 55%),
     color-mix(in srgb, var(--panel-bg) 92%, var(--bg) 8%);
   border: 1px solid color-mix(in srgb, var(--panel-border) 80%, #020617 20%);
@@ -490,7 +490,7 @@
   height: 2.1rem;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.65);
-  background: radial-gradient(circle at 20% 0%, rgba(1, 178, 178, 0.6), rgba(15, 23, 42, 0.95));
+  background: radial-gradient(circle at 20% 0%, rgba(139, 92, 246, 0.6), rgba(15, 23, 42, 0.95));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -560,7 +560,7 @@
   padding-left: 2.35rem;
   padding-right: 1rem;
   height: 2.7rem;
-  border-radius: 10px;
+  border-radius: 9999px;
   border: 1px solid var(--input-border);
   background: var(--input-bg);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -578,12 +578,12 @@
 .zoneFieldInput:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(1, 178, 178, 0.18);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
 }
 
 .zoneFieldInputValid {
-  border-color: rgba(1, 178, 178, 0.7);
-  box-shadow: 0 0 0 3px rgba(1, 178, 178, 0.12);
+  border-color: rgba(139, 92, 246, 0.7);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
   animation: zonePulse 550ms ease-out;
 }
 
@@ -596,7 +596,7 @@
   margin: 0;
   padding: 0.35rem;
   list-style: none;
-  border-radius: 10px;
+  border-radius: 9999px;
   background: color-mix(in srgb, var(--panel-bg) 98%, var(--bg) 2%);
   border: 1px solid var(--input-border);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12), 0 4px 6px rgba(0, 0, 0, 0.05);
@@ -610,7 +610,7 @@
   padding: 0.5rem 0.85rem;
   text-align: left;
   border: none;
-  border-radius: 6px;
+  border-radius: 16px;
   background: transparent;
   font-size: 0.9rem;
   color: var(--text);
@@ -636,7 +636,7 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.35rem 0.6rem;
-  border-radius: 8px;
+  border-radius: 9999px;
   background: color-mix(in srgb, var(--primary) 14%, var(--panel-bg));
   border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
   font-size: 0.85rem;
@@ -683,13 +683,13 @@
 @keyframes zonePulse {
   0% {
     box-shadow:
-      0 0 0 0 rgba(1, 178, 178, 0.65),
-      0 0 0 0 rgba(1, 178, 178, 0.1);
+      0 0 0 0 rgba(139, 92, 246, 0.65),
+      0 0 0 0 rgba(139, 92, 246, 0.1);
   }
   100% {
     box-shadow:
-      0 0 0 7px rgba(1, 178, 178, 0),
-      0 0 0 0 rgba(1, 178, 178, 0);
+      0 0 0 7px rgba(139, 92, 246, 0),
+      0 0 0 0 rgba(139, 92, 246, 0);
   }
 }
 
@@ -706,10 +706,10 @@
 
 .zoneValidBadge {
   padding: 0 1rem;
-  border-radius: 10px;
+  border-radius: 9999px;
   height: 2.7rem;
   box-sizing: border-box;
-  background: linear-gradient(135deg, rgba(1, 178, 178, 0.2), rgba(1, 178, 178, 0.32));
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.32));
   color: #ecfdf5;
   font-size: 0.85rem;
   font-weight: 600;
@@ -718,7 +718,7 @@
   gap: 0.35rem;
   white-space: nowrap;
   border: 1px solid rgba(74, 222, 128, 0.75);
-  box-shadow: 0 4px 12px rgba(1, 178, 178, 0.2);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
   transition:
     transform 0.15s ease,
     box-shadow 0.2s ease,
@@ -778,7 +778,7 @@
   width: 100%;
   padding: 0.58rem 0.68rem;
   border: 1px solid var(--input-border);
-  border-radius: 10px;
+  border-radius: 9999px;
   background: var(--input-bg);
   color: var(--text);
   font-size: 0.95rem;
@@ -818,7 +818,7 @@
   width: 100%;
   padding: 0.58rem 0.68rem;
   border: 1px solid var(--input-border);
-  border-radius: 10px;
+  border-radius: 9999px;
   background: var(--input-bg);
   color: var(--text);
   font-size: 0.95rem;
@@ -826,14 +826,14 @@
 
 .form input:focus,
 .form select:focus {
-  outline: 2px solid rgba(1, 178, 178, 0.45);
+  outline: 2px solid rgba(139, 92, 246, 0.45);
   outline-offset: 1px;
   border-color: var(--primary);
 }
 
 .switchGroup {
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  border-radius: 9999px;
   padding: 0.9rem;
   display: grid;
   gap: 0.75rem;
@@ -855,7 +855,7 @@
 .openaiKeyBlock {
   margin-top: 0.5rem;
   padding: 0.75rem;
-  border-radius: 10px;
+  border-radius: 9999px;
   background: color-mix(in srgb, var(--panel-bg) 96%, var(--bg) 4%);
   border: 1px solid rgba(255, 255, 255, 0.2);
   display: grid;
@@ -872,7 +872,7 @@
   width: 100%;
   max-width: 320px;
   padding: 0.5rem 0.75rem;
-  border-radius: 8px;
+  border-radius: 9999px;
   border: 1px solid var(--input-border);
   background: var(--input-bg);
   font-size: 0.9rem;
@@ -943,7 +943,7 @@
 .gmailStatusCard {
   margin-bottom: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  border-radius: 9999px;
   padding: 0.8rem;
   display: grid;
   gap: 0.55rem;
@@ -983,7 +983,7 @@
 .secondaryBtn,
 .dangerBtn {
   border: 1px solid var(--btn-border);
-  border-radius: 10px;
+  border-radius: 9999px;
   cursor: pointer;
   width: fit-content;
   padding: 0.58rem 0.95rem;
@@ -1043,7 +1043,7 @@
   color: #166534;
   background: #ecfdf3;
   border: 1px solid #86efac;
-  border-radius: 10px;
+  border-radius: 9999px;
   padding: 0.6rem 0.7rem;
 }
 
@@ -1058,7 +1058,7 @@
   color: #b91c1c;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 10px;
+  border-radius: 9999px;
   padding: 0.6rem 0.7rem;
 }
 
@@ -1103,7 +1103,7 @@
 .progressSteps {
   margin: 1.25rem 0;
   padding: 1rem 1.1rem;
-  border-radius: 12px;
+  border-radius: 9999px;
   background: color-mix(in srgb, var(--panel-bg) 95%, var(--bg) 5%);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -1241,7 +1241,7 @@
 /* Drop zone documents */
 .dropZone {
   border: 2px dashed var(--panel-border);
-  border-radius: 12px;
+  border-radius: 9999px;
   padding: 1.25rem 1rem;
   text-align: center;
   cursor: pointer;
@@ -1285,7 +1285,7 @@
 .tableWrap {
   overflow: auto;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  border-radius: 9999px;
 }
 
 .runTable {
@@ -1411,7 +1411,7 @@
 .candidatureSyncMessage {
   padding: 0.6rem 0.75rem;
   margin-bottom: 1rem;
-  border-radius: 8px;
+  border-radius: 9999px;
   font-size: 0.9rem;
   background: color-mix(in srgb, var(--status-success-bg) 80%, transparent);
   color: var(--status-success-text);
@@ -1421,7 +1421,7 @@
 .candidatureSyncError {
   padding: 0.6rem 0.75rem;
   margin-bottom: 1rem;
-  border-radius: 8px;
+  border-radius: 9999px;
   font-size: 0.9rem;
   background: color-mix(in srgb, var(--status-failed-bg) 80%, transparent);
   color: var(--status-failed-text);
@@ -1483,7 +1483,7 @@
 .candidatureEmptyBlock {
   text-align: center;
   padding: 2rem 1.5rem;
-  border-radius: 12px;
+  border-radius: 9999px;
   border: 1px dashed var(--panel-border);
   background: color-mix(in srgb, var(--panel-bg) 98%, var(--bg) 2%);
 }
@@ -1536,7 +1536,7 @@
 .candidatureStatusSelect {
   font-size: 0.85rem;
   padding: 0.3rem 0.5rem;
-  border-radius: 6px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: var(--input-bg);
   color: var(--text);
@@ -1605,7 +1605,7 @@
   max-height: 460px;
   overflow: auto;
   border: 1px solid #1f2937;
-  border-radius: 10px;
+  border-radius: 9999px;
   background: #030712;
   color: #d1fae5;
   padding: 0.8rem;
@@ -1645,7 +1645,7 @@
   inset: 2rem;
   display: flex;
   flex-direction: column;
-  border-radius: 12px;
+  border-radius: 9999px;
   background: #020617;
   border: 1px solid #334155;
   padding: 1rem;
@@ -1676,7 +1676,7 @@
 }
 
 .dotGreen {
-  background: #01B2B2;
+  background: #8b5cf6;
 }
 
 .terminalStatus {
@@ -1688,27 +1688,27 @@
 .cursor {
   display: inline-block;
   margin-left: 0.2rem;
-  color: #01B2B2;
+  color: #8b5cf6;
   animation: blinkCursor 0.85s steps(2, start) infinite;
 }
 
 .logsTyping {
-  text-shadow: 0 0 0.25rem rgba(1, 178, 178, 0.2);
+  text-shadow: 0 0 0.25rem rgba(139, 92, 246, 0.2);
   animation: textJitter 0.14s linear;
 }
 
 @keyframes terminalPulse {
   0% {
     transform: scale(1);
-    box-shadow: 0 0 0 rgba(1, 178, 178, 0);
+    box-shadow: 0 0 0 rgba(139, 92, 246, 0);
   }
   35% {
     transform: scale(1.006);
-    box-shadow: 0 0 0.8rem rgba(1, 178, 178, 0.2);
+    box-shadow: 0 0 0.8rem rgba(139, 92, 246, 0.2);
   }
   100% {
     transform: scale(1);
-    box-shadow: 0 0 0 rgba(1, 178, 178, 0);
+    box-shadow: 0 0 0 rgba(139, 92, 246, 0);
   }
 }
 
@@ -1829,7 +1829,7 @@
 
 .adminStatCard {
   padding: 1rem;
-  border-radius: 10px;
+  border-radius: 9999px;
   background: var(--secondary-bg);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
@@ -1921,7 +1921,7 @@
 :global(:root[data-theme="dark"]) .page .panel {
   background: rgba(15, 23, 42, 0.5);
   border-color: rgba(51, 65, 85, 0.6);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 15px 50px rgba(139, 92, 246, 0.08);
 }
 
 .pageDark .card,
@@ -1932,7 +1932,7 @@
 
 .pageDark .stepCard,
 :global(:root[data-theme="dark"]) .page .stepCard {
-  background: radial-gradient(circle at top left, rgba(1, 178, 178, 0.08), transparent 55%),
+  background: radial-gradient(circle at top left, rgba(139, 92, 246, 0.08), transparent 55%),
     radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.06), transparent 55%),
     rgba(15, 23, 42, 0.6);
   border-color: rgba(51, 65, 85, 0.6);
@@ -1940,7 +1940,7 @@
 
 .pageDark .headerCard,
 :global(:root[data-theme="dark"]) .page .headerCard {
-  background: radial-gradient(circle at top left, rgba(1, 178, 178, 0.1), rgba(15, 23, 42, 0.8));
+  background: radial-gradient(circle at top left, rgba(139, 92, 246, 0.1), rgba(15, 23, 42, 0.8));
   border-color: rgba(51, 65, 85, 0.6);
 }
 

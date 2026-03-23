@@ -5,7 +5,7 @@
   justify-content: center;
   padding: 3rem 1.5rem 4rem;
   background:
-    radial-gradient(circle at top, rgba(1, 178, 178, 0.16), transparent 55%),
+    radial-gradient(circle at top, rgba(139, 92, 246, 0.16), transparent 55%),
     radial-gradient(circle at bottom, rgba(15, 23, 42, 0.85), var(--color-bg));
 }
 
@@ -61,7 +61,7 @@
 }
 
 .helperLink {
-  color: #81DC4D;
+  color: #d946ef;
   text-decoration: none;
 }
 
@@ -125,9 +125,9 @@
 }
 
 .input:focus {
-  outline: 2px solid #01B2B2;
+  outline: 2px solid #8b5cf6;
   outline-offset: 0;
-  border-color: #01B2B2;
+  border-color: #8b5cf6;
 }
 
 .formActions {
@@ -147,7 +147,7 @@
 }
 
 .formLink {
-  color: #81DC4D;
+  color: #d946ef;
   text-decoration: none;
 }
 
@@ -177,12 +177,12 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border: 1px solid rgba(129, 220, 77, 0.6);
-  background-image: linear-gradient(to right, #01B2B2, #81DC4D);
+  border: 1px solid rgba(217, 70, 239, 0.6);
+  background-image: linear-gradient(to right, #8b5cf6, #d946ef);
   color: #052e16;
   box-shadow:
     0 0 0 1px rgba(15, 23, 42, 0.8),
-    0 16px 40px rgba(1, 178, 178, 0.85);
+    0 16px 40px rgba(139, 92, 246, 0.85);
   transition:
     transform 0.1s ease-out,
     box-shadow 0.12s ease-out,
@@ -194,15 +194,15 @@
   transform: translateY(-1px);
   box-shadow:
     0 0 0 1px rgba(15, 23, 42, 0.9),
-    0 20px 52px rgba(1, 178, 178, 0.95);
-  background-image: linear-gradient(to right, #81DC4D, #01B2B2);
+    0 20px 52px rgba(139, 92, 246, 0.95);
+  background-image: linear-gradient(to right, #d946ef, #8b5cf6);
 }
 
 .button:active:not(:disabled) {
   transform: translateY(0);
   box-shadow:
     0 0 0 1px rgba(15, 23, 42, 0.95),
-    0 10px 26px rgba(1, 178, 178, 0.9);
+    0 10px 26px rgba(139, 92, 246, 0.9);
 }
 
 .buttonDisabled {
@@ -210,7 +210,7 @@
   opacity: 0.65;
   box-shadow:
     0 0 0 1px rgba(15, 23, 42, 0.7),
-    0 10px 26px rgba(1, 178, 178, 0.55);
+    0 10px 26px rgba(139, 92, 246, 0.55);
 }
 
 .error {
@@ -268,5 +268,5 @@
 }
 
 :global(:root[data-theme="light"]) .helperLink {
-  color: #81DC4D;
+  color: #d946ef;
 }
