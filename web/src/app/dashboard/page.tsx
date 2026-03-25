@@ -284,8 +284,6 @@ function DashboardContent() {
   const [maxSites, setMaxSites] = useState(1500);
   const [targetFound, setTargetFound] = useState(100);
   const [workers, setWorkers] = useState(20);
-  const [useAi, setUseAi] = useState(false);
-  const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [isLaunchingRun, setIsLaunchingRun] = useState(false);
   const [isRefreshingRuns, setIsRefreshingRuns] = useState(false);
   const [isRefreshingDetails, setIsRefreshingDetails] = useState(false);
@@ -511,7 +509,6 @@ function DashboardContent() {
             run_max_sites?: number;
             run_target_found?: number;
             run_workers?: number;
-            run_use_ai?: boolean;
           };
         }>(response)) as {
           detail?: string;
@@ -531,7 +528,6 @@ function DashboardContent() {
             run_max_sites?: number;
             run_target_found?: number;
             run_workers?: number;
-            run_use_ai?: boolean;
           };
         };
         if (!response.ok) {
@@ -569,7 +565,6 @@ function DashboardContent() {
         setMaxSites(Number(data.profile?.run_max_sites ?? 1500));
         setTargetFound(Number(data.profile?.run_target_found ?? 100));
         setWorkers(Number(data.profile?.run_workers ?? 20));
-        setUseAi(Boolean(data.profile?.run_use_ai));
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : "Erreur de chargement du profil.";
@@ -788,8 +783,6 @@ function DashboardContent() {
         max_sites: maxSites,
         target_found: targetFound,
         workers,
-        use_ai: useAi,
-        ...(useAi && openaiApiKey.trim() ? { openai_api_key: openaiApiKey.trim() } : {}),
       };
       const response = await fetch("/api/runs", {
         method: "POST",
@@ -981,7 +974,6 @@ function DashboardContent() {
           run_max_sites: maxSites,
           run_target_found: targetFound,
           run_workers: workers,
-          run_use_ai: useAi,
         }),
       });
       const data = (await safeJson<{ ok?: boolean; detail?: string }>(response)) as {
@@ -1080,7 +1072,6 @@ function DashboardContent() {
           run_max_sites: maxSites,
           run_target_found: targetFound,
           run_workers: workers,
-          run_use_ai: useAi,
         }),
       });
       const data = (await safeJson<{ ok?: boolean; detail?: string }>(response)) as {
@@ -1198,9 +1189,6 @@ function DashboardContent() {
           </nav>
 
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <button className={styles.secondaryBtn} type="button" onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))} style={{ width: '100%', justifyContent: 'center', borderRadius: '14px' }}>
-              {theme === "light" ? "🌙 Mode Nuit" : "☀️ Mode Jour"}
-            </button>
             {!showDemoBanner && (
               <>
                 <button className={styles.primaryBtn} type="button" onClick={onSaveWorkInProgress} style={{ width: '100%', justifyContent: 'center', borderRadius: '14px', background: 'linear-gradient(to right, #8b5cf6, #d946ef)' }}>
@@ -1610,37 +1598,6 @@ function DashboardContent() {
                     <span className={styles.switchTrack} aria-hidden="true" />
                   </span>
                 </label>
-                <label className={styles.switchField}>
-                  <span>Générer le paragraphe personnalisé avec l&apos;IA</span>
-                  <span className={styles.switchControl}>
-                    <input
-                      type="checkbox"
-                      checked={useAi}
-                      onChange={(e) => setUseAi(e.target.checked)}
-                      aria-describedby="use-ai-hint"
-                    />
-                    <span className={styles.switchTrack} aria-hidden="true" />
-                  </span>
-                </label>
-                {useAi ? (
-                  <div className={styles.openaiKeyBlock} id="use-ai-hint">
-                    <label className={styles.openaiKeyLabel} htmlFor="openai-api-key">
-                      Clé API OpenAI (votre clé, non stockée)
-                    </label>
-                    <input
-                      id="openai-api-key"
-                      type="password"
-                      autoComplete="off"
-                      placeholder="sk-..."
-                      value={openaiApiKey}
-                      onChange={(e) => setOpenaiApiKey(e.target.value)}
-                      className={styles.openaiKeyInput}
-                    />
-                    <p className={styles.openaiKeyHint}>
-                      Saisissez votre clé OpenAI pour que le pipeline génère un paragraphe personnalisé par entreprise. Envoyée en HTTPS pour ce run puis effacée de la mémoire ; jamais enregistrée, loggée ou affichée. Utilisez une clé à plafond d'usage (OpenAI) pour limiter les risques. 
-                    </p>
-                  </div>
-                ) : null}
               </fieldset>
               <div className={styles.launchBlock}>
                 <button

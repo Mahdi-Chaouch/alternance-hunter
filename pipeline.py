@@ -10,7 +10,7 @@ CLI unifiee pour piloter le pipeline alternance:
 Usage rapide:
   python pipeline.py --mode pipeline --zone all
   python pipeline.py --mode hunter --zone paris --max-sites 400
-  python pipeline.py --mode generate --use-ai
+  python pipeline.py --mode generate
   python pipeline.py --mode drafts --dry-run
 """
 
@@ -192,15 +192,11 @@ def build_generate_cmd(args: argparse.Namespace) -> List[str]:
         args.template,
         "--out-dir",
         args.out_dir,
-        "--ai-model",
-        args.ai_model,
         "--sector",
         getattr(args, "sector", "it") or "it",
         "--specialty",
         getattr(args, "specialty", "") or "",
     ]
-    if args.use_ai:
-        cmd.append("--use-ai")
     return cmd
 
 
@@ -304,8 +300,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--emails-found-csv", default="data/exports/emails_found.csv")
     parser.add_argument("--template", default="", help="Template LM .docx (obligatoire pour generate; uploadez via l'UI ou --template /chemin)")
     parser.add_argument("--out-dir", default="outputs/letters")
-    parser.add_argument("--use-ai", action="store_true")
-    parser.add_argument("--ai-model", default="gpt-4o-mini")
     parser.add_argument("--sender-first-name", default="")
     parser.add_argument("--sender-last-name", default="")
     parser.add_argument("--sender-linkedin-url", default="")

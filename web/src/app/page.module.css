@@ -852,7 +852,7 @@
   gap: 0.8rem;
 }
 
-.openaiKeyBlock {
+.llmKeyBlock {
   margin-top: 0.5rem;
   padding: 0.75rem;
   border-radius: 9999px;
@@ -862,13 +862,13 @@
   gap: 0.4rem;
 }
 
-.openaiKeyLabel {
+.llmKeyLabel {
   font-size: 0.88rem;
   font-weight: 500;
   color: var(--text);
 }
 
-.openaiKeyInput {
+.llmKeyInput {
   width: 100%;
   max-width: 320px;
   padding: 0.5rem 0.75rem;
@@ -879,11 +879,11 @@
   color: var(--text);
 }
 
-.openaiKeyInput::placeholder {
+.llmKeyInput::placeholder {
   color: var(--subtle-text);
 }
 
-.openaiKeyHint {
+.llmKeyHint {
   margin: 0;
   font-size: 0.8rem;
   color: var(--muted-text);
@@ -1980,7 +1980,7 @@
 .uploadCard,
 .profileCard,
 .switchGroup,
-.openaiKeyBlock,
+.llmKeyBlock,
 .gmailStatusCard,
 .candidatureEmptyBlock,
 .info,
@@ -2005,7 +2005,7 @@
 .profileCard textarea,
 .form input,
 .form select,
-.openaiKeyInput,
+.llmKeyInput,
 .progressStepBadge,
 .progressBarTrack,
 .progressBarFill,
@@ -2019,7 +2019,7 @@
   border-radius: var(--radius-soft);
 }
 
-.openaiKeyInput,
+.llmKeyInput,
 .form input,
 .form select,
 .zoneFieldInput {

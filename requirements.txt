@@ -8,6 +8,5 @@ google-api-python-client>=2.0.0
 fastapi>=0.115.0
 uvicorn>=0.30.0
 python-multipart>=0.0.9
+psycopg[binary]
 
-# Optionnel : personnalisation des LM par IA (generate_lm.py --use-ai)
-openai>=1.0.0

@@ -61,15 +61,9 @@ SENSITIVE_LOG_PATTERNS = [
     re.compile(r"(oauth_access_token\s*[=:]\s*)(\S+)", flags=re.IGNORECASE),
     re.compile(r"(oauth_refresh_token\s*[=:]\s*)(\S+)", flags=re.IGNORECASE),
     re.compile(r"(oauth_client_secret\s*[=:]\s*)(\S+)", flags=re.IGNORECASE),
-    # OpenAI API keys (sk-...); never log or display
+    # API keys; never log or display
     re.compile(r"(sk-[a-zA-Z0-9_-]{20,})"),
-    re.compile(r"(OPENAI_API_KEY\s*[=:]\s*)(\S+)", flags=re.IGNORECASE),
 ]
-
-
-def _redact_openai_key(match: re.Match) -> str:
-    """Replace OPENAI_API_KEY=... with OPENAI_API_KEY=[REDACTED] (group 2 is the secret)."""
-    return match.group(1) + REDACTED_VALUE
 
 
 def _is_production() -> bool:
@@ -157,9 +151,7 @@ def sanitize_log_line(line: str, secrets: List[str]) -> str:
         if secret:
             masked = masked.replace(secret, REDACTED_VALUE)
     for pattern in SENSITIVE_LOG_PATTERNS:
-        if pattern.groups == 2 and "OPENAI_API_KEY" in pattern.pattern:
-            masked = pattern.sub(_redact_openai_key, masked)
-        elif pattern.groups == 1 and "sk-" in pattern.pattern:
+        if pattern.groups == 1 and "sk-" in pattern.pattern:
             masked = pattern.sub(REDACTED_VALUE, masked)
         else:
             masked = pattern.sub(rf"\1{REDACTED_VALUE}\2", masked)
@@ -190,9 +182,6 @@ class RunRequest(BaseModel):
     draft_file: str = "data/exports/draft_emails.txt"
     template: str = ""
     out_dir: str = "outputs/letters"
-    use_ai: bool = False
-    openai_api_key: Optional[str] = None
-    ai_model: str = "gpt-4o-mini"
     sender_first_name: str = ""
     sender_last_name: str = ""
     sender_linkedin_url: str = ""
@@ -263,7 +252,6 @@ class RunState:
     process: Optional[subprocess.Popen[str]] = None
     owner_user_id: Optional[str] = None
     owner_user_email: Optional[str] = None
-    openai_api_key: Optional[str] = None
     logs_tail: Deque[str] = field(
         default_factory=lambda: deque(maxlen=MAX_IN_MEMORY_LOG_LINES)
     )
@@ -357,7 +345,6 @@ def build_pipeline_command(
     cmd += ["--draft-file", payload.draft_file]
     cmd += ["--template", template_path]
     cmd += ["--out-dir", payload.out_dir]
-    cmd += ["--ai-model", payload.ai_model]
     if payload.sender_first_name:
         cmd += ["--sender-first-name", payload.sender_first_name]
     if payload.sender_last_name:
@@ -403,8 +390,6 @@ def build_pipeline_command(
         cmd.append("--insecure")
     if payload.rh_only:
         cmd.append("--rh-only")
-    if payload.use_ai:
-        cmd.append("--use-ai")
     if payload.no_lm:
         cmd.append("--no-lm")
     if payload.lm:
@@ -447,8 +432,6 @@ def run_in_background(run_id: str) -> None:
     run.append_log(f"[{utc_now_iso()}] Starting run.")
 
     env = {**os.environ, "PYTHONUNBUFFERED": "1"}
-    if run.openai_api_key:
-        env["OPENAI_API_KEY"] = run.openai_api_key
     popen_kwargs = {
         "cwd": str(PROJECT_ROOT),
         "stdout": subprocess.PIPE,
@@ -503,7 +486,6 @@ def run_in_background(run_id: str) -> None:
             run.status = "failed"
         run.process = None
         run.pid = None
-        run.openai_api_key = None  # clear key from memory immediately after run
 
     try:
         run_store.update_run_status(
@@ -732,11 +714,6 @@ def create_run(
     run_id = uuid4().hex
     command = build_pipeline_command(payload, owner_user_id, owner_user_email)
     log_file = RUN_LOG_DIR / f"{run_id}.log"
-    openai_key: Optional[str] = None
-    if payload.use_ai and payload.openai_api_key:
-        raw = (payload.openai_api_key or "").strip()
-        if raw:
-            openai_key = raw
 
     display_command = redact_command(command)
     run_store.insert_run(
@@ -754,11 +731,9 @@ def create_run(
         command=command,
         display_command=display_command,
         log_file=log_file,
-        redaction_secrets=extract_command_secrets(command)
-        + ([openai_key] if openai_key else []),
+        redaction_secrets=extract_command_secrets(command),
         owner_user_id=owner_user_id,
         owner_user_email=owner_user_email,
-        openai_api_key=openai_key,
     )
 
     with RUNS_LOCK:
@@ -1255,6 +1230,75 @@ def get_analytics(
         "reponses_negatives": reponses_negatives,
         "taux_conversion_reponse": round(taux_conversion, 1),
     }
+
+
+# ---------------------------------------------------------------------------
+# Recruiting database (companies/jobs/contacts)
+# ---------------------------------------------------------------------------
+
+@app.get("/recruiting/companies", dependencies=[Depends(verify_token)])
+def recruiting_list_companies_api(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0, le=5000),
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    """List companies that recruit for the current user."""
+    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    try:
+        from recruiting_db import RecruitingDB
+
+        db = RecruitingDB()
+        companies = db.list_companies(user_key=user_key, limit=limit, offset=offset)
+        return {"companies": companies}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Postgres error: {e!s}")
+
+
+@app.get("/recruiting/companies/{domain}/jobs", dependencies=[Depends(verify_token)])
+def recruiting_list_company_jobs_api(
+    domain: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0, le=5000),
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    """List job posts for one company domain."""
+    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    try:
+        from recruiting_db import RecruitingDB
+
+        db = RecruitingDB()
+        jobs = db.list_job_posts_by_company_domain(user_key=user_key, domain=domain, limit=limit, offset=offset)
+        return {"jobs": jobs}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Postgres error: {e!s}")
+
+
+@app.get("/recruiting/companies/{domain}/contacts", dependencies=[Depends(verify_token)])
+def recruiting_list_company_contacts_api(
+    domain: str,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=5000),
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    """List contacts (RH/support) for one company domain."""
+    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    try:
+        from recruiting_db import RecruitingDB
+
+        db = RecruitingDB()
+        contacts = db.list_contacts_by_company_domain(user_key=user_key, domain=domain, limit=limit, offset=offset)
+        return {"contacts": contacts}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Postgres error: {e!s}")
 
 
 @app.get("/candidatures/counts", dependencies=[Depends(verify_token)])
