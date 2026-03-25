@@ -13,18 +13,12 @@ Placeholders supportés dans le template :
   {{SITE}}        - URL du site
   {{SECTEUR}}     - Secteur d'activité (ex: Informatique / Digital)
   {{SPECIALITE}}  - Métier / spécialité (ex: Développement web)
-  {{PARAGRAPHE_PERSONNALISE}} - Paragraphe généré par IA (si --use-ai)
-
-Option --use-ai : utilise l'API OpenAI pour générer un paragraphe personnalisé
-par entreprise (nécessite OPENAI_API_KEY). Le prompt utilise secteur et spécialité
-pour adapter le paragraphe au domaine recherché.
+  {{PARAGRAPHE_PERSONNALISE}} - Paragraphe personnalisé (vide si l'IA n'est pas activée)
 """
 
 import argparse
-import os
 import re
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import date
 from typing import Tuple
@@ -32,11 +26,9 @@ from urllib.parse import urlparse
 
 from docx import Document
 
-AI_PARAGRAPH_WORKERS = 5  # appels OpenAI en parallèle (limite pour éviter rate limit)
-
 SEP = "=============================="
 
-# Libellés secteur pour le prompt IA quand la spécialité est vide (éviter le fallback "développement web").
+# Libellés secteur pour normaliser l'affichage quand la spécialité est vide.
 SECTOR_LABELS_FOR_PROMPT: dict[str, str] = {
     "it": "Informatique / Digital",
     "food": "Alimentation / Restauration",
@@ -130,14 +122,12 @@ def _replace_in_cell(cell, replacements: dict) -> None:
 def replace_in_doc(
     doc: Document,
     info: dict,
-    extra: dict | None = None,
     sector: str = "",
     specialty: str = "",
 ) -> None:
     """
     Remplace tous les placeholders dans le document.
     info : { company, zone, site, domain, ville }
-    extra : { "{{PARAGRAPHE_PERSONNALISE}}": "..." } pour l'IA
     sector / specialty : contexte run pour {{SECTEUR}} et {{SPECIALITE}}
     """
     today = date.today().strftime("%d/%m/%Y")
@@ -151,8 +141,9 @@ def replace_in_doc(
         "{{SECTEUR}}": sector,
         "{{SPECIALITE}}": specialty,
     }
-    if extra:
-        replacements.update(extra)
+    # L'IA est retirée du produit : on remplace toujours ce placeholder par vide
+    # pour éviter que le token brut reste dans le document.
+    replacements["{{PARAGRAPHE_PERSONNALISE}}"] = ""
 
     for p in doc.paragraphs:
         _replace_in_paragraph(p, replacements)
@@ -163,82 +154,13 @@ def replace_in_doc(
                 _replace_in_cell(cell, replacements)
 
 
-def generate_personalized_paragraph(
-    company: str,
-    domain: str,
-    api_key: str,
-    model: str = "gpt-4o-mini",
-    sector: str = "",
-    specialty: str = "",
-) -> str:
-    """
-    Appelle l'API OpenAI pour générer 2-3 phrases personnalisées pour la LM.
-    sector / specialty permettent d'adapter le domaine (ex: alternance en X).
-    """
-    try:
-        import openai
-    except ImportError:
-        return ""
-
-    # Utiliser la spécialité choisie, sinon le libellé du secteur, jamais de fallback "développement web".
-    domain_label = (
-        specialty.strip()
-        or SECTOR_LABELS_FOR_PROMPT.get(sector.strip(), sector.strip() or "votre domaine")
-    ) or "votre domaine"
-    client = openai.OpenAI(api_key=api_key)
-    prompt = (
-        f"Rédige en français, en 2 à 3 phrases maximum, un paragraphe pour une lettre de motivation "
-        f"d'alternance en {domain_label}. Le candidat s'adresse à l'entreprise « {company} » "
-        f"(site: {domain or 'non précisé'}). Le paragraphe doit expliquer brièvement pourquoi il serait "
-        f"motivé de rejoindre cette entreprise (sans inventer de détails, ton professionnel et neutre). "
-        f"Pas de formules de politesse, pas de liste à puces, uniquement le paragraphe."
-    )
-    try:
-        r = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "Tu es un assistant qui rédige des paragraphes courts et professionnels pour des lettres de motivation."},
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=200,
-        )
-        text = (r.choices[0].message.content or "").strip()
-        return text if text else ""
-    except Exception:
-        return ""
-
-
-def _load_dotenv() -> None:
-    """Charge les variables du fichier .env à la racine du projet (OPENAI_API_KEY, etc.)."""
-    env_path = Path(__file__).resolve().parent / ".env"
-    if not env_path.exists():
-        return
-    try:
-        for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if "=" in line:
-                key, _, value = line.partition("=")
-                key, value = key.strip(), value.strip().strip("'\"")
-                if key and value:
-                    os.environ.setdefault(key, value)
-    except Exception:
-        pass
-
-
 def main() -> None:
-    _load_dotenv()
-
     parser = argparse.ArgumentParser(description="Génère des LM .docx à partir du draft et du template.")
     parser.add_argument("--draft-file", default="data/exports/draft_emails.txt", help="Fichier draft (blocs Entreprise/Zone/Site)")
     parser.add_argument("--template", default="", help="Template Word avec placeholders (obligatoire; uploadez via l'UI ou --template /chemin)")
     parser.add_argument("--out-dir", default="outputs/letters", help="Dossier de sortie des LM")
-    parser.add_argument("--use-ai", action="store_true",
-                        help="Génère le paragraphe personnalisé via OpenAI (OPENAI_API_KEY requis)")
-    parser.add_argument("--ai-model", default="gpt-4o-mini", help="Modèle OpenAI (défaut: gpt-4o-mini)")
-    parser.add_argument("--sector", default="", help="Secteur d'activité pour placeholders et prompt IA")
-    parser.add_argument("--specialty", default="", help="Métier / spécialité pour placeholders et prompt IA")
+    parser.add_argument("--sector", default="", help="Secteur d'activité pour placeholders")
+    parser.add_argument("--specialty", default="", help="Métier / spécialité pour placeholders")
 
     args = parser.parse_args()
 
@@ -266,52 +188,14 @@ def main() -> None:
             "avec des entreprises ayant un email trouvé, puis relancez la génération des lettres."
         )
 
-    use_ai = args.use_ai
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip() if use_ai else ""
-    if use_ai and not api_key:
-        print("--use-ai demandé mais OPENAI_API_KEY non défini. Paragraphe personnalisé laissé vide.")
-        use_ai = False
-
     sector = getattr(args, "sector", "") or ""
     specialty = getattr(args, "specialty", "") or ""
     sector_display = SECTOR_LABELS_FOR_PROMPT.get(sector, sector) or sector
 
-    # Avec --use-ai : générer tous les paragraphes en parallèle (plus rapide).
-    paragraphs_by_index = [""] * len(companies_info)
-    if use_ai:
-        check_doc = Document(template)
-        full_text = "\n".join(p.text for p in check_doc.paragraphs)
-        for t in check_doc.tables:
-            for row in t.rows:
-                for cell in row.cells:
-                    full_text += "\n" + cell.text
-        if "{{PARAGRAPHE_PERSONNALISE}}" in full_text:
-            def _gen(i: int) -> Tuple[int, str]:
-                info = companies_info[i]
-                p = generate_personalized_paragraph(
-                    info["company"],
-                    info.get("domain", ""),
-                    api_key,
-                    args.ai_model,
-                    sector=sector,
-                    specialty=specialty,
-                )
-                return i, p or "(Paragraphe non généré.)"
-
-            with ThreadPoolExecutor(max_workers=AI_PARAGRAPH_WORKERS) as ex:
-                futures = [ex.submit(_gen, i) for i in range(len(companies_info))]
-                for fut in as_completed(futures):
-                    idx, para = fut.result()
-                    paragraphs_by_index[idx] = para
-
     generated = 0
-    for i, info in enumerate(companies_info):
+    for info in companies_info:
         doc = Document(template)
-        extra = None
-        if use_ai and paragraphs_by_index[i]:
-            extra = {"{{PARAGRAPHE_PERSONNALISE}}": paragraphs_by_index[i]}
-
-        replace_in_doc(doc, info, extra, sector=sector_display, specialty=specialty)
+        replace_in_doc(doc, info, sector=sector_display, specialty=specialty)
 
         filename = safe_filename(info["company"]) + "_LM.docx"
         path = outdir / filename

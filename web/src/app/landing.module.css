@@ -38,6 +38,295 @@
   pointer-events: none;
 }
 
+.betaPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.55rem 1.05rem;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #16a34a;
+  font-weight: 800;
+  font-size: 0.95rem;
+  margin-bottom: 1.25rem;
+  text-transform: none;
+}
+
+:global(:root[data-theme="dark"]) .betaPill {
+  background: rgba(74, 222, 128, 0.10);
+  border-color: rgba(74, 222, 128, 0.22);
+}
+
+.heroProductFrame {
+  width: min(980px, 100%);
+  margin: 2.1rem auto 0;
+  border-radius: 18px;
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 25px 70px rgba(139, 92, 246, 0.12);
+  overflow: hidden;
+}
+
+:global(:root[data-theme="dark"]) .heroProductFrame {
+  background: rgba(15, 23, 42, 0.42);
+  border-color: rgba(139, 92, 246, 0.22);
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);
+}
+
+.frameTopbar {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.14);
+  background: rgba(2, 6, 23, 0.03);
+}
+
+:global(:root[data-theme="dark"]) .frameTopbar {
+  background: rgba(2, 6, 23, 0.22);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.frameDots {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.frameDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.frameDotRed {
+  background: #f87171;
+}
+.frameDotYellow {
+  background: #fbbf24;
+}
+.frameDotGreen {
+  background: #34d399;
+}
+
+.frameUrl {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 0.82rem;
+  color: var(--color-fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:global(:root[data-theme="dark"]) .frameUrl {
+  color: rgba(229, 231, 235, 0.72);
+}
+
+.frameBody {
+  display: flex;
+  min-height: 260px;
+}
+
+.frameSidebar {
+  width: 230px;
+  border-right: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 1.05rem 0.95rem;
+  background: rgba(2, 6, 23, 0.02);
+}
+
+:global(:root[data-theme="dark"]) .frameSidebar {
+  background: rgba(2, 6, 23, 0.25);
+  border-right-color: rgba(255, 255, 255, 0.06);
+}
+
+.frameSidebarItem {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.16);
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  margin-bottom: 0.85rem;
+}
+
+.frameSidebarSpacer {
+  height: 24px;
+}
+
+.frameSidebarChip {
+  height: 40px;
+  border-radius: 14px;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.18);
+}
+
+.frameMain {
+  flex: 1;
+  padding: 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.frameStatsRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.frameStatCard {
+  height: 92px;
+  border-radius: 16px;
+  background: rgba(139, 92, 246, 0.11);
+  border: 1px solid rgba(139, 92, 246, 0.17);
+}
+
+.frameTerminal {
+  flex: 1;
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  overflow: hidden;
+}
+
+:global(:root[data-theme="dark"]) .frameTerminal {
+  background: rgba(2, 6, 23, 0.25);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.frameTerminalHeader {
+  padding: 0.7rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--color-fg-muted);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+:global(:root[data-theme="dark"]) .frameTerminalHeader {
+  color: rgba(229, 231, 235, 0.72);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.frameTerminalHeaderDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.12);
+}
+
+.frameTerminalLines {
+  padding: 0.85rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+}
+
+.frameLine {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.18);
+}
+
+.frameLineShort {
+  height: 12px;
+  width: 65%;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.18);
+}
+
+.heroTrustRow {
+  width: min(980px, 100%);
+  margin: 1.3rem auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.heroTrustItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.16);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-fg);
+}
+
+.heroTrustCheck {
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(34, 197, 94, 0.18);
+  color: #16a34a;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+:global(:root[data-theme="dark"]) .heroTrustItem {
+  color: rgba(229, 231, 235, 0.92);
+  background: rgba(34, 197, 94, 0.06);
+  border-color: rgba(34, 197, 94, 0.14);
+}
+
+@media (max-width: 900px) {
+  .frameSidebar {
+    width: 190px;
+  }
+  .frameStatsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .frameBody {
+    flex-direction: column;
+  }
+
+  .frameSidebar {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem;
+  }
+
+  .frameSidebarItem,
+  .frameSidebarSpacer,
+  .frameSidebarChip {
+    display: none;
+  }
+
+  .frameMain {
+    padding: 1rem;
+  }
+
+  .frameTerminal {
+    min-height: 170px;
+  }
+
+  .frameStatsRow {
+    grid-template-columns: 1fr;
+  }
+}
+
 .eyebrow {
   display: inline-block;
   padding: 0.4rem 1rem;
@@ -169,8 +458,8 @@
 .card {
   position: relative;
   background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 36px;
   padding: 2rem;
@@ -206,6 +495,10 @@
   font-size: 1rem;
 }
 
+.aboutLeadText {
+  margin-bottom: 1rem;
+}
+
 /* HOW IT WORKS */
 .stepsList {
   display: grid;
@@ -219,6 +512,7 @@
   align-items: flex-start;
   gap: 1.5rem;
   background: rgba(255, 255, 255, 0.4);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   padding: 1.5rem;
@@ -256,6 +550,24 @@
 }
 
 /* PRICING */
+.pricingSectionCard {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 2.35rem 1.25rem 2.25rem;
+  border-radius: 42px;
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  background: rgba(255, 255, 255, 0.35);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 30px 80px rgba(139, 92, 246, 0.10);
+}
+
+:global(:root[data-theme="dark"]) .pricingSectionCard {
+  background: rgba(15, 23, 42, 0.35);
+  border-color: rgba(139, 92, 246, 0.22);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+
 .pricingCard {
   max-width: 500px;
   margin: 0 auto;
@@ -265,38 +577,43 @@
 }
 
 .pricingBadge {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: rgba(129, 220, 77, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 auto 1rem;
+  background: rgba(34, 197, 94, 0.16);
   color: #16a34a;
-  padding: 0.25rem 0.75rem;
+  padding: 0.35rem 0.9rem;
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 700;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 :global(:root[data-theme="dark"]) .pricingBadge {
   color: #4ade80;
+  background: rgba(74, 222, 128, 0.12);
 }
 
 .pricingPrice {
-  font-size: 4rem;
-  font-weight: 800;
+  font-size: 5rem;
+  font-weight: 900;
   margin: 1.5rem 0 0.5rem;
   display: flex;
   justify-content: center;
   align-items: baseline;
+  line-height: 1;
 }
 
 .pricingCurrency {
-  font-size: 2rem;
-  font-weight: 600;
+  font-size: 1em;
+  font-weight: 900;
+  text-shadow: 0 18px 55px rgba(139, 92, 246, 0.25);
 }
 
 .pricingPeriod {
-  font-size: 1rem;
+  font-size: 1.25rem;
   color: var(--color-fg-muted);
   font-weight: 400;
 }
@@ -331,6 +648,7 @@
 
 .faqItem {
   background: rgba(255, 255, 255, 0.4);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 9999px;

@@ -39,7 +39,8 @@ cp .env.example .env
 Variables principales:
 
 - `PIPELINE_API_TOKEN` (ou `API_TOKEN`): token de securite pour l'API
-- `OPENAI_API_KEY`: requis uniquement si `--use-ai` est active
+- `LLM_API_KEY`: requis uniquement si `--use-ai` est active
+- `LLM_BASE_URL`: URL API du provider IA (utile sur Render pour Qwen)
 - `PIPELINE_API_BASE_URL`: URL du backend (utile pour tooling local)
 - `AUTH_ALLOWED_EMAILS`: allowlist invite-only des emails autorises sur le dashboard web
 - `FRANCE_TRAVAIL_CLIENT_ID` / `FRANCE_TRAVAIL_CLIENT_SECRET` / `FRANCE_TRAVAIL_SCOPE`: credentials API Offres France Travail

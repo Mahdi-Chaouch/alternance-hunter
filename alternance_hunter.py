@@ -37,8 +37,10 @@ import re
 import sys
 import time
 import threading
+from datetime import datetime
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
+import html as html_lib
 from urllib.parse import urlparse, urljoin
 
 import requests
@@ -886,6 +888,17 @@ def write_targets_csv(targets: List[Target], targets_csv: str) -> None:
 # ============================================================
 # EMAIL UTILS
 # ============================================================
+@dataclass
+class EmailCandidate:
+    email: str
+    # raw_context: petit extrait brut (voisinage/texte autour du mailto) pour persistance DB
+    raw_context: str = ""
+    context: str = ""
+    source_type: str = "text"  # "text" | "mailto"
+    # email_confidence: score heuristique 0..1 basé sur le contexte et le type RH/support
+    email_confidence: float = 0.0
+
+
 def normalize_email(e: str) -> str:
     return (e or "").strip().lower().rstrip(".,;:)]}>\"'")
 
@@ -925,6 +938,20 @@ def allowed_source_domain(site: str, source_url: str) -> bool:
     if not sdom or not udom:
         return False
     return (udom == sdom) or udom.endswith("." + sdom)
+
+
+def email_domain_matches_site(email: str, site: str) -> bool:
+    """
+    Contrôle "cohérence" : le domaine de l'email doit correspondre au domaine du site
+    (ou à un sous-domaine), sinon on considère que c'est probablement un faux positif.
+    """
+    if not email or "@" not in email:
+        return False
+    site_host = host_no_www(site)
+    if not site_host:
+        return False
+    _, dom = normalize_email(email).split("@", 1)
+    return (dom == site_host) or dom.endswith("." + site_host)
 
 
 def _canonical_fetch_key(url: str) -> str:
@@ -984,6 +1011,118 @@ def deobfuscate_text(s: str) -> str:
     s = s.replace("[dot]", ".").replace("(dot)", ".").replace(" dot ", ".")
     return s
 
+
+def _clean_context_for_scoring(s: str) -> str:
+    """
+    Contexte compact, sans tags, utile pour scorer les mots-clés.
+    """
+    s = s or ""
+    s = html_lib.unescape(s)
+    # Enlève les tags HTML si on extrait du HTML brut
+    s = re.sub(r"<[^>]+>", " ", s)
+    s = re.sub(r"[\r\n\t]+", " ", s)
+    s = re.sub(r"\s+", " ", s).strip().lower()
+    return s
+
+
+def _context_has_any_keyword(context_low: str, keywords: Tuple[str, ...]) -> bool:
+    return any(kw in context_low for kw in keywords)
+
+
+def compute_email_confidence(email: str, context: str, raw_context: str, source_type: str) -> float:
+    """
+    Confiance heuristique (0..1) pour privilégier les emails réellement liés aux candidatures.
+    - basé sur mots-clés dans le contexte
+    - pénalise légal/privacy et support
+    - bonus si l'email ressemble à RH/recrutement
+    """
+    c_low = (context or "").lower()
+    r_low = (raw_context or "").lower()
+    e = normalize_email(email)
+
+    # Base: pas trop basse pour garder de la diversité
+    s = 0.25
+
+    if source_type == "mailto":
+        s += 0.08
+
+    # Signaux sur le local-part
+    if is_hr_email(e):
+        s += 0.35
+    elif is_support_like_email(e):
+        s -= 0.25
+    elif is_generic_email(e):
+        s += 0.05
+
+    recruitment_context_keywords = (
+        "recrut",
+        "recrutement",
+        "candidature",
+        "candidatures",
+        "postuler",
+        "alternance",
+        "stage",
+        "stages",
+        "talent",
+        "hiring",
+        "jobs",
+        "job",
+        "career",
+        "carriere",
+        "offre",
+        "offres",
+        "emploi",
+        "opportunites",
+        "opportunities",
+        "rh",
+    )
+    legal_privacy_context_keywords = (
+        "mentions-legales",
+        "mentions legales",
+        "rgpd",
+        "cookies",
+        "privacy",
+        "confidentialite",
+        "confidentiality",
+        "data-protection",
+        "politique-de-confidentialite",
+        "politique-confidentialite",
+        "confidentialité",
+    )
+    support_context_keywords = (
+        "support",
+        "help",
+        "service",
+        "newsletter",
+        "marketing",
+        "commercial",
+        "sales",
+        "customer",
+    )
+
+    # Context propre (nettoyé) d'abord
+    if _context_has_any_keyword(c_low, recruitment_context_keywords):
+        s += 0.25
+    elif _context_has_any_keyword(c_low, legal_privacy_context_keywords):
+        s -= 0.18
+    elif _context_has_any_keyword(c_low, support_context_keywords):
+        s -= 0.12
+
+    # Raw_context peut contenir des infos utiles en plus
+    if r_low and _context_has_any_keyword(r_low, recruitment_context_keywords):
+        s += 0.08
+    if r_low and _context_has_any_keyword(r_low, legal_privacy_context_keywords):
+        s -= 0.08
+
+    if not c_low and not r_low:
+        s -= 0.15
+
+    if s < 0.0:
+        return 0.0
+    if s > 1.0:
+        return 1.0
+    return s
+
 def looks_like_fake_email(e: str) -> bool:
     """
     Filtre les emails foireux repérés dans ton log:
@@ -1017,27 +1156,60 @@ def looks_like_fake_email(e: str) -> bool:
 
     return False
 
-def extract_emails_from_text(text: str) -> List[str]:
+def extract_emails_from_text(text: str) -> List[EmailCandidate]:
     if not text:
         return []
     text = deobfuscate_text(text)
-    found = [normalize_email(x) for x in EMAIL_REGEX.findall(text)]
-    out, seen = [], set()
-    for e in found:
-        if not e:
-            continue
-        if looks_like_fake_email(e):
-            continue
-        if e not in seen:
-            seen.add(e)
-            out.append(e)
-    return out
+    seen: Dict[str, EmailCandidate] = {}
 
-def extract_mailtos_from_html(html: str) -> List[str]:
+    # On garde un petit contexte autour de l'email pour scorer
+    # (local-part seul = trop de bruit).
+    for m in EMAIL_REGEX.finditer(text):
+        raw_email = m.group(0)
+        e = normalize_email(raw_email)
+        if not e or looks_like_fake_email(e):
+            continue
+
+        start, end = m.start(), m.end()
+        left = max(0, start - 90)
+        right = min(len(text), end + 90)
+        snippet = text[left:right]
+        raw_context = (snippet or "")[:320]
+        context = _clean_context_for_scoring(snippet)[:260]
+
+        conf = compute_email_confidence(
+            email=e,
+            context=context,
+            raw_context=raw_context,
+            source_type="text",
+        )
+        cand = EmailCandidate(
+            email=e,
+            raw_context=raw_context,
+            context=context,
+            source_type="text",
+            email_confidence=conf,
+        )
+        if e not in seen:
+            seen[e] = cand
+        else:
+            old = seen[e]
+            if conf > (old.email_confidence + 0.05):
+                seen[e] = cand
+            elif len(context) > len(old.context):
+                seen[e] = cand
+            elif ("recrut" in context or "candidature" in context or "postuler" in context) and not (
+                "recrut" in old.context or "candidature" in old.context or "postuler" in old.context
+            ):
+                seen[e] = cand
+
+    return list(seen.values())
+
+def extract_mailtos_from_html(html: str) -> List[EmailCandidate]:
     if not html:
         return []
     soup = BeautifulSoup(html, "lxml")
-    out, seen = [], set()
+    seen: Dict[str, EmailCandidate] = {}
     for a in soup.select("a[href]"):
         href = (a.get("href") or "").strip()
         if href.lower().startswith("mailto:"):
@@ -1047,10 +1219,46 @@ def extract_mailtos_from_html(html: str) -> List[str]:
                 continue
             if looks_like_fake_email(mail):
                 continue
+            # Contexte : label du lien + petit morceau du parent.
+            label = (a.get_text(" ", strip=True) or "").strip()
+            aria = (a.get("aria-label") or "").strip()
+            title = (a.get("title") or "").strip()
+            parent_text = ""
+            try:
+                if a.parent:
+                    parent_text = a.parent.get_text(" ", strip=True)
+            except Exception:
+                parent_text = ""
+            raw_context = " ".join(part for part in [label, aria, title, parent_text[:180]] if part)
+            context = _clean_context_for_scoring(raw_context)[:320]
+
+            conf = compute_email_confidence(
+                email=mail,
+                context=context,
+                raw_context=raw_context[:400],
+                source_type="mailto",
+            )
+            cand = EmailCandidate(
+                email=mail,
+                raw_context=raw_context[:400],
+                context=context,
+                source_type="mailto",
+                email_confidence=conf,
+            )
             if mail not in seen:
-                seen.add(mail)
-                out.append(mail)
-    return out
+                seen[mail] = cand
+            else:
+                old = seen[mail]
+                if conf > (old.email_confidence + 0.05):
+                    seen[mail] = cand
+                elif len(context) > len(old.context):
+                    seen[mail] = cand
+                elif ("recrut" in context or "candidature" in context or "postuler" in context) and not (
+                    "recrut" in old.context or "candidature" in old.context or "postuler" in old.context
+                ):
+                    seen[mail] = cand
+
+    return list(seen.values())
 
 def safe_urljoin(base_url: str, href: str) -> Optional[str]:
     if not href:
@@ -1081,18 +1289,90 @@ def safe_urljoin(base_url: str, href: str) -> Optional[str]:
         return None
 
 def find_contact_like_urls(html: str, base_url: str) -> List[str]:
+    """
+    Backward-compat shim.
+
+    Historically this function mixed recruitment/contact and legal/privacy links.
+    We now return only recruitment/contact/job-listing-like URLs to prevent
+    legal/privacy pages from polluting candidature extraction.
+    """
+    return find_candidate_like_urls(html, base_url)
+
+
+PAGE_TYPE_LEGAL_PRIVACY = "legal_privacy"
+PAGE_TYPE_RECRUITMENT = "recruitment"
+PAGE_TYPE_JOB_LISTINGS = "job_listings"
+PAGE_TYPE_CONTACT = "contact"
+PAGE_TYPE_OTHER = "other"
+
+LEGAL_PRIVACY_URL_KEYWORDS = (
+    "mentions-legales", "mentions_legales", "privacy", "rgpd", "cookies",
+    "politique-de-confidentialite", "politique-confidentialite",
+    "confidentialite", "confidentiality", "data-protection",
+)
+
+JOB_LISTINGS_URL_KEYWORDS = (
+    "jobs", "/jobs", "job", "/job", "careers", "/careers", "carriere", "carrieres",
+    "offre", "offres", "emploi", "employ", "opportunites", "opportunities",
+)
+
+JOB_LISTINGS_PATH_CANDIDATES = (
+    # French/English common paths for job listings
+    "/jobs", "/jobs/",
+    "/job", "/job/",
+    "/careers", "/careers/",
+    "/carrieres", "/carrieres/",
+    "/offres", "/offres/",
+    "/offre", "/offre/",
+    "/emploi", "/emploi/",
+    "/employ", "/employ/",
+    "/opportunites", "/opportunites/",
+    "/opportunities", "/opportunities/",
+)
+
+RECRUITMENT_URL_KEYWORDS = (
+    "recrut", "recruit", "recrutement",
+    "alternance", "stage", "stages", "postuler", "candidature", "candidatures",
+    "talent", "hiring", "join", "nous-rejoindre",
+)
+
+CONTACT_URL_KEYWORDS = (
+    "contact", "nous-contacter", "contactez-nous", "contact-us", "about",
+    "equipe", "team",
+)
+
+
+def get_page_type(url: str, html: Optional[str] = None) -> str:
+    """
+    Heuristique rapide (URL d'abord, texte optionnel ensuite).
+    On veut surtout séparer "legal_privacy" des pages recrutement/offres.
+    """
+    low = (url or "").lower()
+    if any(kw in low for kw in LEGAL_PRIVACY_URL_KEYWORDS):
+        return PAGE_TYPE_LEGAL_PRIVACY
+
+    if any(kw in low for kw in JOB_LISTINGS_URL_KEYWORDS):
+        return PAGE_TYPE_JOB_LISTINGS
+    if any(kw in low for kw in RECRUITMENT_URL_KEYWORDS):
+        return PAGE_TYPE_RECRUITMENT
+    if any(kw in low for kw in CONTACT_URL_KEYWORDS):
+        return PAGE_TYPE_CONTACT
+
+    if html:
+        low_html = html.lower()
+        if any(kw in low_html for kw in ("mentions-legales", "mentions legales", "rgpd", "cookies", "privacy", "confidentiality", "confidentialite")):
+            return PAGE_TYPE_LEGAL_PRIVACY
+        if any(kw in low_html for kw in ("offres d'emploi", "offres d’emploi", "postuler", "candidature", "recrutement", "alternance", "stage")):
+            return PAGE_TYPE_RECRUITMENT
+
+    return PAGE_TYPE_OTHER
+
+
+def _find_urls_by_keywords(html: str, base_url: str, keywords: Tuple[str, ...], cap: int) -> List[str]:
     if not html:
         return []
     soup = BeautifulSoup(html, "lxml")
     candidates: List[str] = []
-
-    keywords = (
-        "contact", "nous-contacter", "contactez-nous", "contact-us",
-        "recrut", "career", "carriere", "carrieres", "jobs", "join",
-        "alternance", "stage", "stages", "mentions-legales", "legal", "privacy",
-        "postuler", "candidature"
-    )
-
     for a in soup.select("a[href]"):
         href = (a.get("href") or "").strip()
         u = safe_urljoin(base_url, href)
@@ -1102,55 +1382,153 @@ def find_contact_like_urls(html: str, base_url: str) -> List[str]:
         if any(k in low for k in keywords):
             candidates.append(u)
 
-    # unique + cap
     out, seen = [], set()
     for u in candidates:
         if u not in seen:
             seen.add(u)
             out.append(u)
-        if len(out) >= 25:
+        if len(out) >= cap:
             break
     return out
 
-def pick_best_email(emails: List[str], reject_support_like: bool = True) -> Optional[str]:
+
+def find_candidate_like_urls(html: str, base_url: str) -> List[str]:
+    """
+    URLs utiles pour trouver une candidature (recrutement, job_listings, contact).
+    Exclut volontairement tout ce qui ressemble à "legal/privacy" pour réduire les faux positifs.
+    """
+    keywords = (
+        "contact", "nous-contacter", "contactez-nous", "contact-us", "about", "equipe", "team",
+        "recrut", "recruit", "career", "carriere", "careers", "jobs", "job", "join",
+        "alternance", "stage", "stages",
+        "postuler", "candidature", "candidatures", "talent", "hiring",
+        "offre", "offres", "emploi", "opportunites", "opportunities",
+    )
+    return _find_urls_by_keywords(html, base_url, keywords=keywords, cap=25)
+
+
+def find_legal_privacy_urls(html: str, base_url: str) -> List[str]:
+    """URLs typiquement legal/privacy (mentions légales, RGPD, cookies...)."""
+    return _find_urls_by_keywords(html, base_url, keywords=LEGAL_PRIVACY_URL_KEYWORDS, cap=15)
+
+def pick_best_email(
+    candidates: List[EmailCandidate],
+    site: str,
+    reject_support_like: bool = True,
+) -> Optional[str]:
     """
     Choisit le meilleur email pour une candidature.
     - Exclut les emails support/help/service (souvent non-RH, ne fonctionnent pas pour recrutement).
     - Priorise fortement les emails RH (recrut@, rh@, jobs@, etc.), puis contact/info.
     """
-    if not emails:
+    if not candidates:
         return None
 
-    emails2 = [e for e in emails if e and not looks_like_fake_email(e)]
-    if not emails2:
+    # Filtrage minimal "anti-bruit" (au cas où)
+    cands: List[EmailCandidate] = []
+    for c in candidates:
+        e = normalize_email(c.email)
+        if not e or looks_like_fake_email(e):
+            continue
+        cands.append(
+            EmailCandidate(
+                email=e,
+                raw_context=c.raw_context or "",
+                context=c.context or "",
+                source_type=c.source_type,
+                email_confidence=getattr(c, "email_confidence", 0.0) or 0.0,
+            )
+        )
+    if not cands:
         return None
 
     # Ne jamais sélectionner support@, help@, service@, etc. pour une candidature
     if reject_support_like:
-        candidates = [e for e in emails2 if not is_support_like_email(e)]
-        if not candidates:
+        cands2 = [c for c in cands if not is_support_like_email(c.email)]
+        if not cands2:
             return None  # que des emails support → on considère comme NOT_FOUND (FORM_ONLY si URLs)
-        emails2 = candidates
+        cands = cands2
 
-    def score_email(e: str) -> int:
-        e = normalize_email(e)
-        local = e.split("@")[0]
+    site_host = host_no_www(site)
+    recruitment_keywords = (
+        "recrut", "recrutement", "recruit", "rh", "candidature", "candidatures", "postuler",
+        "alternance", "stage", "stages", "talent", "hiring", "jobs", "job", "career", "carriere",
+        "offre", "offres", "emploi", "opportunites", "opportunities",
+    )
+    legal_privacy_keywords = (
+        "mentions-legales", "mentions legales", "rgpd", "cookies", "privacy", "confidentialite",
+        "confidentiality", "data-protection", "politique-de-confidentialite", "politique-confidentialite",
+        "confidentialité",
+    )
+    support_keywords = ("support", "help", "service", "newsletter", "marketing", "commercial", "sales", "customer")
+
+    # Contrainte domaine : si on a au moins un email cohérent, on ne sélectionne que dans ce sous-ensemble.
+    if site_host:
+        domain_matches = [c for c in cands if email_domain_matches_site(c.email, site)]
+        if domain_matches:
+            cands = domain_matches
+
+    def score_context(context_low: str) -> int:
+        context_low = (context_low or "").lower()
         s = 0
+        if not context_low:
+            return s
+        if _context_has_any_keyword(context_low, recruitment_keywords):
+            s += 8
+        if _context_has_any_keyword(context_low, legal_privacy_keywords):
+            s -= 10
+        if _context_has_any_keyword(context_low, support_keywords):
+            s -= 6
+        return s
+
+    def score_email(c: EmailCandidate) -> int:
+        e = normalize_email(c.email)
+        local = e.split("@", 1)[0]
+        s = 0
+
         # Priorité maximale : email clairement RH/recrutement
         if is_hr_email(e):
             s += 10
         elif is_generic_email(e):
             s += 4
+
         # bonus supplémentaire pour RH explicite dans le local
-        if any(k in local for k in ("rh", "recrut", "recruit", "job", "jobs", "career", "talent", "hiring", "alternance", "stage")):
-            s += 2
+        if any(
+            k in local
+            for k in (
+                "rh",
+                "recrut",
+                "recruit",
+                "job",
+                "jobs",
+                "career",
+                "carriere",
+                "talent",
+                "hiring",
+                "alternance",
+                "stage",
+            )
+        ):
+            s += 3
+
         # malus si prénom.nom sans être générique (moins prioritaire que recrut@)
         if "." in local and not is_generic_email(e):
             s -= 1
+
+        # Bonus / pénalité domaine (utile pour départager)
+        if site_host:
+            if email_domain_matches_site(e, site):
+                s += 7
+            else:
+                s -= 25
+
+        s += score_context(c.context)
+        # Petit bonus basé sur la confiance heuristique (0..1)
+        s += int(round((getattr(c, "email_confidence", 0.0) or 0.0) * 6))
         return s
 
-    emails2.sort(key=score_email, reverse=True)
-    return emails2[0]
+    cands.sort(key=score_email, reverse=True)
+    return cands[0].email
 
 
 # ============================================================
@@ -1268,9 +1646,12 @@ Je vous joins mon CV et ma lettre de motivation en pieces jointes.
 # ============================================================
 # PER SITE
 # ============================================================
-def try_urls_for_site(site: str, enable_sitemap: bool = False) -> Tuple[Optional[str], Optional[str], List[str], str]:
+def try_urls_for_site(
+    site: str,
+    enable_sitemap: bool = False,
+) -> Tuple[Optional[str], Optional[str], List[str], str, List[str]]:
     """
-    Retourne: (email, source_url, contact_urls, reason)
+    Retourne: (email, source_url, contact_urls, reason, job_listing_urls)
     reason: FOUND | NOT_FOUND | BLOCKED | UNSTABLE
     """
     fetched: Set[str] = set()
@@ -1284,16 +1665,48 @@ def try_urls_for_site(site: str, enable_sitemap: bool = False) -> Tuple[Optional
     html0, st0 = fetch_html(site)
     mark_fetched(site)
     if st0 in (403, 429):
-        return None, None, [], "BLOCKED"
+        return None, None, [], "BLOCKED", []
     if html0 is None:
-        return None, None, [], "UNSTABLE"
+        return None, None, [], "UNSTABLE", []
 
-    contact_urls = find_contact_like_urls(html0, site)
+    contact_urls = find_candidate_like_urls(html0, site)
+    legal_privacy_urls = find_legal_privacy_urls(html0, site)
 
-    emails = extract_mailtos_from_html(html0) + extract_emails_from_text(html0)
-    best = pick_best_email(emails)
+    # ------------------------------------------------------------
+    # Job post discovery (separate from email/candidature discovery)
+    # ------------------------------------------------------------
+    MAX_JOB_LISTING_URLS = 40
+    job_listing_urls: List[str] = []
+    job_listing_url_set: Set[str] = set()
+
+    def add_job_listing_url(u: str) -> None:
+        if not u:
+            return
+        if not allowed_source_domain(site, u):
+            return
+        if get_page_type(u) != PAGE_TYPE_JOB_LISTINGS:
+            return
+        if u in job_listing_url_set:
+            return
+        job_listing_url_set.add(u)
+        job_listing_urls.append(u)
+
+    # Seeds: already-discovered candidate urls + explicit common paths.
+    for u in contact_urls:
+        add_job_listing_url(u)
+    for u in _find_urls_by_keywords(html0, site, keywords=JOB_LISTINGS_URL_KEYWORDS, cap=15):
+        add_job_listing_url(u)
+    for p in JOB_LISTINGS_PATH_CANDIDATES:
+        add_job_listing_url(urljoin(site, p))
+
+    cands = extract_mailtos_from_html(html0) + extract_emails_from_text(html0)
+    best = pick_best_email(cands, site)
     if best:
-        return best, site, contact_urls[:20], "FOUND"
+        pt = get_page_type(site, html0)
+        if pt == PAGE_TYPE_LEGAL_PRIVACY and not is_hr_email(best):
+            best = None
+        if best:
+            return best, site, contact_urls[:20], "FOUND", job_listing_urls[:MAX_JOB_LISTING_URLS]
 
     # Liens réels du site (carrière, contact…) — avant les chemins fixes : souvent moins de requêtes, meilleure cible RH.
     for u in sort_discovered_urls_for_fetch(site, contact_urls)[:MAX_DISCOVERED_URL_FETCH]:
@@ -1305,18 +1718,33 @@ def try_urls_for_site(site: str, enable_sitemap: bool = False) -> Tuple[Optional
             continue
         if not html:
             continue
-        more = find_contact_like_urls(html, u)
+        add_job_listing_url(u)
+        more = find_candidate_like_urls(html, u)
+        more_legal = find_legal_privacy_urls(html, u)
         for x in more:
             if x not in contact_urls:
                 contact_urls.append(x)
-        emails = extract_mailtos_from_html(html) + extract_emails_from_text(html)
-        best = pick_best_email(emails)
+            add_job_listing_url(x)
+        for x in more_legal:
+            if x not in legal_privacy_urls:
+                legal_privacy_urls.append(x)
+        cands = extract_mailtos_from_html(html) + extract_emails_from_text(html)
+        best = pick_best_email(cands, site)
         if best:
-            return best, u, contact_urls[:25], "FOUND"
+            pt = get_page_type(u, html)
+            if pt == PAGE_TYPE_LEGAL_PRIVACY and not is_hr_email(best):
+                continue
+            return best, u, contact_urls[:25], "FOUND", job_listing_urls[:MAX_JOB_LISTING_URLS]
 
     # Chemins usuels (sans refaire une URL déjà téléchargée)
+    # On skip les pages legal/privacy pour ne pas polluer la recherche principale.
+    legal_privacy_fast_paths: List[str] = []
     for p in FAST_PATHS[1:]:
         url = urljoin(site, p)
+        if get_page_type(url) == PAGE_TYPE_LEGAL_PRIVACY:
+            if url not in legal_privacy_fast_paths:
+                legal_privacy_fast_paths.append(url)
+            continue
         if was_fetched(url):
             continue
         mark_fetched(url)
@@ -1325,16 +1753,40 @@ def try_urls_for_site(site: str, enable_sitemap: bool = False) -> Tuple[Optional
             continue
         if not html:
             continue
+        add_job_listing_url(url)
 
-        more = find_contact_like_urls(html, url)
+        more = find_candidate_like_urls(html, url)
+        more_legal = find_legal_privacy_urls(html, url)
         for x in more:
             if x not in contact_urls:
                 contact_urls.append(x)
+            add_job_listing_url(x)
+        for x in more_legal:
+            if x not in legal_privacy_urls:
+                legal_privacy_urls.append(x)
 
-        emails = extract_mailtos_from_html(html) + extract_emails_from_text(html)
-        best = pick_best_email(emails)
+        cands = extract_mailtos_from_html(html) + extract_emails_from_text(html)
+        best = pick_best_email(cands, site)
         if best:
-            return best, url, contact_urls[:25], "FOUND"
+            pt = get_page_type(url, html)
+            if pt == PAGE_TYPE_LEGAL_PRIVACY and not is_hr_email(best):
+                continue
+            return best, url, contact_urls[:25], "FOUND", job_listing_urls[:MAX_JOB_LISTING_URLS]
+
+    # Fallback : si rien n'a fonctionné sur les pages recrutement/contact,
+    # on tente quelques pages legal/privacy mais uniquement si l'email est RH.
+    if legal_privacy_fast_paths or legal_privacy_urls:
+        for u in (legal_privacy_fast_paths + legal_privacy_urls)[:10]:
+            if was_fetched(u):
+                continue
+            mark_fetched(u)
+            html, st = fetch_html(u)
+            if st in (403, 429) or not html:
+                continue
+            cands = extract_mailtos_from_html(html) + extract_emails_from_text(html)
+            best = pick_best_email(cands, site)
+            if best and is_hr_email(best):
+                return best, u, contact_urls[:30], "FOUND", job_listing_urls[:MAX_JOB_LISTING_URLS]
 
     # sitemap (optionnel et léger)
     if enable_sitemap:
@@ -1359,17 +1811,353 @@ def try_urls_for_site(site: str, enable_sitemap: bool = False) -> Tuple[Optional
                 html, st = fetch_html(u)
                 if not html:
                     continue
-                emails = extract_mailtos_from_html(html) + extract_emails_from_text(html)
-                best = pick_best_email(emails)
+                add_job_listing_url(u)
+                cands = extract_mailtos_from_html(html) + extract_emails_from_text(html)
+                best = pick_best_email(cands, site)
                 if best:
                     if u not in contact_urls:
                         contact_urls.append(u)
-                    return best, u, contact_urls[:30], "FOUND"
+                    # Also discover job listing URLs from candidate links on the fetched page.
+                    for x in find_candidate_like_urls(html, u):
+                        add_job_listing_url(x)
+                    pt = get_page_type(u, html)
+                    if pt != PAGE_TYPE_LEGAL_PRIVACY or is_hr_email(best):
+                        return best, u, contact_urls[:30], "FOUND", job_listing_urls[:MAX_JOB_LISTING_URLS]
 
     if contact_urls:
-        return None, None, contact_urls[:30], "NOT_FOUND"
+        return None, None, contact_urls[:30], "NOT_FOUND", job_listing_urls[:MAX_JOB_LISTING_URLS]
 
-    return None, None, [], "NOT_FOUND"
+    return None, None, [], "NOT_FOUND", []
+
+
+@dataclass
+class JobPostCandidate:
+    title: str
+    location: str = ""
+    job_url: str = ""
+    source_url: str = ""
+    posted_date: Optional[str] = None  # ISO date "YYYY-MM-DD"
+    scraped_at: str = ""
+    confidence: float = 0.0
+    # Email contact détecté sur la page du job (optionnel)
+    contact_email: str = ""
+    contact_email_confidence: float = 0.0
+    contact_raw_context: str = ""
+
+
+def _parse_date_to_iso(raw: str) -> Optional[str]:
+    """
+    Try to parse a French/English-ish "posted date" into ISO date (YYYY-MM-DD).
+    Returns None when parsing fails.
+    """
+    if not raw:
+        return None
+    s = re.sub(r"\s+", " ", raw).strip()
+    if not s:
+        return None
+
+    # 2026-03-25 / 25/03/2026 / 25.03.2026
+    m = re.search(r"\b(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})\b", s)
+    if m:
+        y, mo, d = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        try:
+            return datetime(y, mo, d).date().isoformat()
+        except ValueError:
+            return None
+    m = re.search(r"\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\b", s)
+    if m:
+        d, mo, y = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        try:
+            return datetime(y, mo, d).date().isoformat()
+        except ValueError:
+            return None
+
+    # "25 March 2026" / "25 mars 2026"
+    months_fr = {
+        "janvier": 1,
+        "février": 2,
+        "fevrier": 2,
+        "mars": 3,
+        "avril": 4,
+        "mai": 5,
+        "juin": 6,
+        "juillet": 7,
+        "août": 8,
+        "aout": 8,
+        "septembre": 9,
+        "octobre": 10,
+        "novembre": 11,
+        "décembre": 12,
+        "decembre": 12,
+        "décembre": 12,
+    }
+    months_en = {
+        "january": 1,
+        "february": 2,
+        "march": 3,
+        "april": 4,
+        "may": 5,
+        "june": 6,
+        "july": 7,
+        "august": 8,
+        "september": 9,
+        "october": 10,
+        "november": 11,
+        "december": 12,
+    }
+    m = re.search(r"\b(\d{1,2})\s+([A-Za-zÀ-ÿ]+)\s+(\d{4})\b", s)
+    if m:
+        d = int(m.group(1))
+        mon_raw = (m.group(2) or "").strip().lower()
+        y = int(m.group(3))
+        mon = months_fr.get(mon_raw) or months_en.get(mon_raw)
+        if mon:
+            try:
+                return datetime(y, mon, d).date().isoformat()
+            except ValueError:
+                return None
+
+    return None
+
+
+def extract_posted_date_iso(html: str) -> Optional[str]:
+    """
+    Extract posted date from a job listing HTML page.
+    Supports common schema.org + regex fallback.
+    """
+    if not html:
+        return None
+    soup = BeautifulSoup(html, "lxml")
+
+    # schema.org: itemprop="datePosted"
+    for attr in ("itemprop", "name"):
+        tags = soup.select(f'meta[{attr}="datePosted"],*[{attr}="datePosted"],time[{attr}="datePosted"]')
+        for tag in tags:
+            content = (tag.get("content") or "").strip()
+            if not content and tag.name == "time":
+                content = (tag.get("datetime") or "").strip()
+            if not content:
+                content = (tag.get_text(" ", strip=True) or "").strip()
+            iso = _parse_date_to_iso(content)
+            if iso:
+                return iso
+
+    # Common text patterns
+    text = soup.get_text(" ", strip=True)
+    # Examples: "Publié le 25/03/2026", "Mise en ligne : 25 mars 2026", "Posted on March 25, 2026"
+    m = re.search(
+        r"(publi[eé]\s*le|mise\s*en\s*ligne|date\s*(de\s*)?(publication)|posted\s+on)\s*[:\-]?\s*([0-9]{1,4}[\/.-][0-9]{1,2}[\/.-][0-9]{1,4}|[0-9]{1,2}\s+[A-Za-zÀ-ÿ]+\s+[0-9]{4})",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if m:
+        # The posted date itself is always the last capturing group.
+        date_raw = m.group(m.lastindex) if m.lastindex else ""
+        iso = _parse_date_to_iso(date_raw)
+        if iso:
+            return iso
+
+    return None
+
+
+def _extract_location_from_text(text: str) -> str:
+    if not text:
+        return ""
+    t = re.sub(r"\s+", " ", text).strip()
+    if not t:
+        return ""
+
+    # Prefer known city names (derived from the existing zone keyword list).
+    # We keep the match simple to avoid false positives.
+    city_candidates = sorted({kw.title() for kw in PREFERRED_ZONE_KEYWORDS if kw != "auxerre"}, key=len, reverse=True)
+    for city in city_candidates:
+        if city and re.search(rf"\b{re.escape(city)}\b", t, flags=re.IGNORECASE):
+            return city
+
+    # Fallback: "Localisation: <...>"
+    m = re.search(r"(locali(sation|zation)|location)\s*[:\-]\s*([^|,;\n\r]{2,60})", t, flags=re.IGNORECASE)
+    if m:
+        return (m.group(3) or "").strip()[:60]
+    return ""
+
+
+def _nearest_heading_text(a) -> str:
+    """
+    Best-effort: find closest heading text (h1..h3) around an anchor.
+    """
+    try:
+        cur = a
+        for _ in range(4):
+            cur = getattr(cur, "parent", None) or None
+            if not cur:
+                break
+            for h in cur.find_all(["h1", "h2", "h3"], limit=2):
+                ht = (h.get_text(" ", strip=True) or "").strip()
+                if ht:
+                    return ht
+    except Exception:
+        pass
+    try:
+        return (a.get_text(" ", strip=True) or "").strip()
+    except Exception:
+        return ""
+
+
+def extract_jobs_from_job_listing_urls(
+    job_listing_urls: List[str],
+    company_site: str,
+    max_listing_pages: int = 3,
+    max_jobs_total: int = 15,
+    max_job_contact_fetch: int = 2,
+) -> List[JobPostCandidate]:
+    """
+    Extract job posts from job listing pages.
+    Heuristics-first extraction to keep precision high.
+    """
+    if not job_listing_urls:
+        return []
+
+    scraped_at = datetime.utcnow().isoformat()
+    out_by_job_url: Dict[str, JobPostCandidate] = {}
+
+    def job_url_key(u: str) -> str:
+        return _canonical_fetch_key(u)
+
+    listing_subset = job_listing_urls[:max_listing_pages]
+    for listing_url in listing_subset:
+        html, st = fetch_html(listing_url)
+        if st in (403, 429) or not html:
+            continue
+
+        page_posted_date = extract_posted_date_iso(html)
+        soup = BeautifulSoup(html, "lxml")
+
+        # Job-like link keywords
+        job_detail_keywords = (
+            "offre",
+            "offres",
+            "job",
+            "jobs",
+            "emploi",
+            "employ",
+            "opportunite",
+            "opportunites",
+            "opportunities",
+            "/offre",
+            "/offres",
+            "/job",
+            "/jobs",
+        )
+        title_keywords = (
+            "alternance",
+            "stage",
+            "offre",
+            "emploi",
+            "job",
+            "candidature",
+            "postuler",
+        )
+
+        anchors = soup.select("a[href]")
+        for a in anchors:
+            href = (a.get("href") or "").strip()
+            if not href:
+                continue
+            job_url = safe_urljoin(listing_url, href)
+            if not job_url:
+                continue
+            low_url = job_url.lower()
+            if not any(kw in low_url for kw in job_detail_keywords):
+                # Some listing pages do not use "job" in the URL; we use anchor text too.
+                pass
+
+            anchor_text = (a.get_text(" ", strip=True) or "").strip()
+            title_text = (a.get("title") or "").strip()
+            nearest_heading = _nearest_heading_text(a)
+            combined_text = " ".join(part for part in [anchor_text, title_text, nearest_heading] if part)
+            combined_low = combined_text.lower()
+
+            if not any(kw in combined_low for kw in title_keywords) and not any(kw in low_url for kw in job_detail_keywords):
+                continue
+
+            if not allowed_source_domain(company_site, job_url):
+                continue
+            if is_ats_domain(job_url):
+                continue
+
+            # Title
+            title = anchor_text or title_text or nearest_heading
+            title = title.strip()
+            if not title:
+                continue
+            title = title[:180]
+
+            # Location from nearby text
+            parent_text = ""
+            try:
+                parent_text = a.parent.get_text(" ", strip=True)
+            except Exception:
+                parent_text = anchor_text
+            location = _extract_location_from_text(parent_text)[:60]
+
+            # Confidence
+            conf = 0.25
+            if page_posted_date:
+                conf += 0.1
+            if any(kw in combined_low for kw in ("alternance", "stage")):
+                conf += 0.25
+            if any(kw in combined_low for kw in ("offre", "emploi", "opportunit", "job")):
+                conf += 0.2
+            if location:
+                conf += 0.1
+            if any(kw in low_url for kw in ("/offre", "/offres", "/job", "/jobs", "/emploi")):
+                conf += 0.15
+
+            # Dedup + keep highest confidence
+            key = job_url_key(job_url)
+            prev = out_by_job_url.get(key)
+            candidate = JobPostCandidate(
+                title=title,
+                location=location,
+                job_url=job_url,
+                source_url=listing_url,
+                posted_date=page_posted_date,
+                scraped_at=scraped_at,
+                confidence=conf,
+            )
+            if not prev or candidate.confidence > prev.confidence:
+                out_by_job_url[key] = candidate
+
+            if len(out_by_job_url) >= max_jobs_total:
+                break
+
+        if len(out_by_job_url) >= max_jobs_total:
+            break
+
+    jobs = list(out_by_job_url.values())
+    jobs.sort(key=lambda j: j.confidence, reverse=True)
+    jobs = jobs[:max_jobs_total]
+
+    # Optional: fetch a couple job pages to extract a job-specific HR contact email.
+    for i, job in enumerate(jobs[:max_job_contact_fetch]):
+        html, st = fetch_html(job.job_url)
+        if st in (403, 429) or not html:
+            continue
+        cands = extract_mailtos_from_html(html) + extract_emails_from_text(html)
+        best = pick_best_email(cands, company_site)
+        if best:
+            # Recover candidate metadata (confidence + context) for the selected email.
+            best_norm = normalize_email(best)
+            for c in cands:
+                if normalize_email(c.email) == best_norm:
+                    job.contact_email = best_norm
+                    job.contact_email_confidence = float(getattr(c, "email_confidence", 0.0) or 0.0)
+                    job.contact_raw_context = c.raw_context or ""
+                    break
+            if is_hr_email(best):
+                job.confidence = min(1.0, job.confidence + 0.15)
+
+    return jobs
 
 
 # ============================================================
@@ -1398,8 +2186,14 @@ def run_email_finder(
     fieldnames = [
         "entreprise", "zone", "ville", "site", "score",
         "alternance_relevance", "contact_quality", "zone_score",
-        "status", "email", "source_url", "contact_urls", "reason",
+        "status", "email", "source_url", "contact_urls", "job_listing_urls", "job_posts_json", "reason",
     ]
+
+    def infer_user_key_from_path(p: str) -> str:
+        pp = (p or "").replace("\\", "/")
+        # Expect: .../data/exports/users/<user_key>/...
+        m = re.search(r"/users/([^/]+)/", pp)
+        return (m.group(1) if m else "").strip()
 
     done_sites = load_done_sites(emails_found_csv)
     if done_sites:
@@ -1417,6 +2211,46 @@ def run_email_finder(
     deadline = time.time() + max_minutes * 60
     lock = threading.Lock()
 
+    # Optional Postgres persistence (only when DATABASE_URL is configured + user_key can be inferred).
+    db = None
+    user_key = infer_user_key_from_path(emails_found_csv) or infer_user_key_from_path(drafts_txt)
+    if user_key and (os.getenv("DATABASE_URL") or "").strip():
+        try:
+            from recruiting_db import RecruitingDB, normalize_domain
+
+            db = RecruitingDB()
+            db.ensure_schema()
+            # Insert a scrape run row for traceability. (No FK linking yet.)
+            scrape_run_id = f"hunter_{int(time.time())}"
+            try:
+                db.insert_scrape_run(
+                    user_key=user_key,
+                    run_id=scrape_run_id,
+                    zone=None,
+                    focus=focus,
+                    sector=sector,
+                    mode="hunter",
+                )
+            except Exception:
+                # Schema exists; ignore if insert_scrape_run fails (non-blocking).
+                pass
+        except Exception as e:
+            print(f"⚠️  Postgres disabled (init error): {e!s}")
+            db = None
+            normalize_domain = None  # type: ignore[assignment]
+    else:
+        normalize_domain = None  # type: ignore[assignment]
+
+    # Optional debug evidence (JSON files for diagnosing extraction false positives).
+    debug_dir = (os.getenv("RECRUITING_DEBUG_DIR") or "").strip()
+    debug_enabled = bool(debug_dir and user_key)
+    debug_base = os.path.join(debug_dir, user_key) if debug_enabled else ""
+    if debug_enabled:
+        try:
+            os.makedirs(debug_base, exist_ok=True)
+        except Exception:
+            debug_enabled = False
+
     processed = 0
     found = 0
     blocked = 0
@@ -1429,11 +2263,37 @@ def run_email_finder(
     pending.sort(key=lambda t: t.score, reverse=True)
 
     def job(t: Target):
+        jobs: List[JobPostCandidate] = []
         try:
-            email, source_url, contact_urls, reason = try_urls_for_site(t.site, enable_sitemap)
+            email, source_url, contact_urls, reason, job_listing_urls = try_urls_for_site(t.site, enable_sitemap)
+            job_posts_json = "[]"
+            if job_listing_urls:
+                jobs = extract_jobs_from_job_listing_urls(
+                    job_listing_urls=job_listing_urls,
+                    company_site=t.site,
+                    max_listing_pages=3,
+                    max_jobs_total=12,
+                    max_job_contact_fetch=2,
+                )
+                job_posts_json = json.dumps(
+                    [
+                        {
+                            "title": j.title,
+                            "location": j.location,
+                            "job_url": j.job_url,
+                            "posted_date": j.posted_date,
+                            "confidence": round(j.confidence, 3),
+                            "contact_email": j.contact_email,
+                            "contact_email_confidence": round(j.contact_email_confidence, 3),
+                        }
+                        for j in jobs
+                    ],
+                    ensure_ascii=False,
+                )
         except Exception:
-            email, source_url, contact_urls, reason = None, None, [], "ERROR"
-        return t, email, source_url, contact_urls, reason
+            email, source_url, contact_urls, reason, job_listing_urls = None, None, [], "ERROR", []
+            job_posts_json = "[]"
+        return t, email, source_url, contact_urls, job_listing_urls, jobs, job_posts_json, reason
 
     # Submit in batches so that when we hit target_found we only wait for this batch, not all targets
     batch_size = max(workers * 2, 40)
@@ -1462,7 +2322,11 @@ def run_email_finder(
                         stop_requested = True
                         break
 
-                    t, email, source_url, contact_urls, reason = fut.result()
+                    t, email, source_url, contact_urls, job_listing_urls, jobs, job_posts_json, reason = fut.result()
+
+                    company_domain = None
+                    if normalize_domain is not None:
+                        company_domain = normalize_domain(t.site)
 
                     with lock:
                         processed += 1
@@ -1540,6 +2404,8 @@ def run_email_finder(
                             "email": email or "",
                             "source_url": source_url or "",
                             "contact_urls": " | ".join(contact_urls) if contact_urls else "",
+                            "job_listing_urls": " | ".join(job_listing_urls) if job_listing_urls else "",
+                            "job_posts_json": job_posts_json,
                             "reason": reason,
                         }
                     writer.writerow(row)
@@ -1554,6 +2420,113 @@ def run_email_finder(
                         print(f"    📨 FORM_ONLY ({len(contact_urls)} url(s) contact/career)")
                     else:
                         print(f"    ❌ NOT_FOUND (reason={reason})")
+
+                    # Postgres upserts (non-blocking, best-effort).
+                    if db and company_domain:
+                        try:
+                            company_id = db.upsert_company(
+                                user_key=user_key,
+                                name=t.entreprise,
+                                website=t.site,
+                                domain=company_domain,
+                            )
+                            now_dt = datetime.utcnow()
+                            if email:
+                                db.upsert_contact(
+                                    user_key=user_key,
+                                    company_id=company_id,
+                                    email=email,
+                                    contact_kind="rh" if is_hr_email(email) else "contact",
+                                    is_hr=bool(is_hr_email(email)),
+                                    source_url=source_url or None,
+                                    scraped_date=now_dt,
+                                    confidence=1.0 if is_hr_email(email) else 0.5,
+                                    raw_context=None,
+                                )
+                            for j in jobs:
+                                posted_date = None
+                                if j.posted_date:
+                                    try:
+                                        posted_date = datetime.fromisoformat(j.posted_date).date()
+                                    except Exception:
+                                        posted_date = None
+                                scraped_dt = now_dt
+                                if j.scraped_at:
+                                    try:
+                                        scraped_dt = datetime.fromisoformat(j.scraped_at)
+                                    except Exception:
+                                        scraped_dt = now_dt
+
+                                job_id = db.upsert_job_post(
+                                    user_key=user_key,
+                                    company_id=company_id,
+                                    title=j.title,
+                                    location=j.location or None,
+                                    job_url=j.job_url,
+                                    source_url=j.source_url or None,
+                                    posted_date=posted_date,
+                                    scraped_date=scraped_dt,
+                                    status="open",
+                                    confidence=j.confidence,
+                                )
+
+                                if j.contact_email:
+                                    db.upsert_contact(
+                                        user_key=user_key,
+                                        company_id=company_id,
+                                        email=j.contact_email,
+                                        contact_kind="rh" if is_hr_email(j.contact_email) else "contact",
+                                        is_hr=bool(is_hr_email(j.contact_email)),
+                                        source_url=j.job_url,
+                                        scraped_date=scraped_dt,
+                                        confidence=j.contact_email_confidence or 0.0,
+                                        raw_context=j.contact_raw_context or None,
+                                    )
+                        except Exception as e:
+                            # Never stop scraping due to DB issues.
+                            print(f"⚠️  Postgres upsert failed for {t.entreprise}: {e!s}")
+
+                    # Debug output (non-blocking).
+                    if debug_enabled:
+                        try:
+                            company_slug = (company_domain or t.site or "company").strip().lower()
+                            company_slug = re.sub(r"[^a-zA-Z0-9._-]+", "_", company_slug)
+                            debug_file = os.path.join(debug_base, f"{company_slug}_{processed}.json")
+                            debug_payload = {
+                                "user_key": user_key,
+                                "company": t.entreprise,
+                                "site": t.site,
+                                "domain": company_domain,
+                                "zone": t.zone,
+                                "ville": t.ville,
+                                "email_extraction": {
+                                    "email": email or "",
+                                    "source_url": source_url or "",
+                                    "page_type": get_page_type(source_url or t.site),
+                                    "reason": reason,
+                                },
+                                "job_listing_urls": job_listing_urls,
+                                "job_posts": [
+                                    {
+                                        "title": j.title,
+                                        "location": j.location,
+                                        "job_url": j.job_url,
+                                        "source_url": j.source_url,
+                                        "posted_date": j.posted_date,
+                                        "confidence": j.confidence,
+                                        "page_type": get_page_type(j.job_url),
+                                        "contact_email": j.contact_email,
+                                        "contact_email_confidence": j.contact_email_confidence,
+                                        "contact_raw_context": j.contact_raw_context,
+                                    }
+                                    for j in jobs
+                                ],
+                                "status": status,
+                            }
+                            with open(debug_file, "w", encoding="utf-8") as fh:
+                                json.dump(debug_payload, fh, ensure_ascii=False, indent=2)
+                        except Exception:
+                            pass
 
                     if found >= target_found:
                         print(f"\n🎯 STOP: target-found atteint ({found}/{target_found}).")

@@ -52,7 +52,6 @@ export async function GET(): Promise<NextResponse> {
         run_max_sites: 1500,
         run_target_found: 100,
         run_workers: 20,
-        run_use_ai: false,
       },
       profile_completed: name.firstName.length > 0 && name.lastName.length > 0,
       email: userEmail,
@@ -95,7 +94,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     run_max_sites?: number;
     run_target_found?: number;
     run_workers?: number;
-    run_use_ai?: boolean;
   };
 
   const firstName = (payload.first_name ?? "").trim();
@@ -120,7 +118,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const runMaxSites = Number(payload.run_max_sites ?? 1500);
   const runTargetFound = Number(payload.run_target_found ?? 100);
   const runWorkers = Number(payload.run_workers ?? 20);
-  const runUseAi = payload.run_use_ai === true;
 
   if (!ALLOWED_MODES.has(runMode)) {
     return NextResponse.json({ detail: "Mode pipeline invalide." }, { status: 400 });
@@ -162,7 +159,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     runMaxSites,
     runTargetFound,
     runWorkers,
-    runUseAi,
   });
   return NextResponse.json({
     ok: true,

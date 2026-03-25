@@ -9,23 +9,86 @@ export default function Home() {
         {/* HERO SECTION */}
         <section className={styles.hero}>
           <div className={styles.heroBackground} />
-          <div className={styles.eyebrow}>SaaS Orienté Développeurs</div>
+          <div className={styles.betaPill}>
+            ● Beta gratuite · Aucune carte requise
+          </div>
           <h1 className={styles.heroTitle}>
             Automatisez vos candidatures, <br />
             <span className={styles.textGradient}>gardez le contrôle absolu.</span>
           </h1>
           <p className={styles.heroSubtitle}>
-            Générez des dizaines de brouillons ciblés directement dans votre boîte Gmail. 
-            Vous gardez la main sur le cliquage final. Zéro spam, 100% de pertinence.
+            Créez en quelques secondes des brouillons d'alternance ultra ciblés directement depuis Gmail.
+            Vous validez chaque envoi : zéro spam, 100% de pertinence.
           </p>
           <div className={styles.heroActions}>
-            <Link href="/dashboard" className={styles.primaryBtn}>
-              🚀 Commencer gratuitement
-            </Link>
-            <Link href="/login" className={styles.secondaryBtn}>
+            <Link href="/login" className={styles.primaryBtn}>
               <GoogleLogo size={20} />
               Continuer avec Google
             </Link>
+            <a
+              href="https://github.com/Mahdi-Chaouch/alternance-killer"
+              target="_blank"
+              rel="noreferrer noopener"
+              className={styles.secondaryBtn}
+            >
+              Voir le code source
+            </a>
+          </div>
+
+          {/* Product frame (placeholder statique) */}
+          <div className={styles.heroProductFrame} aria-hidden="true">
+            <div className={styles.frameTopbar}>
+              <div className={styles.frameDots}>
+                <span className={`${styles.frameDot} ${styles.frameDotRed}`} />
+                <span className={`${styles.frameDot} ${styles.frameDotYellow}`} />
+                <span className={`${styles.frameDot} ${styles.frameDotGreen}`} />
+              </div>
+              <div className={styles.frameUrl}>alternance-hunter.com/dashboard</div>
+            </div>
+            <div className={styles.frameBody}>
+              <aside className={styles.frameSidebar}>
+                <div className={styles.frameSidebarItem} />
+                <div className={styles.frameSidebarItem} />
+                <div className={styles.frameSidebarItem} />
+                <div className={styles.frameSidebarSpacer} />
+                <div className={styles.frameSidebarChip} />
+              </aside>
+              <section className={styles.frameMain}>
+                <div className={styles.frameStatsRow}>
+                  <div className={styles.frameStatCard} />
+                  <div className={styles.frameStatCard} />
+                  <div className={styles.frameStatCard} />
+                </div>
+                <div className={styles.frameTerminal}>
+                  <div className={styles.frameTerminalHeader}>
+                    <span className={styles.frameTerminalHeaderDot} />
+                    Live logs & Terminal
+                  </div>
+                  <div className={styles.frameTerminalLines}>
+                    <div className={styles.frameLine} />
+                    <div className={styles.frameLine} />
+                    <div className={styles.frameLine} />
+                    <div className={styles.frameLine} />
+                    <div className={styles.frameLineShort} />
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div className={styles.heroTrustRow}>
+            <div className={styles.heroTrustItem}>
+              <span className={styles.heroTrustCheck}>✓</span>
+              Aucun email envoyé sans validation
+            </div>
+            <div className={styles.heroTrustItem}>
+              <span className={styles.heroTrustCheck}>✓</span>
+              OAuth Google officiel
+            </div>
+            <div className={styles.heroTrustItem}>
+              <span className={styles.heroTrustCheck}>✓</span>
+              100% open source
+            </div>
           </div>
         </section>
 
@@ -97,11 +160,14 @@ export default function Home() {
 
         {/* PRICING */}
         <section className={styles.section} id="pricing">
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Tarification simple</h2>
-            <p className={styles.sectionLead}>L'outil est actuellement un projet personnel. Profitez-en !</p>
-          </div>
-          <div className={`${styles.card} ${styles.pricingCard}`}>
+          <div className={styles.pricingSectionCard}>
+            <div className={styles.sectionHeader}>
+              <h2 className={styles.sectionTitle}>Tarification simple</h2>
+              <p className={styles.sectionLead}>
+                L'outil est actuellement un projet personnel. Profitez-en !
+              </p>
+            </div>
+            <div className={`${styles.card} ${styles.pricingCard}`}>
             <span className={styles.pricingBadge}>Beta Accès Libre</span>
             <h3 className={styles.cardTitle}>Plan Étudiant</h3>
             <div className={styles.pricingPrice}>
@@ -117,6 +183,7 @@ export default function Home() {
             <Link href="/dashboard" className={styles.primaryBtn} style={{ width: '100%' }}>
               Commencer gratuitement
             </Link>
+          </div>
           </div>
         </section>
 
@@ -154,7 +221,7 @@ export default function Home() {
           <div className={`${styles.card} ${styles.aboutLayout}`}>
             <div>
               <h2 className={styles.cardTitle}>Le Projet & Développeur</h2>
-              <p className={styles.cardText} style={{ marginBottom: '1rem' }}>
+              <p className={`${styles.cardText} ${styles.aboutLeadText}`}>
                 Alternance Hunter est développé par <strong>Mahdi Chaouch</strong>. C'est une solution 
                 née d'un besoin réel lors de ma recherche d'alternance.
               </p>
