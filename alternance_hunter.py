@@ -1312,7 +1312,11 @@ LEGAL_PRIVACY_URL_KEYWORDS = (
 )
 
 JOB_LISTINGS_URL_KEYWORDS = (
+    # Paths/pages where job listings are commonly hosted.
+    # NOTE: we also include "recrutement" because many French sites expose their job listings at
+    # something like `/recrutement/` (e.g. Sadev94).
     "jobs", "/jobs", "job", "/job", "careers", "/careers", "carriere", "carrieres",
+    "recrutement", "/recrutement",
     "offre", "offres", "emploi", "employ", "opportunites", "opportunities",
 )
 
@@ -1322,6 +1326,7 @@ JOB_LISTINGS_PATH_CANDIDATES = (
     "/job", "/job/",
     "/careers", "/careers/",
     "/carrieres", "/carrieres/",
+    "/recrutement", "/recrutement/",
     "/offres", "/offres/",
     "/offre", "/offre/",
     "/emploi", "/emploi/",
