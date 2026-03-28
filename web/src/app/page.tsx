@@ -243,9 +243,9 @@ export default function Home() {
               </div>
               <div>
                 <ul className={styles.contactLinks}>
-                  <li><a href="mailto:mah.chaouch@gmail.com" className={styles.contactLink}>✉️ Envoyer un email</a></li>
-                  <li><a href="https://linkedin.com/in/mahdi-chaouch" className={styles.contactLink} target="_blank" rel="noreferrer noopener">💼 Profil LinkedIn</a></li>
-                  <li><a href="https://github.com/Mahdi-Chaouch/alternance-killer" className={styles.contactLink} target="_blank" rel="noreferrer noopener">📦 Code Source (GitHub)</a></li>
+                  <li><a href="mailto:mahdichaouch435@gmail.com" className={styles.contactLink}>✉️ Envoyer un email</a></li>
+                  <li><a href="https://www.linkedin.com/in/mahdi-chaouch-3a27263a0"className={styles.contactLink} target="_blank" rel="noreferrer noopener">💼 Profil LinkedIn</a></li>
+                  <li><a href="https://github.com/Mahdi-Chaouch/alternance-hunter" className={styles.contactLink} target="_blank" rel="noreferrer noopener">📦 Code Source (GitHub)</a></li>
                 </ul>
               </div>
             </div>
