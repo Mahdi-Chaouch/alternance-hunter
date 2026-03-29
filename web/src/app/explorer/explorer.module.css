@@ -1,0 +1,326 @@
+.page {
+  min-height: 100vh;
+  padding: 2rem 1.5rem 4rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 2rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0 0 0.4rem 0;
+}
+
+.subtitle {
+  color: var(--subtle-text, #6b7280);
+  margin: 0;
+  font-size: 1rem;
+}
+
+.searchBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  align-items: center;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 180px;
+  padding: 0.65rem 1rem;
+  border: 1.5px solid rgba(139, 92, 246, 0.25);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  background: var(--card-bg, #fff);
+  color: var(--text, #111);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.searchInput:focus {
+  border-color: #8b5cf6;
+}
+
+.selectInput {
+  padding: 0.65rem 1rem;
+  border: 1.5px solid rgba(139, 92, 246, 0.25);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  background: var(--card-bg, #fff);
+  color: var(--text, #111);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.selectInput:focus {
+  border-color: #8b5cf6;
+}
+
+.searchBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem 1.2rem;
+  background: linear-gradient(135deg, #8b5cf6, #d946ef);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.searchBtn:hover {
+  opacity: 0.88;
+}
+
+.stats {
+  font-size: 0.85rem;
+  color: var(--subtle-text, #6b7280);
+  margin-bottom: 1.25rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.card {
+  background: var(--card-bg, #fff);
+  border: 1.5px solid rgba(139, 92, 246, 0.15);
+  border-radius: 14px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.1);
+}
+
+.cardName {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardDomain {
+  font-size: 0.8rem;
+  color: #8b5cf6;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardDomain:hover {
+  text-decoration: underline;
+}
+
+.cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+}
+
+.badgeGray {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+}
+
+.candidaterBtn {
+  margin-top: auto;
+  padding: 0.6rem 1rem;
+  background: linear-gradient(135deg, #8b5cf6, #d946ef);
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.candidaterBtn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.candidaterBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.candidaterBtnDone {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.pageBtn {
+  padding: 0.5rem 1rem;
+  border: 1.5px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text, #111);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.pageBtn:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.pageBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pageCurrent {
+  font-size: 0.9rem;
+  color: var(--subtle-text, #6b7280);
+}
+
+.empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--subtle-text, #6b7280);
+}
+
+.emptyIcon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Modal */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal {
+  background: var(--card-bg, #fff);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modalTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+}
+
+.modalSubtitle {
+  font-size: 0.9rem;
+  color: var(--subtle-text, #6b7280);
+  margin: 0 0 1.5rem 0;
+}
+
+.modalActions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+.btnSecondary {
+  padding: 0.6rem 1.2rem;
+  border: 1.5px solid rgba(139, 92, 246, 0.3);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text, #111);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btnPrimary {
+  padding: 0.6rem 1.2rem;
+  background: linear-gradient(135deg, #8b5cf6, #d946ef);
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  padding: 0.9rem 1.4rem;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  z-index: 2000;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.25s ease;
+}
+
+.toastSuccess {
+  background: #10b981;
+  color: #fff;
+}
+
+.toastError {
+  background: #ef4444;
+  color: #fff;
+}
+
+@keyframes slideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.loading {
+  text-align: center;
+  padding: 3rem;
+  color: var(--subtle-text, #6b7280);
+}

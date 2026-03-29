@@ -6,9 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import styles from "../page.module.css";
 import { authClient } from "@/lib/auth-client";
 import { GoogleLogo } from "@/app/components/GoogleLogo";
-import { 
-  LayoutDashboard, User, FolderOpen, Settings, Terminal as TerminalIcon, 
-  Save, LogOut, MapPin, Search, FileText, Mail, Play, Square, X, RefreshCw
+import {
+  LayoutDashboard, User, FolderOpen, Settings, Terminal as TerminalIcon,
+  Save, LogOut, MapPin, Search, FileText, Mail, Play, Square, X, RefreshCw,
+  Hand, Eye
 } from "lucide-react";
 
 import { COMMUNES_FRANCE } from "@/data/communes-france";
@@ -1130,7 +1131,7 @@ function DashboardContent() {
         <main className={styles.main}>
           <section className={styles.panel}>
             <p className={styles.eyebrow}>Alternance Hunter</p>
-            <h1>👋 Bienvenue</h1>
+            <h1><Hand size={28} style={{ verticalAlign: 'middle', marginRight: '0.4rem' }} />Bienvenue</h1>
             <p className={styles.panelHint}>
               Connectez-vous avec votre compte Google invite pour acceder au dashboard et lancer vos
               executions.
@@ -1141,7 +1142,7 @@ function DashboardContent() {
                 Se connecter
               </button>
               <Link href="/dashboard?demo=1" className={styles.secondaryBtn} style={{ display: "inline-block", textDecoration: "none" }}>
-                👀 Voir le dashboard en démo
+                <Eye size={16} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Voir le dashboard en démo
               </Link>
               <button
                 className={styles.secondaryBtn}
@@ -1186,6 +1187,7 @@ function DashboardContent() {
             <a href="#step-config" className={styles.sidebarLink}><Settings size={18} /> Config. Recherche</a>
             <a href="#step-runs" className={styles.sidebarLink}><LayoutDashboard size={18} /> Historique & Suivi</a>
             <a href="#step-logs" className={styles.sidebarLink}><TerminalIcon size={18} /> Terminal Live</a>
+            <Link href="/explorer" className={styles.sidebarLink} style={{ marginTop: '0.5rem', borderTop: '1px solid rgba(139,92,246,0.12)', paddingTop: '0.75rem' }}><Search size={18} /> Explorer les entreprises</Link>
           </nav>
 
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -1205,7 +1207,7 @@ function DashboardContent() {
         {/* MAIN CONTENT */}
         <main className={styles.mainContentArea} style={{ flex: 1, padding: '2.5rem 3rem', overflowY: 'auto', background: 'transparent' }}>
           <header style={{ marginBottom: '2.5rem' }}>
-            <h1 style={{ fontSize: '2.2rem', margin: '0 0 0.5rem 0', fontWeight: 800 }}>Content de vous revoir{firstName ? `, ${firstName}` : ''} 👋</h1>
+            <h1 style={{ fontSize: '2.2rem', margin: '0 0 0.5rem 0', fontWeight: 800 }}>Content de vous revoir{firstName ? `, ${firstName}` : ''} <Hand size={28} style={{ verticalAlign: 'middle' }} /></h1>
             <p style={{ color: 'var(--subtle-text)', margin: 0, fontSize: '1.05rem' }}>Poursuivez la configuration ou lancez une nouvelle recherche ludique.</p>
           </header>
 

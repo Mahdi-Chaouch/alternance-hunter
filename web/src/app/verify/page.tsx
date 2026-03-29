@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { Mail, CheckCircle } from "lucide-react";
 import styles from "../login/login.module.css";
 
 export default function VerifyEmailPage() {
@@ -30,7 +31,7 @@ export default function VerifyEmailPage() {
         return;
       }
 
-      setSuccess("Ton email est vérifié. Tu peux maintenant te connecter 🎉");
+      setSuccess("Ton email est vérifié. Tu peux maintenant te connecter.");
       setCode("");
     } catch {
       setError("Erreur réseau pendant la vérification. Réessaie dans un instant.");
@@ -44,7 +45,7 @@ export default function VerifyEmailPage() {
       <section className={styles.layout}>
         <div className={styles.copy}>
           <p className={styles.eyebrow}>Alternance Hunter</p>
-          <h1 className={styles.title}>📧 Vérifie ton adresse email</h1>
+          <h1 className={styles.title}><Mail size={28} style={{ verticalAlign: 'middle', marginRight: '0.4rem' }} />Vérifie ton adresse email</h1>
           <p className={styles.subtitle}>
             Colle le code de vérification que tu as reçu par email pour activer
             ton compte Alternance Hunter.
@@ -102,7 +103,7 @@ export default function VerifyEmailPage() {
 
           {success ? (
             <p role="status" className={styles.cardHint}>
-              {success}
+              <CheckCircle size={16} />{success}
             </p>
           ) : null}
         </div>

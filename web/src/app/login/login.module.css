@@ -97,6 +97,9 @@
   margin: 0.4rem 0 0;
   font-size: 0.86rem;
   color: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .form {

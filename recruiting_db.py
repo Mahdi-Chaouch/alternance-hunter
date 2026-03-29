@@ -4,6 +4,7 @@
 Postgres persistence for recruiting data extracted by alternance_hunter.py.
 
 Tables created from `recruiting_schema.sql`.
+Companies, contacts and job_posts are SHARED across all users.
 Upserts are designed to keep the highest confidence and to deduplicate on unique constraints.
 """
 
@@ -34,7 +35,6 @@ def normalize_domain(website_or_domain: str) -> str:
     if not v:
         return ""
     if "://" not in v:
-        # Might be a raw domain
         return v.replace("www.", "")
     try:
         p = urlparse(v)
@@ -58,7 +58,6 @@ class RecruitingDB:
     def _conn(self):
         conn = getattr(self._local, "conn", None)
         if conn is None or getattr(conn, "closed", False):
-            # Autocommit is off by default; we commit in each method.
             self._local.conn = psycopg.connect(self._database_url)
             conn = self._local.conn
         return conn
@@ -80,10 +79,11 @@ class RecruitingDB:
     def upsert_company(
         self,
         *,
-        user_key: str,
         name: str,
         website: str,
         domain: str,
+        sector: Optional[str] = None,
+        location: Optional[str] = None,
     ) -> int:
         self.ensure_schema()
         domain = normalize_domain(domain)
@@ -93,16 +93,18 @@ class RecruitingDB:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO companies (user_key, name, website, domain)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (user_key, domain)
+                INSERT INTO companies (name, website, domain, sector, location)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (domain)
                 DO UPDATE SET
                     name = EXCLUDED.name,
                     website = EXCLUDED.website,
+                    sector = COALESCE(EXCLUDED.sector, companies.sector),
+                    location = COALESCE(EXCLUDED.location, companies.location),
                     last_seen_at = NOW()
                 RETURNING id
                 """,
-                (user_key, name_norm, website_norm, domain),
+                (name_norm, website_norm, domain, sector, location),
             )
             row = cur.fetchone()
             if not row:
@@ -121,10 +123,6 @@ class RecruitingDB:
         sector: Optional[str] = None,
         mode: Optional[str] = None,
     ) -> int:
-        """
-        Insert one scrape run row.
-        We keep it simple (no upsert) because alternance_hunter runs are typically distinct.
-        """
         self.ensure_schema()
         conn = self._conn()
         with conn.cursor() as cur:
@@ -135,14 +133,7 @@ class RecruitingDB:
                 ) VALUES (%s,%s,%s,%s,%s,%s)
                 RETURNING id
                 """,
-                (
-                    run_id,
-                    user_key,
-                    zone,
-                    focus,
-                    sector,
-                    mode,
-                ),
+                (run_id, user_key, zone, focus, sector, mode),
             )
             row = cur.fetchone()
             if not row:
@@ -154,7 +145,6 @@ class RecruitingDB:
     def upsert_job_post(
         self,
         *,
-        user_key: str,
         company_id: int,
         title: str,
         location: Optional[str],
@@ -171,11 +161,11 @@ class RecruitingDB:
             cur.execute(
                 """
                 INSERT INTO job_posts (
-                    user_key, company_id, title, location, job_url, source_url,
+                    company_id, title, location, job_url, source_url,
                     posted_date, scraped_date, status, confidence
                 )
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                ON CONFLICT (user_key, company_id, job_url)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (company_id, job_url)
                 DO UPDATE SET
                     title = EXCLUDED.title,
                     location = EXCLUDED.location,
@@ -187,7 +177,6 @@ class RecruitingDB:
                 RETURNING id
                 """,
                 (
-                    user_key,
                     company_id,
                     (title or "").strip(),
                     location,
@@ -209,7 +198,6 @@ class RecruitingDB:
     def upsert_contact(
         self,
         *,
-        user_key: str,
         company_id: int,
         email: str,
         contact_kind: str = "unknown",
@@ -223,15 +211,14 @@ class RecruitingDB:
         conn = self._conn()
         email_norm = (email or "").strip().lower()
         with conn.cursor() as cur:
-            # Keep the highest confidence and prefer raw_context when confidence increases.
             cur.execute(
                 """
                 INSERT INTO contacts (
-                    user_key, company_id, email, contact_kind, is_hr, source_url,
+                    company_id, email, contact_kind, is_hr, source_url,
                     scraped_date, confidence, raw_context
                 )
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                ON CONFLICT (user_key, company_id, email)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (company_id, email)
                 DO UPDATE SET
                     contact_kind = EXCLUDED.contact_kind,
                     is_hr = contacts.is_hr OR EXCLUDED.is_hr,
@@ -245,7 +232,6 @@ class RecruitingDB:
                 RETURNING id
                 """,
                 (
-                    user_key,
                     company_id,
                     email_norm,
                     (contact_kind or "unknown").strip(),
@@ -263,19 +249,106 @@ class RecruitingDB:
         conn.commit()
         return contact_id
 
-    def list_companies(self, *, user_key: str, limit: int = 50, offset: int = 0) -> list[dict]:
+    def search_companies(
+        self,
+        *,
+        q: Optional[str] = None,
+        sector: Optional[str] = None,
+        zone: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        """
+        Search companies with optional filters.
+        Returns { items: [...], total: N }
+        Each item includes contact_count.
+        """
+        self.ensure_schema()
+        conn = self._conn()
+
+        conditions = []
+        params: list = []
+
+        if q:
+            conditions.append("(c.name ILIKE %s OR c.domain ILIKE %s)")
+            like_q = f"%{q.strip()}%"
+            params.extend([like_q, like_q])
+
+        if sector:
+            conditions.append("c.sector ILIKE %s")
+            params.append(f"%{sector.strip()}%")
+
+        if zone:
+            conditions.append("c.location ILIKE %s")
+            params.append(f"%{zone.strip()}%")
+
+        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        with conn.cursor() as cur:
+            # Total count
+            cur.execute(
+                f"SELECT COUNT(*) FROM companies c {where_clause}",
+                params,
+            )
+            total = int((cur.fetchone() or [0])[0])
+
+            # Items with contact count
+            cur.execute(
+                f"""
+                SELECT c.id, c.name, c.website, c.domain, c.sector, c.location,
+                       c.first_seen_at, c.last_seen_at,
+                       COUNT(ct.id) AS contact_count
+                FROM companies c
+                LEFT JOIN contacts ct ON ct.company_id = c.id
+                {where_clause}
+                GROUP BY c.id
+                ORDER BY c.last_seen_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                params + [int(limit), int(offset)],
+            )
+            rows = cur.fetchall()
+
+        conn.commit()
+
+        items = []
+        for r in rows:
+            items.append(
+                {
+                    "id": int(r[0]),
+                    "name": r[1],
+                    "website": r[2],
+                    "domain": r[3],
+                    "sector": r[4],
+                    "location": r[5],
+                    "first_seen_at": r[6].isoformat() if r[6] else None,
+                    "last_seen_at": r[7].isoformat() if r[7] else None,
+                    "contact_count": int(r[8] or 0),
+                }
+            )
+
+        return {"items": items, "total": total}
+
+    def list_contacts_by_company_id(
+        self,
+        *,
+        company_id: int,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict]:
         self.ensure_schema()
         conn = self._conn()
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, name, website, domain, first_seen_at, last_seen_at
-                FROM companies
-                WHERE user_key = %s
-                ORDER BY last_seen_at DESC
+                SELECT id, email, contact_kind, is_hr, source_url,
+                       scraped_date, confidence, raw_context
+                FROM contacts
+                WHERE company_id = %s
+                ORDER BY scraped_date DESC
                 LIMIT %s OFFSET %s
                 """,
-                (user_key, int(limit), int(offset)),
+                (company_id, int(limit), int(offset)),
             )
             rows = cur.fetchall()
         conn.commit()
@@ -284,11 +357,13 @@ class RecruitingDB:
             out.append(
                 {
                     "id": int(r[0]),
-                    "name": r[1],
-                    "website": r[2],
-                    "domain": r[3],
-                    "first_seen_at": r[4].isoformat() if r[4] else None,
-                    "last_seen_at": r[5].isoformat() if r[5] else None,
+                    "email": r[1],
+                    "contact_kind": r[2],
+                    "is_hr": bool(r[3]),
+                    "source_url": r[4],
+                    "scraped_date": r[5].isoformat() if r[5] else None,
+                    "confidence": float(r[6] or 0.0),
+                    "raw_context": r[7],
                 }
             )
         return out
@@ -296,7 +371,6 @@ class RecruitingDB:
     def list_job_posts_by_company_domain(
         self,
         *,
-        user_key: str,
         domain: str,
         limit: int = 50,
         offset: int = 0,
@@ -311,11 +385,11 @@ class RecruitingDB:
                        jp.posted_date, jp.scraped_date, jp.status, jp.confidence
                 FROM job_posts jp
                 JOIN companies c ON c.id = jp.company_id
-                WHERE c.user_key = %s AND c.domain = %s
+                WHERE c.domain = %s
                 ORDER BY jp.scraped_date DESC
                 LIMIT %s OFFSET %s
                 """,
-                (user_key, domain_norm, int(limit), int(offset)),
+                (domain_norm, int(limit), int(offset)),
             )
             rows = cur.fetchall()
         conn.commit()
@@ -339,7 +413,6 @@ class RecruitingDB:
     def list_contacts_by_company_domain(
         self,
         *,
-        user_key: str,
         domain: str,
         limit: int = 100,
         offset: int = 0,
@@ -354,11 +427,11 @@ class RecruitingDB:
                        ct.scraped_date, ct.confidence, ct.raw_context
                 FROM contacts ct
                 JOIN companies c ON c.id = ct.company_id
-                WHERE c.user_key = %s AND c.domain = %s
+                WHERE c.domain = %s
                 ORDER BY ct.scraped_date DESC
                 LIMIT %s OFFSET %s
                 """,
-                (user_key, domain_norm, int(limit), int(offset)),
+                (domain_norm, int(limit), int(offset)),
             )
             rows = cur.fetchall()
         conn.commit()
@@ -377,4 +450,3 @@ class RecruitingDB:
                 }
             )
         return out
-

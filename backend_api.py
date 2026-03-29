@@ -1006,6 +1006,31 @@ class CandidatureAnalyzeInboxBody(BaseModel):
         extra = "forbid"
 
 
+class QuickDraftBody(BaseModel):
+    """Body for POST /recruiting/quick-draft — create a single Gmail draft for one company."""
+    company_name: str
+    contact_email: str
+    # Sender info (from user profile)
+    sender_first_name: str = ""
+    sender_last_name: str = ""
+    sender_linkedin_url: str = ""
+    sender_portfolio_url: str = ""
+    # Email content templates (placeholders: {ENTREPRISE}, {DATE})
+    mail_subject_template: str = ""
+    mail_body_template: str = ""
+    # OAuth tokens for Gmail
+    oauth_access_token: str
+    oauth_refresh_token: Optional[str] = None
+    oauth_client_id: Optional[str] = None
+    oauth_client_secret: Optional[str] = None
+    oauth_token_uri: Optional[str] = None
+    oauth_scope: Optional[str] = None
+    oauth_access_token_expires_at: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
+
+
 def _classify_reply_sentiment(text: str) -> Optional[str]:
     """Classify email body as reponse_positive, reponse_negative, or None (unknown).
     Uses French keywords typical of recruitment replies."""
@@ -1237,22 +1262,20 @@ def get_analytics(
 # ---------------------------------------------------------------------------
 
 @app.get("/recruiting/companies", dependencies=[Depends(verify_token)])
-def recruiting_list_companies_api(
+def recruiting_search_companies_api(
+    q: Optional[str] = Query(default=None),
+    sector: Optional[str] = Query(default=None),
+    zone: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0, le=5000),
-    x_run_user_id: Optional[str] = Header(default=None),
-    x_run_user_email: Optional[str] = Header(default=None),
+    offset: int = Query(default=0, ge=0, le=10000),
 ) -> dict:
-    """List companies that recruit for the current user."""
-    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
-    if not user_key:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    """Search the shared company database with optional filters."""
     try:
         from recruiting_db import RecruitingDB
 
         db = RecruitingDB()
-        companies = db.list_companies(user_key=user_key, limit=limit, offset=offset)
-        return {"companies": companies}
+        result = db.search_companies(q=q or None, sector=sector or None, zone=zone or None, limit=limit, offset=offset)
+        return result
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Postgres error: {e!s}")
 
@@ -1262,18 +1285,13 @@ def recruiting_list_company_jobs_api(
     domain: str,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0, le=5000),
-    x_run_user_id: Optional[str] = Header(default=None),
-    x_run_user_email: Optional[str] = Header(default=None),
 ) -> dict:
-    """List job posts for one company domain."""
-    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
-    if not user_key:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    """List job posts for one company domain (shared DB)."""
     try:
         from recruiting_db import RecruitingDB
 
         db = RecruitingDB()
-        jobs = db.list_job_posts_by_company_domain(user_key=user_key, domain=domain, limit=limit, offset=offset)
+        jobs = db.list_job_posts_by_company_domain(domain=domain, limit=limit, offset=offset)
         return {"jobs": jobs}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Postgres error: {e!s}")
@@ -1284,21 +1302,110 @@ def recruiting_list_company_contacts_api(
     domain: str,
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=5000),
-    x_run_user_id: Optional[str] = Header(default=None),
-    x_run_user_email: Optional[str] = Header(default=None),
 ) -> dict:
-    """List contacts (RH/support) for one company domain."""
-    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
-    if not user_key:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+    """List contacts (RH/support) for one company domain (shared DB)."""
     try:
         from recruiting_db import RecruitingDB
 
         db = RecruitingDB()
-        contacts = db.list_contacts_by_company_domain(user_key=user_key, domain=domain, limit=limit, offset=offset)
+        contacts = db.list_contacts_by_company_domain(domain=domain, limit=limit, offset=offset)
         return {"contacts": contacts}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Postgres error: {e!s}")
+
+
+@app.post("/recruiting/quick-draft", dependencies=[Depends(verify_token)], status_code=status.HTTP_201_CREATED)
+def recruiting_quick_draft(
+    body: QuickDraftBody,
+    x_run_user_id: Optional[str] = Header(default=None),
+    x_run_user_email: Optional[str] = Header(default=None),
+) -> dict:
+    """
+    Create a single Gmail draft for one company contact, using the user's uploaded CV and template.
+    Records the candidature automatically.
+    """
+    user_key = _get_user_key_from_headers(x_run_user_id, x_run_user_email)
+    if not user_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User key required.")
+
+    # Resolve CV file (attachment)
+    cv_path_str, _ = resolve_user_assets(user_key)
+    cv_path = (PROJECT_ROOT / cv_path_str) if cv_path_str else None
+
+    # Build email content from templates
+    try:
+        from create_gmail_drafts import replace_draft_placeholders, get_gmail_service_from_oauth_tokens, make_message, create_draft
+    except ImportError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Module Gmail manquant: {e}")
+
+    # Subject
+    default_subject = f"Candidature alternance — {body.company_name}"
+    subject_tpl = (body.mail_subject_template or "").strip() or default_subject
+    subject = replace_draft_placeholders(subject_tpl, body.company_name)
+
+    # Body
+    full_name = f"{body.sender_first_name} {body.sender_last_name}".strip()
+    linkedin_line = f"\nLinkedIn : {body.sender_linkedin_url}" if body.sender_linkedin_url else ""
+    portfolio_line = f"\nPortfolio : {body.sender_portfolio_url}" if body.sender_portfolio_url else ""
+    default_body = (
+        f"Bonjour,\n\nJe me permets de vous contacter dans le cadre de ma recherche d'alternance.\n"
+        f"Je suis très intéressé(e) par une opportunité au sein de {body.company_name}.\n\n"
+        f"Cordialement,\n{full_name}{linkedin_line}{portfolio_line}"
+    )
+    body_tpl = (body.mail_body_template or "").strip() or default_body
+    # Replace {NOM_COMPLET} if present
+    body_tpl = body_tpl.replace("{NOM_COMPLET}", full_name).replace("{{NOM_COMPLET}}", full_name)
+    if body.sender_linkedin_url:
+        body_tpl = body_tpl.replace("{LINKEDIN}", body.sender_linkedin_url).replace("{{LINKEDIN}}", body.sender_linkedin_url)
+    if body.sender_portfolio_url:
+        body_tpl = body_tpl.replace("{PORTFOLIO}", body.sender_portfolio_url).replace("{{PORTFOLIO}}", body.sender_portfolio_url)
+    email_body = replace_draft_placeholders(body_tpl, body.company_name)
+
+    # Build Gmail service
+    try:
+        service = get_gmail_service_from_oauth_tokens(
+            access_token=body.oauth_access_token,
+            refresh_token=(body.oauth_refresh_token or "").strip(),
+            client_id=(body.oauth_client_id or "").strip(),
+            client_secret=(body.oauth_client_secret or "").strip(),
+            token_uri=(body.oauth_token_uri or "https://oauth2.googleapis.com/token").strip(),
+            scope=(body.oauth_scope or "https://www.googleapis.com/auth/gmail.compose").strip(),
+            access_token_expires_at=(body.oauth_access_token_expires_at or "").strip(),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Connexion Gmail échouée: {e!s}")
+
+    # Prepare attachments
+    attachments = []
+    if cv_path and cv_path.exists():
+        attachments.append(cv_path)
+
+    # Create the draft
+    try:
+        attachment_cache: dict = {}
+        draft_body = make_message(
+            to_email=body.contact_email,
+            subject=subject,
+            body=email_body,
+            attachments=attachments,
+            attachment_cache=attachment_cache,
+        )
+        draft_result = create_draft(service, draft_body)
+        draft_id = draft_result.get("id") or ""
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Erreur création brouillon Gmail: {e!s}")
+
+    # Record the candidature
+    cand = candidature_store.insert_candidature(
+        user_key=user_key,
+        company=body.company_name,
+        email=body.contact_email,
+        status="draft_created",
+        run_id=None,
+        draft_id=draft_id,
+    )
+
+    return {"ok": True, "draft_id": draft_id, "candidature_id": cand.id}
 
 
 @app.get("/candidatures/counts", dependencies=[Depends(verify_token)])

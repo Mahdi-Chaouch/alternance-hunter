@@ -2430,15 +2430,15 @@ def run_email_finder(
                     if db and company_domain:
                         try:
                             company_id = db.upsert_company(
-                                user_key=user_key,
                                 name=t.entreprise,
                                 website=t.site,
                                 domain=company_domain,
+                                sector=sector or None,
+                                location=(t.zone or None),
                             )
                             now_dt = datetime.utcnow()
                             if email:
                                 db.upsert_contact(
-                                    user_key=user_key,
                                     company_id=company_id,
                                     email=email,
                                     contact_kind="rh" if is_hr_email(email) else "contact",
@@ -2463,7 +2463,6 @@ def run_email_finder(
                                         scraped_dt = now_dt
 
                                 job_id = db.upsert_job_post(
-                                    user_key=user_key,
                                     company_id=company_id,
                                     title=j.title,
                                     location=j.location or None,
@@ -2477,7 +2476,6 @@ def run_email_finder(
 
                                 if j.contact_email:
                                     db.upsert_contact(
-                                        user_key=user_key,
                                         company_id=company_id,
                                         email=j.contact_email,
                                         contact_kind="rh" if is_hr_email(j.contact_email) else "contact",
