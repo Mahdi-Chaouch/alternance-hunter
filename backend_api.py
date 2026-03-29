@@ -1713,3 +1713,34 @@ def analyze_inbox_replies(
     if err:
         return {**stats, "message": err}
     return stats
+
+
+# ---------------------------------------------------------------------------
+# Admin — one-time DB migration (shared companies schema)
+# ---------------------------------------------------------------------------
+
+@app.post("/admin/migrate-shared-companies", dependencies=[Depends(verify_token)])
+def admin_migrate_shared_companies() -> dict:
+    """
+    Run the migrate_shared_companies.sql migration once.
+    Safe to call multiple times (uses IF NOT EXISTS / IF EXISTS guards).
+    """
+    migration_path = PROJECT_ROOT / "migrate_shared_companies.sql"
+    if not migration_path.exists():
+        raise HTTPException(status_code=404, detail="Migration file not found.")
+    sql = migration_path.read_text(encoding="utf-8")
+    try:
+        import psycopg
+        db_url = (os.getenv("DATABASE_URL") or "").strip()
+        if not db_url:
+            raise HTTPException(status_code=500, detail="DATABASE_URL not set.")
+        conn = psycopg.connect(db_url, autocommit=False)
+        with conn.cursor() as cur:
+            cur.execute(sql)
+        conn.commit()
+        conn.close()
+        return {"ok": True, "message": "Migration exécutée avec succès."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Migration échouée: {e!s}")

@@ -324,3 +324,39 @@
   padding: 3rem;
   color: var(--subtle-text, #6b7280);
 }
+
+.migrationBanner {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1.5px solid rgba(245, 158, 11, 0.4);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.migrationIcon {
+  color: #d97706;
+  flex-shrink: 0;
+}
+
+.migrationText {
+  flex: 1;
+}
+
+.migrationTitle {
+  color: #92400e;
+}
+
+.migrationDesc {
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+  color: #78350f;
+}
+
+.migrationBtn {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  flex-shrink: 0;
+}

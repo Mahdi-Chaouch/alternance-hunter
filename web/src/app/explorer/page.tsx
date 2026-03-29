@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Search, Building2, MapPin, Users, Send, X, Upload, CheckCircle } from "lucide-react";
+import { Search, Building2, MapPin, Users, Send, X, Upload, CheckCircle, DatabaseZap } from "lucide-react";
 import { SECTOR_LABELS, SECTOR_ORDER } from "@/data/sectors-specialties";
 import { COMMUNES_FRANCE } from "@/data/communes-france";
 import styles from "./explorer.module.css";
@@ -34,6 +34,8 @@ export default function ExplorerPage() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  const [needsMigration, setNeedsMigration] = useState(false);
+  const [migrating, setMigrating] = useState(false);
   const [uploadsStatus, setUploadsStatus] = useState<{ cv: boolean; template: boolean } | null>(null);
   const [pendingCompany, setPendingCompany] = useState<Company | null>(null);
   const [sendingId, setSendingId] = useState<number | null>(null);
@@ -87,15 +89,15 @@ export default function ExplorerPage() {
         const data = await res.json();
         if (!res.ok) {
           const detail: string = data?.detail ?? "Erreur serveur";
-          const isMigration = detail.includes("column") || detail.includes("does not exist") || detail.includes("user_key");
-          showToast(
-            isMigration
-              ? "Migration DB requise : exécute migrate_shared_companies.sql sur Render (voir README)."
-              : detail,
-            "error",
-          );
+          const isMigration = detail.includes("column") || detail.includes("does not exist") || detail.includes("user_key") || detail.includes("sector") || detail.includes("location");
+          if (isMigration) {
+            setNeedsMigration(true);
+          } else {
+            showToast(detail, "error");
+          }
           return;
         }
+        setNeedsMigration(false);
         setCompanies(data.items ?? []);
         setTotal(data.total ?? 0);
         setPage(pageIndex);
@@ -187,6 +189,25 @@ export default function ExplorerPage() {
     }
   }, [pendingCompany, showToast, handleCandidater]);
 
+  const runMigration = useCallback(async () => {
+    setMigrating(true);
+    try {
+      const res = await fetch("/api/admin/migrate", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.detail ?? "Migration échouée.", "error");
+      } else {
+        showToast("Migration réussie ! Chargement des entreprises…", "success");
+        setNeedsMigration(false);
+        setTimeout(() => search(0, query, sector, zone), 800);
+      }
+    } catch {
+      showToast("Erreur réseau pendant la migration.", "error");
+    } finally {
+      setMigrating(false);
+    }
+  }, [showToast, search, query, sector, zone]);
+
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
@@ -200,6 +221,28 @@ export default function ExplorerPage() {
           Base partagée — {total > 0 ? `${total.toLocaleString("fr-FR")} entreprises` : "…"} enrichie par tous les utilisateurs.
         </p>
       </header>
+
+      {/* Migration banner */}
+      {needsMigration && (
+        <div className={styles.migrationBanner}>
+          <DatabaseZap size={20} className={styles.migrationIcon} />
+          <div className={styles.migrationText}>
+            <strong className={styles.migrationTitle}>Mise à jour de la base de données requise.</strong>
+            <p className={styles.migrationDesc}>
+              La base partagée doit être migrée une seule fois. Clique sur le bouton pour lancer la migration automatiquement.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={`${styles.searchBtn} ${styles.migrationBtn}`}
+            onClick={runMigration}
+            disabled={migrating}
+          >
+            <DatabaseZap size={15} />
+            {migrating ? "Migration en cours…" : "Lancer la migration"}
+          </button>
+        </div>
+      )}
 
       {/* Search bar */}
       <div className={styles.searchBar}>
