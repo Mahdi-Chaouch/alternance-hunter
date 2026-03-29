@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 
 const THEME_KEY = "alternance-ui-theme";
 type Theme = "light" | "dark";
@@ -45,7 +46,7 @@ export function FloatingActions() {
         title={theme === "light" ? "Mode sombre" : "Mode clair"}
         aria-label={theme === "light" ? "Passer en mode sombre" : "Passer en mode clair"}
       >
-        {theme === "light" ? "🌙" : "☀️"}
+        {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
       </button>
       {showBackToTop && (
         <button

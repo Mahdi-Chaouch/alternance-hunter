@@ -84,13 +84,24 @@ export default function ExplorerPage() {
         if (sec) params.set("sector", sec);
         if (z.trim()) params.set("zone", z.trim());
         const res = await fetch(`/api/recruiting/companies?${params}`);
-        if (!res.ok) throw new Error("Erreur serveur");
         const data = await res.json();
+        if (!res.ok) {
+          const detail: string = data?.detail ?? "Erreur serveur";
+          const isMigration = detail.includes("column") || detail.includes("does not exist") || detail.includes("user_key");
+          showToast(
+            isMigration
+              ? "Migration DB requise : exécute migrate_shared_companies.sql sur Render (voir README)."
+              : detail,
+            "error",
+          );
+          return;
+        }
         setCompanies(data.items ?? []);
         setTotal(data.total ?? 0);
         setPage(pageIndex);
-      } catch {
-        showToast("Impossible de charger les entreprises.", "error");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Erreur réseau";
+        showToast(msg.includes("fetch") ? "Backend inaccessible (Render en veille ?)" : msg, "error");
       } finally {
         setLoading(false);
       }

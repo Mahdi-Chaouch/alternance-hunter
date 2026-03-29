@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, Home, User, LogIn, LogOut, ExternalLink, List } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
@@ -114,7 +114,7 @@ export function AppHeader() {
         </div>
         <nav className="app-nav" aria-label="Navigation principale">
           <Link href="/" className="app-nav-link">
-            🏠 Accueil
+            <Home size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Accueil
           </Link>
           {isConnected ? (
             <>
@@ -122,16 +122,16 @@ export function AppHeader() {
                 <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Explorer
               </Link>
               <Link href="/profil" className="app-nav-link">
-                👤 Profil
+                <User size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Profil
               </Link>
             </>
           ) : (
             <Link href="/login" className="app-nav-link">
-              🔐 Connexion
+              <LogIn size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Connexion
             </Link>
           )}
           <a href="https://github.com/Mahdi-Chaouch/alternance-killer" target="_blank" rel="noreferrer noopener" className="app-nav-link">
-            📦 GitHub
+            <ExternalLink size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />GitHub
           </a>
         </nav>
         <div className="app-header-cta">
@@ -176,7 +176,7 @@ export function AppHeader() {
                     role="menuitem"
                     onClick={() => setProfilDropdownOpen(false)}
                   >
-                    👤 Mon profil
+                    <User size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Mon profil
                   </Link>
                   <Link
                     href="/profil#candidatures"
@@ -184,7 +184,7 @@ export function AppHeader() {
                     role="menuitem"
                     onClick={() => setProfilDropdownOpen(false)}
                   >
-                    📋 Suivi de candidatures
+                    <List size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Suivi de candidatures
                   </Link>
                   <button
                     type="button"
@@ -192,14 +192,14 @@ export function AppHeader() {
                     role="menuitem"
                     onClick={() => void handleSignOut()}
                   >
-                    🚪 Déconnexion
+                    <LogOut size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Déconnexion
                   </button>
                 </div>
               ) : null}
             </div>
           ) : (
             <Link href="/login" className="app-header-button">
-              🔐 Connexion
+              <LogIn size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Connexion
             </Link>
           )}
         </div>
@@ -238,30 +238,30 @@ export function AppHeader() {
         <div className="app-mobile-menu-panel">
           <nav className="app-mobile-nav" aria-label="Menu mobile">
             <Link href="/" className="app-mobile-nav-link" onClick={closeMenu}>
-              🏠 Accueil
+              <Home size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Accueil
             </Link>
             {isConnected ? (
               <>
                 <Link href="/explorer" className="app-mobile-nav-link" onClick={closeMenu}>
-                  <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Explorer les entreprises
+                  <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Explorer les entreprises
                 </Link>
                 <Link href="/profil" className="app-mobile-nav-link" onClick={closeMenu}>
-                  👤 Mon profil
+                  <User size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Mon profil
                 </Link>
                 <Link href="/profil#candidatures" className="app-mobile-nav-link" onClick={closeMenu}>
-                  📋 Suivi de candidatures
+                  <List size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Suivi de candidatures
                 </Link>
                 <button
                   type="button"
                   className="app-mobile-nav-link app-mobile-nav-signout"
                   onClick={() => void handleSignOut()}
                 >
-                  🚪 Déconnexion
+                  <LogOut size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Déconnexion
                 </button>
               </>
             ) : (
               <Link href="/login" className="app-mobile-nav-link" onClick={closeMenu}>
-                🔐 Connexion
+                <LogIn size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Connexion
               </Link>
             )}
             <a
