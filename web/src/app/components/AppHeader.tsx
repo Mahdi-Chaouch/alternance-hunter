@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
@@ -116,9 +117,14 @@ export function AppHeader() {
             🏠 Accueil
           </Link>
           {isConnected ? (
-            <Link href="/profil" className="app-nav-link">
-              👤 Profil
-            </Link>
+            <>
+              <Link href="/explorer" className="app-nav-link">
+                <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Explorer
+              </Link>
+              <Link href="/profil" className="app-nav-link">
+                👤 Profil
+              </Link>
+            </>
           ) : (
             <Link href="/login" className="app-nav-link">
               🔐 Connexion
@@ -236,6 +242,9 @@ export function AppHeader() {
             </Link>
             {isConnected ? (
               <>
+                <Link href="/explorer" className="app-mobile-nav-link" onClick={closeMenu}>
+                  <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Explorer les entreprises
+                </Link>
                 <Link href="/profil" className="app-mobile-nav-link" onClick={closeMenu}>
                   👤 Mon profil
                 </Link>
