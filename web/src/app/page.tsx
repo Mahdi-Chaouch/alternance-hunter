@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Zap, Target, Shield, Mail, Linkedin, Github } from "lucide-react";
+import { Zap, Target, Shield, Mail, ExternalLink } from "lucide-react";
 import { GoogleLogo } from "@/app/components/GoogleLogo";
 import { FadeInSection } from "@/app/components/FadeInSection";
 import styles from "./landing.module.css";
@@ -244,8 +244,8 @@ export default function Home() {
               <div>
                 <ul className={styles.contactLinks}>
                   <li><a href="mailto:mahdichaouch435@gmail.com" className={styles.contactLink}><Mail size={16} /> Envoyer un email</a></li>
-                  <li><a href="https://www.linkedin.com/in/mahdi-chaouch-3a27263a0"className={styles.contactLink} target="_blank" rel="noreferrer noopener"><Linkedin size={16} /> Profil LinkedIn</a></li>
-                  <li><a href="https://github.com/Mahdi-Chaouch/alternance-hunter" className={styles.contactLink} target="_blank" rel="noreferrer noopener"><Github size={16} /> Code Source (GitHub)</a></li>
+                  <li><a href="https://www.linkedin.com/in/mahdi-chaouch-3a27263a0" className={styles.contactLink} target="_blank" rel="noreferrer noopener"><ExternalLink size={16} /> Profil LinkedIn</a></li>
+                  <li><a href="https://github.com/Mahdi-Chaouch/alternance-hunter" className={styles.contactLink} target="_blank" rel="noreferrer noopener"><ExternalLink size={16} /> Code Source (GitHub)</a></li>
                 </ul>
               </div>
             </div>
