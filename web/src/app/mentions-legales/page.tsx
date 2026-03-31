@@ -3,13 +3,13 @@ export default function MentionsLegales() {
     <div style={{ maxWidth: "800px", margin: "0 auto", padding: "4rem 2rem", lineHeight: "1.6" }}>
       <h1>Mentions Légales</h1>
       <p>Dernière mise à jour : {new Date().toLocaleDateString("fr-FR")}</p>
-      
+
       <section style={{ marginTop: "2rem" }}>
         <h2>1. Éditeur de l'application</h2>
         <p>
           Alternance Hunter est une application web développée et éditée par :<br />
           <strong>Mahdi Chaouch</strong> (Développeur indépendant).<br />
-          Contact : <a href="mailto:mahdi435@gmail.com">mahdi435@gmail.com</a> 
+          Contact : <a href="mailto:mahdichaouch435@gmail.com">mahdichaouch435@gmail.com</a>
           <br /><i>(Veuillez remplacer cet email par votre véritable email de contact)</i>
         </p>
       </section>
