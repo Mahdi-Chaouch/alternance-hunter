@@ -12,16 +12,27 @@ export function FloatingActions() {
 
   useEffect(() => {
     const saved = window.localStorage.getItem(THEME_KEY);
-    let initial: Theme;
+    const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+
+    const apply = (t: Theme) => {
+      setTheme(t);
+      document.documentElement.dataset.theme = t;
+    };
+
     if (saved === "dark" || saved === "light") {
-      initial = saved;
+      apply(saved);
     } else {
-      // Aucune préférence sauvegardée — détecte le mode système
-      initial = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      apply(systemDark.matches ? "dark" : "light");
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTheme(initial);
-    document.documentElement.dataset.theme = initial;
+
+    // Suit les changements OS en temps réel si pas de préférence manuelle
+    const onSystemChange = (e: MediaQueryListEvent) => {
+      if (!window.localStorage.getItem(THEME_KEY)) {
+        apply(e.matches ? "dark" : "light");
+      }
+    };
+    systemDark.addEventListener("change", onSystemChange);
+    return () => systemDark.removeEventListener("change", onSystemChange);
   }, []);
 
   useEffect(() => {
