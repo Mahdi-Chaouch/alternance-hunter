@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Home, User, LogIn, LogOut, ExternalLink, List, LayoutDashboard } from "lucide-react";
+import { Search, Home, User, LogIn, LogOut, ExternalLink, List, LayoutDashboard, X } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
@@ -244,6 +244,15 @@ export function AppHeader() {
       >
         <div className="app-mobile-menu-backdrop" onClick={closeMenu} aria-hidden="true" />
         <div className="app-mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Menu de navigation">
+          <div className="app-mobile-menu-header">
+            <Link href="/" className="app-brand-link" onClick={closeMenu}>
+              <Image src="/logo.png" alt="Alternance Hunter" className="app-brand-logo" width={28} height={28} priority />
+              <span className="app-brand-text" style={{ fontSize: '0.85rem' }}>Alternance Hunter</span>
+            </Link>
+            <button type="button" className="app-mobile-menu-close" onClick={closeMenu} aria-label="Fermer le menu">
+              <X size={20} />
+            </button>
+          </div>
           <nav className="app-mobile-nav" aria-label="Menu mobile">
             <Link href="/" className="app-mobile-nav-link" onClick={closeMenu}>
               <Home size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Accueil
@@ -282,13 +291,8 @@ export function AppHeader() {
               className="app-mobile-nav-link"
               onClick={closeMenu}
             >
-              📦 GitHub
+              <ExternalLink size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />GitHub
             </a>
-            {!isConnected ? (
-              <Link href="/login" className="app-mobile-nav-cta" onClick={closeMenu}>
-                🔐 Connexion
-              </Link>
-            ) : null}
           </nav>
         </div>
       </div>
