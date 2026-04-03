@@ -1,14 +1,44 @@
 /**
- * In-memory rate limiting per user.
- * Keys are scoped by userId + scope (e.g. "api", "cancel").
- * Uses fixed 1-minute windows; old entries are pruned on access.
+ * PostgreSQL-backed rate limiting per user.
+ * Uses fixed 1-minute windows with atomic upserts — works across all Vercel instances.
+ * Falls back gracefully (allow) if the DB is unreachable, to avoid blocking users on infra issues.
  */
 
-const WINDOW_MS = 60 * 1000;
+import { Pool } from "pg";
+import { getDatabaseUrl, isProduction } from "./env";
 
-type Entry = { count: number; windowStart: number };
+const DATABASE_URL = getDatabaseUrl();
 
-const store = new Map<string, Entry>();
+const globalForRateLimit = globalThis as unknown as { rateLimitPool?: Pool };
+
+const rateLimitPool =
+  globalForRateLimit.rateLimitPool ??
+  new Pool({ connectionString: DATABASE_URL });
+
+if (!isProduction) {
+  globalForRateLimit.rateLimitPool = rateLimitPool;
+}
+
+const WINDOW_MS = 60 * 1_000;
+
+let tableReady = false;
+
+async function ensureTable(): Promise<void> {
+  if (tableReady) return;
+  await rateLimitPool.query(`
+    CREATE TABLE IF NOT EXISTS rate_limit_counters (
+      key         TEXT        NOT NULL,
+      window_start TIMESTAMPTZ NOT NULL,
+      count       INTEGER     NOT NULL DEFAULT 0,
+      PRIMARY KEY (key, window_start)
+    )
+  `);
+  await rateLimitPool.query(`
+    CREATE INDEX IF NOT EXISTS rate_limit_window_idx
+      ON rate_limit_counters (window_start)
+  `);
+  tableReady = true;
+}
 
 function getEnvInt(name: string, defaultValue: number): number {
   const raw = process.env[name]?.trim();
@@ -23,19 +53,11 @@ export const RATE_LIMIT_API_PER_MINUTE = getEnvInt(
   120,
 );
 
-/** Max cancel requests per minute per user (cancel burst). */
+/** Max cancel requests per minute per user. */
 export const RATE_LIMIT_CANCEL_PER_MINUTE = getEnvInt(
   "RATE_LIMIT_CANCEL_PER_MINUTE",
   5,
 );
-
-function prune(key: string, now: number): void {
-  const entry = store.get(key);
-  if (!entry) return;
-  if (now - entry.windowStart >= WINDOW_MS) {
-    store.delete(key);
-  }
-}
 
 export type RateLimitResult =
   | { allowed: true; remaining: number; resetAt: number }
@@ -44,42 +66,51 @@ export type RateLimitResult =
 /**
  * Check and consume one request for the given user and scope.
  * Returns allowed/remaining/resetAt. When allowed is false, caller should return 429.
+ * Never throws — returns allowed:true on DB errors to avoid blocking legitimate users.
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   userId: string,
   scope: "api" | "cancel",
   limit: number,
-): RateLimitResult {
-  const key = `${userId}:${scope}`;
+): Promise<RateLimitResult> {
+  // Fixed window aligned to the minute boundary
   const now = Date.now();
-  prune(key, now);
+  const windowStart = new Date(Math.floor(now / WINDOW_MS) * WINDOW_MS);
+  const resetAt = windowStart.getTime() + WINDOW_MS;
+  const key = `${userId}:${scope}`;
 
-  const entry = store.get(key);
-  const inCurrentWindow = entry && now - entry.windowStart < WINDOW_MS;
+  try {
+    await ensureTable();
 
-  if (!inCurrentWindow) {
-    store.set(key, { count: 1, windowStart: now });
-    const resetAt = now + WINDOW_MS;
-    return {
-      allowed: true,
-      remaining: Math.max(0, limit - 1),
-      resetAt,
-    };
+    // Async cleanup of expired windows (1% of requests, non-blocking)
+    if (Math.random() < 0.01) {
+      rateLimitPool
+        .query(`DELETE FROM rate_limit_counters WHERE window_start < $1`, [
+          new Date(now - WINDOW_MS * 2),
+        ])
+        .catch(() => {});
+    }
+
+    const result = await rateLimitPool.query<{ count: string }>(
+      `INSERT INTO rate_limit_counters (key, window_start, count)
+       VALUES ($1, $2, 1)
+       ON CONFLICT (key, window_start) DO UPDATE
+         SET count = rate_limit_counters.count + 1
+       RETURNING count`,
+      [key, windowStart],
+    );
+
+    const newCount = parseInt(result.rows[0]?.count ?? "1", 10);
+
+    if (newCount > limit) {
+      return { allowed: false, remaining: 0, resetAt };
+    }
+
+    return { allowed: true, remaining: Math.max(0, limit - newCount), resetAt };
+  } catch {
+    // DB unavailable — fail open to avoid blocking users
+    return { allowed: true, remaining: 0, resetAt };
   }
-
-  const newCount = (entry!.count ?? 0) + 1;
-  entry!.count = newCount;
-  const resetAt = entry!.windowStart + WINDOW_MS;
-
-  if (newCount > limit) {
-    return { allowed: false, remaining: 0, resetAt };
-  }
-
-  return {
-    allowed: true,
-    remaining: Math.max(0, limit - newCount),
-    resetAt,
-  };
 }
 
 /** Seconds until reset (for Retry-After header). */

@@ -9,10 +9,32 @@ const nunito = Nunito({
   weight: ["400", "500", "600", "700", "800", "900"],
 });
 
+const SITE_URL = "https://alternance-hunter.com";
+const SITE_DESCRIPTION =
+  "Automatisez vos candidatures d'alternance : pipeline de recherche d'entreprises, génération de lettres de motivation et création de brouillons Gmail en un clic.";
+
 export const metadata: Metadata = {
-  title: "Alternance Hunter",
-  description:
-    "Automatisez vos candidatures d'alternance avec un pipeline Gmail suivi par un dashboard temps reel.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Alternance Hunter",
+    template: "%s — Alternance Hunter",
+  },
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    title: "Alternance Hunter",
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: "Alternance Hunter",
+    images: [{ url: "/logo.png", width: 192, height: 192, alt: "Alternance Hunter" }],
+    locale: "fr_FR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Alternance Hunter",
+    description: SITE_DESCRIPTION,
+    images: ["/logo.png"],
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", type: "image/x-icon", sizes: "any" },
@@ -20,6 +42,9 @@ export const metadata: Metadata = {
     ],
     apple: "/logo.png",
     shortcut: "/favicon.ico",
+  },
+  alternates: {
+    canonical: SITE_URL,
   },
 };
 

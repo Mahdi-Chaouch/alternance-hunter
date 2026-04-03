@@ -37,7 +37,7 @@ export async function POST(
   const isAdmin = isAdminEmail(authResult.value.user.email);
 
   if (!isAdmin) {
-    const rateLimit = checkRateLimit(userId, "cancel", RATE_LIMIT_CANCEL_PER_MINUTE);
+    const rateLimit = await checkRateLimit(userId, "cancel", RATE_LIMIT_CANCEL_PER_MINUTE);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {

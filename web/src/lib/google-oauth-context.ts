@@ -12,6 +12,7 @@ export type GoogleLinkedAccount = {
 
 export type GoogleAccessTokenPayload = {
   accessToken?: string;
+  refreshToken?: string | null;
   accessTokenExpiresAt?: Date | string | null;
   scopes?: string[];
 };
@@ -142,7 +143,7 @@ export async function resolveGoogleOAuthContextForSync(): Promise<
     ok: true,
     payload: {
       oauth_access_token: accessToken,
-      oauth_refresh_token: "",
+      oauth_refresh_token: accessTokenPayload?.refreshToken?.trim() ?? "",
       oauth_client_id: oauthClientId,
       oauth_client_secret: oauthClientSecret,
       oauth_token_uri: process.env.GOOGLE_TOKEN_URI ?? "https://oauth2.googleapis.com/token",
@@ -258,7 +259,7 @@ export async function resolveGoogleOAuthContext(): Promise<
     ok: true,
     payload: {
       oauth_access_token: accessToken,
-      oauth_refresh_token: "",
+      oauth_refresh_token: accessTokenPayload?.refreshToken?.trim() ?? "",
       oauth_client_id: oauthClientId,
       oauth_client_secret: oauthClientSecret,
       oauth_token_uri: process.env.GOOGLE_TOKEN_URI ?? "https://oauth2.googleapis.com/token",

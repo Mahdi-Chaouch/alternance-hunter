@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { getAuthHeaders, getBackendConfig } from "@/lib/backend";
-import { requireApiAuthorizedSession } from "@/lib/auth-guard";
+import { requireAdminSession } from "@/lib/admin-guard";
 import { readJsonSafely } from "@/lib/http";
 
 export async function POST(): Promise<NextResponse> {
-  const authResult = await requireApiAuthorizedSession();
-  if (!authResult.ok) {
-    return authResult.response;
+  const admin = await requireAdminSession();
+  if (!admin.ok) {
+    return admin.response;
   }
 
   try {

@@ -25,6 +25,7 @@ import run_store
 import candidature_store
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 
@@ -281,6 +282,17 @@ async def _lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Alternance Pipeline API", version="1.0.0", lifespan=_lifespan)
+
+_allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "").strip()
+_allowed_origins = [o.strip() for o in _allowed_origins_raw.split(",") if o.strip()]
+if _allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "X-Api-Token", "X-Run-User-Id", "X-Run-User-Email"],
+        max_age=3600,
+    )
 
 RUNS: Dict[str, RunState] = {}
 RUNS_LOCK = threading.Lock()

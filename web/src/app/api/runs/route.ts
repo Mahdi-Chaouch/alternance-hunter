@@ -166,7 +166,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const isAdmin = isAdminEmail(authResult.value.user.email);
 
   if (!isAdmin) {
-    const rateLimit = checkRateLimit(userId, "api", RATE_LIMIT_API_PER_MINUTE);
+    const rateLimit = await checkRateLimit(userId, "api", RATE_LIMIT_API_PER_MINUTE);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {
@@ -266,7 +266,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const isAdmin = isAdminEmail(authResult.value.user.email);
 
   if (!isAdmin) {
-    const rateLimit = checkRateLimit(userId, "api", RATE_LIMIT_API_PER_MINUTE);
+    const rateLimit = await checkRateLimit(userId, "api", RATE_LIMIT_API_PER_MINUTE);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {

@@ -22,6 +22,9 @@ assets/
 # --- Generated data and logs ---
 data/exports/*
 !data/exports/.gitkeep
+data/runs.db
+data/upload_quota.json
+data/user_assets/
 
 outputs/
 
