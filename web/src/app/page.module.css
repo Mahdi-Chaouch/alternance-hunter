@@ -1012,6 +1012,32 @@
   border-color: #b91c1c;
 }
 
+.deleteAccountConfirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 28rem;
+}
+
+.deleteAccountInput {
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--btn-border);
+  background: var(--secondary-bg);
+  color: inherit;
+  font-size: 0.95rem;
+}
+
+.deleteAccountActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.deleteAccountError {
+  margin-top: 0.75rem;
+}
+
 .panelHeader {
   display: flex;
   justify-content: space-between;

@@ -59,6 +59,11 @@ export default function ProfilPage() {
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [countsByStatus, setCountsByStatus] = useState<Record<string, number> | null>(null);
 
+  const [deleteAccountStep, setDeleteAccountStep] = useState<"idle" | "confirm">("idle");
+  const [deleteAccountPhrase, setDeleteAccountPhrase] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
+
   useEffect(() => {
     const saved = window.localStorage.getItem("alternance-ui-theme");
     const initial: ThemeMode = saved === "dark" || saved === "light" ? saved : "light";
@@ -309,6 +314,23 @@ export default function ProfilPage() {
     }
   }, [refreshCandidatures, refreshAnalytics]);
 
+  async function onConfirmDeleteAccount() {
+    setDeleteAccountError(null);
+    setIsDeletingAccount(true);
+    try {
+      const result = await authClient.deleteUser({});
+      if (result?.error?.message) {
+        setDeleteAccountError(result.error.message);
+        return;
+      }
+      router.replace("/");
+    } catch {
+      setDeleteAccountError("Impossible de supprimer le compte. Réessayez ou contactez le support.");
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }
+
   useEffect(() => {
     if (accessDenied || !session?.user?.email) return;
     void refreshCandidatures();
@@ -498,6 +520,72 @@ export default function ProfilPage() {
               Documents & templates
             </Link>
           </div>
+        </section>
+
+        <section className={styles.panel} aria-labelledby="delete-account-heading">
+          <h2 id="delete-account-heading">Supprimer mon compte</h2>
+          <p className={styles.sectionHint}>
+            Supprime définitivement votre compte Alternance Hunter, votre profil enregistré et l’entrée
+            d’invitation associée à votre email. Les données côté serveur d’exécution (historique de runs,
+            candidatures) peuvent être conservées selon la configuration du backend ; contactez-nous pour une
+            suppression complète si besoin.
+          </p>
+          {deleteAccountStep === "idle" ? (
+            <button
+              type="button"
+              className={styles.dangerBtn}
+              onClick={() => {
+                setDeleteAccountError(null);
+                setDeleteAccountPhrase("");
+                setDeleteAccountStep("confirm");
+              }}
+            >
+              Supprimer mon compte
+            </button>
+          ) : (
+            <div className={styles.deleteAccountConfirm}>
+              <p className={styles.panelHint} id="delete-confirm-desc">
+                Pour confirmer, saisissez <strong>SUPPRIMER</strong> dans le champ ci-dessous.
+              </p>
+              <input
+                type="text"
+                autoComplete="off"
+                aria-labelledby="delete-confirm-desc"
+                className={styles.deleteAccountInput}
+                value={deleteAccountPhrase}
+                onChange={(e) => setDeleteAccountPhrase(e.target.value)}
+                disabled={isDeletingAccount}
+                placeholder="SUPPRIMER"
+              />
+              <div className={styles.deleteAccountActions}>
+                <button
+                  type="button"
+                  className={styles.dangerBtn}
+                  disabled={isDeletingAccount || deleteAccountPhrase.trim() !== "SUPPRIMER"}
+                  onClick={() => void onConfirmDeleteAccount()}
+                >
+                  {isDeletingAccount ? "Suppression…" : "Confirmer la suppression"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  disabled={isDeletingAccount}
+                  onClick={() => {
+                    setDeleteAccountStep("idle");
+                    setDeleteAccountPhrase("");
+                    setDeleteAccountError(null);
+                  }}
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          )}
+          {deleteAccountError ? (
+            <p role="alert" className={`${styles.error} ${styles.deleteAccountError}`}>
+              {deleteAccountError}
+            </p>
+          ) : null}
         </section>
       </main>
     </div>

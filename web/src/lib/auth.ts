@@ -1,12 +1,10 @@
 import { betterAuth } from "better-auth";
+import type { User } from "better-auth/types";
 import { nextCookies } from "better-auth/next-js";
 import { getRequiredEnv, isProduction } from "./env";
 import { pgPool } from "./db";
+import { deleteUserAppData } from "./delete-user-app-data";
 
-const DATABASE_URL = getRequiredEnv(
-  "DATABASE_URL",
-  "postgres://postgres:postgres@127.0.0.1:5432/alternance_mails",
-);
 const authUrlRaw =
   (process.env.BETTER_AUTH_URL ?? process.env.VERCEL_URL ?? "").trim();
 if (isProduction && !authUrlRaw) {
@@ -49,6 +47,16 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
+    /** OAuth-only: allow account deletion without a 24h "fresh" session window. */
+    freshAge: 0,
+  },
+  user: {
+    deleteUser: {
+      enabled: true,
+      beforeDelete: async (user: User) => {
+        await deleteUserAppData(user);
+      },
+    },
   },
   emailAndPassword: {
     enabled: false,

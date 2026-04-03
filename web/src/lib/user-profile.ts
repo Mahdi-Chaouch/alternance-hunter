@@ -94,6 +94,11 @@ export async function getUserProfile(userId: string): Promise<StoredUserProfile 
   return result.rows[0] ?? null;
 }
 
+export async function deleteUserProfileRow(userId: string): Promise<void> {
+  await ensureUserProfileTable();
+  await pgPool.query(`DELETE FROM run_user_profiles WHERE user_id = $1`, [userId]);
+}
+
 export async function upsertUserProfile(
   userId: string,
   email: string,

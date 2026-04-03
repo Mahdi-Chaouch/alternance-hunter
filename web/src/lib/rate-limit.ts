@@ -117,3 +117,18 @@ export async function checkRateLimit(
 export function retryAfterSeconds(resetAt: number): number {
   return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
 }
+
+/** Removes rate-limit rows for this user (all time windows). */
+export async function deleteRateLimitRowsForUser(userId: string): Promise<void> {
+  const id = userId.trim();
+  if (!id) return;
+  try {
+    await ensureTable();
+    await rateLimitPool.query(
+      `DELETE FROM rate_limit_counters WHERE key = $1 OR key = $2`,
+      [`${id}:api`, `${id}:cancel`],
+    );
+  } catch {
+    // same fail-open spirit as checkRateLimit
+  }
+}

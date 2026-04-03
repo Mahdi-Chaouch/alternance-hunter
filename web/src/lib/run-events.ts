@@ -20,6 +20,11 @@ export async function ensureRunEventsTable(): Promise<void> {
   tableReady = true;
 }
 
+export async function deleteRunEventsForOwner(ownerUserId: string): Promise<void> {
+  await ensureRunEventsTable();
+  await pgPool.query(`DELETE FROM run_events WHERE owner_user_id = $1`, [ownerUserId]);
+}
+
 export async function insertRunEvent(params: {
   runId: string;
   ownerUserId: string;

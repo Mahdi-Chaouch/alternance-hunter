@@ -87,3 +87,8 @@ export async function recordUploadEvent(userId: string): Promise<void> {
     [userId || ""],
   );
 }
+
+export async function deleteUploadEventsForUser(userId: string): Promise<void> {
+  await ensureUploadEventsTable();
+  await pgPool.query(`DELETE FROM upload_events WHERE user_id = $1`, [userId]);
+}
