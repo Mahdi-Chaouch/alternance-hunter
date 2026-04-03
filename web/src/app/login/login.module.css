@@ -4,9 +4,7 @@
   align-items: stretch;
   justify-content: center;
   padding: 3rem 1.5rem 4rem;
-  background:
-    radial-gradient(circle at top, rgba(139, 92, 246, 0.16), transparent 55%),
-    radial-gradient(circle at bottom, rgba(15, 23, 42, 0.85), var(--color-bg));
+  background: transparent;
 }
 
 .layout {
@@ -72,10 +70,14 @@
 .card {
   width: min(420px, 100%);
   margin-left: auto;
-  border-radius: 1rem;
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: radial-gradient(circle at top left, #0f172a 0, #020617 70%);
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.75);
+  border-radius: 1.25rem;
+  border: 1px solid var(--glass-border-accent, rgba(139, 92, 246, 0.35));
+  background:
+    radial-gradient(circle at top left, rgba(139, 92, 246, 0.12), transparent 55%),
+    var(--glass-bg, rgba(15, 23, 42, 0.55));
+  box-shadow: var(--glass-shadow, 0 20px 50px rgba(15, 23, 42, 0.75));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 1.2));
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 1.2));
   padding: 1.6rem 1.5rem 1.7rem;
   color: #e5e7eb;
   display: grid;
@@ -253,9 +255,7 @@
 
 /* Light mode */
 :global(:root[data-theme="light"]) .page {
-  background:
-    radial-gradient(circle at top, rgba(139, 92, 246, 0.1), transparent 55%),
-    var(--color-bg);
+  background: transparent;
 }
 
 :global(:root[data-theme="light"]) .copy {
@@ -281,10 +281,14 @@
 }
 
 :global(:root[data-theme="light"]) .card {
-  background: var(--color-bg-elevated);
-  border-color: rgba(139, 92, 246, 0.2);
-  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.1);
+  background:
+    radial-gradient(circle at top left, rgba(139, 92, 246, 0.1), transparent 50%),
+    var(--glass-bg-elevated);
+  border-color: rgba(139, 92, 246, 0.22);
+  box-shadow: var(--glass-shadow);
   color: var(--color-fg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
 
 :global(:root[data-theme="light"]) .cardTitle {

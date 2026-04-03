@@ -3,6 +3,7 @@
   padding: 2rem 1.5rem 4rem;
   max-width: 1200px;
   margin: 0 auto;
+  background: transparent;
 }
 
 .header {
@@ -95,19 +96,22 @@
 }
 
 .card {
-  background: var(--card-bg, #fff);
-  border: 1.5px solid rgba(139, 92, 246, 0.15);
+  background: var(--glass-bg, var(--card-bg, #fff));
+  border: 1.5px solid var(--glass-border-accent, rgba(139, 92, 246, 0.2));
   border-radius: 14px;
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   transition: border-color 0.2s, box-shadow 0.2s;
+  -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-saturate, 1.15));
+  backdrop-filter: blur(var(--glass-blur, 16px)) saturate(var(--glass-saturate, 1.15));
+  box-shadow: var(--glass-shadow, 0 4px 20px rgba(15, 23, 42, 0.06));
 }
 
 .card:hover {
-  border-color: rgba(139, 92, 246, 0.4);
-  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.45);
+  box-shadow: var(--glass-shadow, 0 8px 28px rgba(139, 92, 246, 0.14));
 }
 
 .cardName {
