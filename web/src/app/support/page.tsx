@@ -140,7 +140,7 @@ export default function SupportPage() {
                 />
               </div>
 
-              <div className={styles.supportField}>
+              <div className={`${styles.supportField} ${styles.supportMessageField}`}>
                 <label className={styles.supportLabel} htmlFor="support-message">
                   Message <span aria-hidden="true">*</span>
                 </label>
@@ -150,7 +150,7 @@ export default function SupportPage() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   required
-                  rows={8}
+                  rows={14}
                   minLength={8}
                   maxLength={4000}
                   placeholder="Décrivez votre situation en quelques phrases…"

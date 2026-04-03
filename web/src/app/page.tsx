@@ -6,7 +6,7 @@ import styles from "./landing.module.css";
 
 export default function Home() {
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} landing-home`}>
       <main className={styles.main}>
 
         {/* ── HERO ── */}

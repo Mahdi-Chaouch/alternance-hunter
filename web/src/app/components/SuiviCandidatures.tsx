@@ -125,7 +125,7 @@ export function SuiviCandidatures({
   );
 
   return (
-    <section className={styles.panel} id="candidatures">
+    <section className={`${styles.panel} ${styles.candidaturePanelSection}`} id="candidatures">
       <div className={`${styles.panelHeader} ${styles.candidaturePanelHeader}`}>
         <div>
           <h2 className={styles.candidaturesTitle}>Suivi des candidatures</h2>

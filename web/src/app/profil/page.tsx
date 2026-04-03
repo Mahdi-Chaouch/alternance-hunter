@@ -442,35 +442,27 @@ export default function ProfilPage() {
           {loading ? (
             <p className={styles.panelHint}>Chargement...</p>
           ) : analyticsData ? (
-            <div
-              className={styles.metaGrid}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                gap: "1rem",
-                marginTop: "0.75rem",
-              }}
-            >
-              <div className={styles.stepCard} style={{ padding: "0.75rem" }}>
+            <div className={styles.profilAnalyticsGrid}>
+              <div className={`${styles.stepCard} ${styles.profilAnalyticsCard}`}>
                 <div style={{ fontSize: "0.85rem", color: "var(--muted-text)" }}>Cibles totales</div>
                 <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{analyticsData.total_targets}</div>
               </div>
-              <div className={styles.stepCard} style={{ padding: "0.75rem" }}>
+              <div className={`${styles.stepCard} ${styles.profilAnalyticsCard}`}>
                 <div style={{ fontSize: "0.85rem", color: "var(--muted-text)" }}>Brouillons créés</div>
                 <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{analyticsData.drafts_crees}</div>
                 <div style={{ fontSize: "0.8rem" }}>{analyticsData.taux_drafts_crees} %</div>
               </div>
-              <div className={styles.stepCard} style={{ padding: "0.75rem" }}>
+              <div className={`${styles.stepCard} ${styles.profilAnalyticsCard}`}>
                 <div style={{ fontSize: "0.85rem", color: "var(--muted-text)" }}>Envoyés / relances</div>
                 <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{analyticsData.candidatures_sent}</div>
               </div>
-              <div className={styles.stepCard} style={{ padding: "0.75rem" }}>
+              <div className={`${styles.stepCard} ${styles.profilAnalyticsCard}`}>
                 <div style={{ fontSize: "0.85rem", color: "var(--muted-text)" }}>Réponses positives</div>
                 <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "var(--status-success-text)" }}>
                   {analyticsData.reponses_positives}
                 </div>
               </div>
-              <div className={styles.stepCard} style={{ padding: "0.75rem" }}>
+              <div className={`${styles.stepCard} ${styles.profilAnalyticsCard}`}>
                 <div style={{ fontSize: "0.85rem", color: "var(--muted-text)" }}>Conversion réponse</div>
                 <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{analyticsData.taux_conversion_reponse} %</div>
               </div>
