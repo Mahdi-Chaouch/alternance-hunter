@@ -12,7 +12,13 @@ export function FloatingActions() {
 
   useEffect(() => {
     const saved = window.localStorage.getItem(THEME_KEY);
-    const initial: Theme = saved === "dark" || saved === "light" ? saved : "dark";
+    let initial: Theme;
+    if (saved === "dark" || saved === "light") {
+      initial = saved;
+    } else {
+      // Aucune préférence sauvegardée — détecte le mode système
+      initial = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(initial);
     document.documentElement.dataset.theme = initial;

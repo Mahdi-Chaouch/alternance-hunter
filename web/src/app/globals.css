@@ -677,6 +677,11 @@ a {
     justify-content: center;
   }
 
+  /* On mobile : cache le texte, centre uniquement l'icône */
+  .app-brand-text {
+    display: none;
+  }
+
   .app-burger-wrap {
     display: flex;
     position: absolute;

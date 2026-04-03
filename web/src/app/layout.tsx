@@ -70,7 +70,7 @@ export default function RootLayout({
       <body className={`${nunito.variable} ${spaceGrotesk.variable} ${dmSans.variable}`}>
         <script
           dangerouslySetInnerHTML={{
-            __html: `document.documentElement.dataset.theme = localStorage.getItem('alternance-ui-theme') === 'light' ? 'light' : 'dark';`,
+            __html: `(function(){var s=localStorage.getItem('alternance-ui-theme');document.documentElement.dataset.theme=s==='light'||s==='dark'?s:window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';})();`,
           }}
         />
         <LayoutWrapper>{children}</LayoutWrapper>
