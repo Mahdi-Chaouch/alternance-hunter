@@ -10,7 +10,7 @@ export default function MentionsLegales() {
           Alternance Hunter est une application web développée et éditée par :<br />
           <strong>Mahdi Chaouch</strong> (Développeur indépendant).<br />
           Contact : <a href="mailto:mahdichaouch435@gmail.com">mahdichaouch435@gmail.com</a>
-          <br /><i>(Veuillez remplacer cet email par votre véritable email de contact)</i>
+          
         </p>
       </section>
 

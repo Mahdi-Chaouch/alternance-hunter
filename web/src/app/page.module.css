@@ -1969,3 +1969,65 @@
 .zoneFieldInput {
   border-radius: var(--radius-input);
 }
+
+/* ── Light mode overrides ─────────────────────────────────────── */
+
+/* Status colors lisibles sur fond clair */
+:global(:root[data-theme="light"]) .page {
+  --status-success-text: #15803d;
+  --status-failed-text:  #dc2626;
+  --status-neutral-text: #64748b;
+  --status-running-text: var(--color-accent);
+}
+
+/* Hero : retirer le dégradé sombre */
+:global(:root[data-theme="light"]) .hero {
+  background: radial-gradient(circle at top left, rgba(139, 92, 246, 0.07) 0, rgba(139, 92, 246, 0.02) 65%);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+}
+
+/* HeaderCard : bordure blanche invisible → subtile */
+:global(:root[data-theme="light"]) .headerCard {
+  border-color: rgba(139, 92, 246, 0.15);
+  background: radial-gradient(circle at top left, rgba(139, 92, 246, 0.05), var(--panel-bg));
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+}
+
+/* stepBadge : ombre trop sombre */
+:global(:root[data-theme="light"]) .stepBadge {
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.35);
+}
+
+/* zoneValidBadge : texte quasi-blanc sur fond clair */
+:global(:root[data-theme="light"]) .zoneValidBadge {
+  color: #15803d;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(139, 92, 246, 0.2));
+}
+
+/* Tous les éléments avec bordure blanche invisible en light */
+:global(:root[data-theme="light"]) .techCard,
+:global(:root[data-theme="light"]) .contactLinks,
+:global(:root[data-theme="light"]) .stepNav,
+:global(:root[data-theme="light"]) .switchGroup,
+:global(:root[data-theme="light"]) .llmKeyBlock,
+:global(:root[data-theme="light"]) .gmailStatusCard,
+:global(:root[data-theme="light"]) .progressSteps,
+:global(:root[data-theme="light"]) .tableWrap,
+:global(:root[data-theme="light"]) .candidaturePill,
+:global(:root[data-theme="light"]) .candidatureStatusSelect,
+:global(:root[data-theme="light"]) .adminStatCard {
+  border-color: var(--color-border-subtle);
+}
+
+/* Message sync/erreur candidatures : couleurs text/border lisibles */
+:global(:root[data-theme="light"]) .candidatureSyncMessage {
+  color: #15803d;
+  border-color: #86efac;
+  background: rgba(34, 197, 94, 0.08);
+}
+
+:global(:root[data-theme="light"]) .candidatureSyncError {
+  color: #dc2626;
+  border-color: #fca5a5;
+  background: rgba(239, 68, 68, 0.08);
+}

@@ -171,7 +171,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           detail:
-            "Trop de requetes. Veuillez patienter avant de reessayer.",
+            "Trop de requetes. patienter avant de reessayer.",
         },
         {
           status: 429,

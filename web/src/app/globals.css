@@ -329,6 +329,11 @@ a {
 }
 
 .app-header-profil-dropdown-item-signout:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+:root[data-theme="dark"] .app-header-profil-dropdown-item-signout:hover {
   background: rgba(239, 68, 68, 0.2);
   color: #fecaca;
 }
@@ -433,7 +438,7 @@ a {
   border-radius: var(--radius-sm);
 }
 .app-burger:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-header-btn-hover);
 }
 .app-burger-bar {
   display: block;
@@ -521,7 +526,7 @@ a {
   font-weight: 500;
 }
 .app-mobile-nav-link:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-header-btn-hover);
 }
 .app-mobile-nav-cta {
   display: inline-flex;

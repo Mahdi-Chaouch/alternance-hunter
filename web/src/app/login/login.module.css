@@ -251,25 +251,78 @@
   }
 }
 
-/* Light mode: fond restant sombre → texte clair pour lisibilité */
+/* Light mode */
+:global(:root[data-theme="light"]) .page {
+  background:
+    radial-gradient(circle at top, rgba(139, 92, 246, 0.1), transparent 55%),
+    var(--color-bg);
+}
+
 :global(:root[data-theme="light"]) .copy {
-  color: #e5e7eb;
+  color: var(--color-fg);
 }
 
 :global(:root[data-theme="light"]) .eyebrow {
-  color: #cbd5e1;
+  color: var(--color-fg-muted);
 }
 
 :global(:root[data-theme="light"]) .title {
-  color: #f1f5f9;
+  color: var(--color-fg);
 }
 
 :global(:root[data-theme="light"]) .subtitle,
 :global(:root[data-theme="light"]) .points,
 :global(:root[data-theme="light"]) .helperText {
-  color: #cbd5e1;
+  color: var(--color-fg-muted);
 }
 
 :global(:root[data-theme="light"]) .helperLink {
-  color: #d946ef;
+  color: #7c3aed;
+}
+
+:global(:root[data-theme="light"]) .card {
+  background: var(--color-bg-elevated);
+  border-color: rgba(139, 92, 246, 0.2);
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.1);
+  color: var(--color-fg);
+}
+
+:global(:root[data-theme="light"]) .cardTitle {
+  color: var(--color-fg);
+}
+
+:global(:root[data-theme="light"]) .cardText {
+  color: var(--color-fg-muted);
+}
+
+:global(:root[data-theme="light"]) .cardHint {
+  color: var(--color-fg-muted);
+}
+
+:global(:root[data-theme="light"]) .label {
+  color: var(--color-fg);
+}
+
+:global(:root[data-theme="light"]) .input {
+  background: var(--color-bg);
+  border-color: var(--color-border-subtle);
+  color: var(--color-fg);
+}
+
+:global(:root[data-theme="light"]) .input::placeholder {
+  color: var(--color-fg-muted);
+}
+
+:global(:root[data-theme="light"]) .divider {
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.2), transparent 70%);
+}
+
+:global(:root[data-theme="light"]) .formLink {
+  color: #7c3aed;
+}
+
+:global(:root[data-theme="light"]) .error {
+  background: rgba(254, 226, 226, 0.9);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #991b1b;
 }
