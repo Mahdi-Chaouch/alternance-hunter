@@ -59,6 +59,12 @@ export const RATE_LIMIT_CANCEL_PER_MINUTE = getEnvInt(
   5,
 );
 
+/** Max support form submissions per minute per client IP (Discord webhook). */
+export const RATE_LIMIT_SUPPORT_PER_MINUTE = getEnvInt(
+  "RATE_LIMIT_SUPPORT_PER_MINUTE",
+  5,
+);
+
 export type RateLimitResult =
   | { allowed: true; remaining: number; resetAt: number }
   | { allowed: false; remaining: 0; resetAt: number };
@@ -70,7 +76,7 @@ export type RateLimitResult =
  */
 export async function checkRateLimit(
   userId: string,
-  scope: "api" | "cancel",
+  scope: "api" | "cancel" | "support",
   limit: number,
 ): Promise<RateLimitResult> {
   // Fixed window aligned to the minute boundary

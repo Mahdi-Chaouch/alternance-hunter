@@ -3,7 +3,18 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Home, User, LogIn, LogOut, ExternalLink, List, LayoutDashboard, X } from "lucide-react";
+import {
+  Search,
+  Home,
+  User,
+  LogIn,
+  LogOut,
+  ExternalLink,
+  List,
+  LayoutDashboard,
+  X,
+  MessageCircle,
+} from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
@@ -136,6 +147,9 @@ export function AppHeader() {
               <LogIn size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Connexion
             </Link>
           )}
+          <Link href="/support" className={`app-nav-link${pathname?.startsWith('/support') ? ' app-nav-link-active' : ''}`}>
+            <MessageCircle size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Support
+          </Link>
           <a href="https://github.com/Mahdi-Chaouch/alternance-killer" target="_blank" rel="noreferrer noopener" className="app-nav-link">
             <ExternalLink size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />GitHub
           </a>
@@ -284,6 +298,9 @@ export function AppHeader() {
                 <LogIn size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Connexion
               </Link>
             )}
+            <Link href="/support" className="app-mobile-nav-link" onClick={closeMenu}>
+              <MessageCircle size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Support
+            </Link>
             <a
               href="https://github.com/Mahdi-Chaouch/alternance-killer"
               target="_blank"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import styles from "../page.module.css";
 
@@ -62,6 +62,22 @@ function formatDate(value: string | null): string {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short" }).format(d);
 }
 
+const NARROW_MQ = "(max-width: 767px)";
+
+function subscribeNarrow(callback: () => void): () => void {
+  const mq = window.matchMedia(NARROW_MQ);
+  mq.addEventListener("change", callback);
+  return () => mq.removeEventListener("change", callback);
+}
+
+function getNarrowSnapshot(): boolean {
+  return window.matchMedia(NARROW_MQ).matches;
+}
+
+function useNarrowCandidatureLayout(): boolean {
+  return useSyncExternalStore(subscribeNarrow, getNarrowSnapshot, () => false);
+}
+
 type SuiviCandidaturesProps = {
   candidaturesList: CandidatureItem[];
   candidatureStatusFilter: string;
@@ -101,6 +117,8 @@ export function SuiviCandidatures({
   analyzeError = null,
   countsByStatus = null,
 }: SuiviCandidaturesProps) {
+  const isNarrow = useNarrowCandidatureLayout();
+
   const onSync = useCallback(
     () => void syncCandidatures(activeRunId ?? undefined),
     [syncCandidatures, activeRunId],
@@ -108,14 +126,14 @@ export function SuiviCandidatures({
 
   return (
     <section className={styles.panel} id="candidatures">
-      <div className={styles.panelHeader}>
+      <div className={`${styles.panelHeader} ${styles.candidaturePanelHeader}`}>
         <div>
           <h2 className={styles.candidaturesTitle}>Suivi des candidatures</h2>
           <p className={styles.candidaturesSubtitle}>
             Importez vos brouillons Gmail et suivez les statuts (brouillon → envoyé → relance → réponse).
           </p>
         </div>
-        <div className={styles.panelHeaderActions}>
+        <div className={`${styles.panelHeaderActions} ${styles.candidaturePanelActions}`}>
           <button
             type="button"
             className={styles.primaryBtn}
@@ -164,7 +182,7 @@ export function SuiviCandidatures({
         </div>
       ) : null}
 
-      <div className={styles.candidaturePillsWrap}>
+      <div className={`${styles.candidaturePillsWrap} ${styles.candidaturePillsOuter}`}>
         <span className={styles.candidaturePillsLabel}>Filtrer par statut</span>
         <div className={styles.candidaturePills} role="group" aria-label="Filtrer par statut">
           <button
@@ -209,9 +227,45 @@ export function SuiviCandidatures({
             </Link>
           </div>
         </div>
+      ) : isNarrow ? (
+        <div className={styles.candidatureCardList}>
+          {candidaturesList.map((c) => (
+            <article key={c.id} className={styles.candidatureCard}>
+              <div className={styles.candidatureCardHeader}>
+                <h3 className={styles.candidatureCardTitle}>{c.company}</h3>
+                <span className={getCandidatureBadgeClass(c.status)}>
+                  {CANDIDATURE_LABELS[c.status as CandidatureStatus] ?? c.status}
+                </span>
+              </div>
+              <p className={styles.candidatureCardEmail}>{c.email}</p>
+              <div className={styles.candidatureCardMeta}>
+                <span className={styles.candidatureCardDateLabel}>Dernière mise à jour</span>
+                <span className={styles.candidatureCellDate}>
+                  {formatDate(c.updated_at ?? c.created_at)}
+                </span>
+              </div>
+              <label className={styles.candidatureCardSelectLabel} htmlFor={`cand-status-${c.id}`}>
+                Statut
+              </label>
+              <select
+                id={`cand-status-${c.id}`}
+                aria-label={`Changer le statut de la candidature ${c.company}`}
+                value={c.status}
+                onChange={(e) => updateCandidatureStatus(c.id, e.target.value)}
+                className={styles.candidatureStatusSelect}
+              >
+                {CANDIDATURE_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {CANDIDATURE_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </article>
+          ))}
+        </div>
       ) : (
-        <div className={styles.tableWrap}>
-          <table className={styles.runTable}>
+        <div className={`${styles.tableWrap} ${styles.candidatureTableWrap}`}>
+          <table className={`${styles.runTable} ${styles.candidatureRunTable}`}>
             <thead>
               <tr>
                 <th>Entreprise</th>
