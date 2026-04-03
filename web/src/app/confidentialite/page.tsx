@@ -1,10 +1,13 @@
+import styles from "../legal/legal.module.css";
+
 export default function Confidentialite() {
   return (
-    <div style={{ maxWidth: "800px", margin: "0 auto", padding: "4rem 2rem", lineHeight: "1.6" }}>
+    <div className={styles.page}>
+      <article className={styles.inner}>
       <h1>Politique de Confidentialité</h1>
       <p>Dernière mise à jour : {new Date().toLocaleDateString("fr-FR")}</p>
 
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>1. Introduction</h2>
         <p>
           La présente politique détaille la façon dont Alternance Hunter utilise et protège les
@@ -12,7 +15,7 @@ export default function Confidentialite() {
         </p>
       </section>
 
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>2. Connexion avec les services Google (Gmail API)</h2>
         <p>
           Alternance Hunter nécessite une connexion à votre compte Google pour fonctionner. L'accès demandé 
@@ -25,7 +28,7 @@ export default function Confidentialite() {
         </p>
       </section>
 
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>3. Données personnelles traitées</h2>
         <p>
           Afin de générer vos candidatures, nous stockons temporairement :
@@ -40,7 +43,7 @@ export default function Confidentialite() {
         </p>
       </section>
 
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>4. Hébergement et sécurité</h2>
         <p>
           Les données relatives à votre compte sont chiffrées et transitent de manière sécurisée (HTTPS).
@@ -48,7 +51,7 @@ export default function Confidentialite() {
         </p>
       </section>
       
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>5. Vos droits</h2>
         <p>
           Vous bénéficiez d'un droit de consultation et de suppression de vos données. L'application devrait vous 
@@ -56,6 +59,7 @@ export default function Confidentialite() {
           via l'adresse de contact du créateur, indiquée dans nos Mentions Légales.
         </p>
       </section>
+      </article>
     </div>
   );
 }

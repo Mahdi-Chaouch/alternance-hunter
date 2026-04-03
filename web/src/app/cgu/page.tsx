@@ -1,10 +1,13 @@
+import styles from "../legal/legal.module.css";
+
 export default function CGU() {
   return (
-    <div style={{ maxWidth: "800px", margin: "0 auto", padding: "4rem 2rem", lineHeight: "1.6" }}>
+    <div className={styles.page}>
+      <article className={styles.inner}>
       <h1>Conditions Générales d'Utilisation (CGU)</h1>
       <p>Dernière mise à jour : {new Date().toLocaleDateString("fr-FR")}</p>
       
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>1. Objet</h2>
         <p>
           Les présentes Conditions Générales d'Utilisation ont pour objet de définir les modalités
@@ -14,7 +17,7 @@ export default function CGU() {
         </p>
       </section>
 
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>2. Description du service</h2>
         <p>
           Alternance Hunter est un outil technique destiné à aider les développeurs et étudiants à
@@ -23,7 +26,7 @@ export default function CGU() {
         </p>
       </section>
 
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>3. Responsabilité de l'Utilisateur</h2>
         <p>
           L'Utilisateur s'engage à faire un usage personnel et licite de l'application. En particulier,
@@ -35,7 +38,7 @@ export default function CGU() {
         </p>
       </section>
 
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>4. Limites de responsabilité</h2>
         <p>
           Alternance Hunter étant un projet expérimental, son auteur ne garantit pas la pérennité du service
@@ -43,6 +46,7 @@ export default function CGU() {
           quota Gmail de l'utilisateur, ou de tout incident résultant de l'utilisation de l'application.
         </p>
       </section>
+      </article>
     </div>
   );
 }

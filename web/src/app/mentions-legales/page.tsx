@@ -1,10 +1,13 @@
+import styles from "../legal/legal.module.css";
+
 export default function MentionsLegales() {
   return (
-    <div style={{ maxWidth: "800px", margin: "0 auto", padding: "4rem 2rem", lineHeight: "1.6" }}>
+    <div className={styles.page}>
+      <article className={styles.inner}>
       <h1>Mentions Légales</h1>
       <p>Dernière mise à jour : {new Date().toLocaleDateString("fr-FR")}</p>
 
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>1. Éditeur de l'application</h2>
         <p>
           Alternance Hunter est une application web développée et éditée par :<br />
@@ -14,7 +17,7 @@ export default function MentionsLegales() {
         </p>
       </section>
 
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>2. Hébergement</h2>
         <p>
           L'interface frontend de l'application est hébergée par :<br />
@@ -32,12 +35,13 @@ export default function MentionsLegales() {
         </p>
       </section>
 
-      <section style={{ marginTop: "2rem" }}>
+      <section className={styles.section}>
         <h2>3. Propriété intellectuelle</h2>
         <p>
           L'ensemble des éléments constituant l'application (textes, graphismes, logiciels, photographies, images, logos, etc.) sont protégés par le droit de la propriété intellectuelle. Toute reproduction, représentation, modification ou adaptation de ces éléments est strictement interdite sans l'autorisation expresse du créateur.
         </p>
       </section>
+      </article>
     </div>
   );
 }
