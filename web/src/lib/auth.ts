@@ -1,10 +1,7 @@
 import { betterAuth } from "better-auth";
-import { createAuthMiddleware, APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
-import { Resend } from "resend";
 import { getRequiredEnv, isProduction } from "./env";
 import { pgPool } from "./db";
-import { isInvitedEmail } from "./invited-emails";
 
 const DATABASE_URL = getRequiredEnv(
   "DATABASE_URL",
@@ -26,52 +23,6 @@ const BETTER_AUTH_SECRET = getRequiredEnv(
   "BETTER_AUTH_SECRET",
   "dev-secret-not-for-production",
 );
-
-const AUTH_WHITELIST_ENABLED =
-  (process.env.AUTH_WHITELIST_ENABLED ?? "true").trim().toLowerCase() !==
-  "false";
-const AUTH_WHITELIST =
-  process.env.AUTH_ALLOWED_EMAILS?.split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean) ?? [];
-const AUTH_WHITELIST_DOMAIN =
-  process.env.AUTH_WHITELIST_DOMAIN?.split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean) ?? [];
-
-function isEmailWhitelisted(email: string | null | undefined): boolean {
-  if (!AUTH_WHITELIST_ENABLED) return true;
-  const value = (email ?? "").trim().toLowerCase();
-  if (!value) return false;
-  if (AUTH_WHITELIST.length > 0 && AUTH_WHITELIST.includes(value)) {
-    return true;
-  }
-  if (AUTH_WHITELIST_DOMAIN.length > 0) {
-    const atIndex = value.lastIndexOf("@");
-    if (atIndex > 0) {
-      const domain = value.slice(atIndex + 1);
-      if (AUTH_WHITELIST_DOMAIN.includes(domain)) return true;
-    }
-  }
-  return AUTH_WHITELIST.length === 0 && AUTH_WHITELIST_DOMAIN.length === 0;
-}
-
-async function isEmailAllowed(email: string | null | undefined): Promise<boolean> {
-  if (!AUTH_WHITELIST_ENABLED) return true;
-
-  // Priorité à la table "invited_emails" (panel admin)
-  if (await isInvitedEmail(email)) return true;
-
-  // Puis aux listes d'emails / domaines configurées via les variables d'environnement
-  return isEmailWhitelisted(email);
-}
-
-const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim();
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim();
-
-const resendClient =
-  RESEND_API_KEY && RESEND_FROM_EMAIL ? new Resend(RESEND_API_KEY) : null;
-
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID?.trim() || undefined;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined;
@@ -99,100 +50,8 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
   },
-  hooks: {
-    before: createAuthMiddleware(async (ctx) => {
-      if (ctx.path !== "/sign-up/email") return;
-
-      const rawEmail = (ctx.body as any)?.email ?? "";
-      const email =
-        typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
-
-      const allowed = await isEmailAllowed(email);
-      if (!allowed) {
-        throw new APIError("FORBIDDEN", {
-          message:
-            "Cette adresse email n'est pas autorisée pour le moment. Contactez l'équipe Alternance Hunter.",
-        });
-      }
-    }),
-  },
-  emailVerification: {
-    sendVerificationEmail: async ({ user, url, token }) => {
-      if (!resendClient || !RESEND_FROM_EMAIL) {
-        console.warn(
-          "[BetterAuth] Email verification requested but Resend is not configured.",
-          JSON.stringify({
-            email: user.email,
-            url,
-            tokenLength: token.length,
-          }),
-        );
-        return;
-      }
-
-      const verifyCode = token;
-      const manualVerifyUrl = `${BETTER_AUTH_URL}/verify`;
-
-      await resendClient.emails.send({
-        from: RESEND_FROM_EMAIL,
-        to: user.email,
-        subject: "Activation de votre compte Alternance Hunter",
-        html: `
-          <p>Bonjour,</p>
-          <p>Merci de votre inscription à Alternance Hunter.</p>
-          <p>Tu peux activer ton compte de deux façons&nbsp;:</p>
-          <ol>
-            <li>
-              <strong>En cliquant sur le lien suivant</strong>&nbsp;:<br />
-              <a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>
-            </li>
-            <li>
-              <strong>Ou en copiant ce code</strong> puis en le collant sur la page
-              <a href="${manualVerifyUrl}" target="_blank" rel="noopener noreferrer">${manualVerifyUrl}</a>&nbsp;:<br />
-              <code style="font-size:16px;font-weight:bold;">${verifyCode}</code>
-            </li>
-          </ol>
-          <p>Si vous n'êtes pas à l'origine de cette inscription, vous pouvez ignorer cet email.</p>
-          <p>À bientôt,<br/>L'équipe Alternance Hunter</p>
-        `,
-      });
-    },
-    sendOnSignUp: true,
-  },
   emailAndPassword: {
-    enabled: true,
-    minPasswordLength: 8,
-    maxPasswordLength: 128,
-    autoSignIn: false,
-    requireEmailVerification: true,
-    sendResetPassword: async ({ user, url, token }) => {
-      if (!resendClient || !RESEND_FROM_EMAIL) {
-        console.warn(
-          "[BetterAuth] Password reset requested but Resend is not configured.",
-          JSON.stringify({
-            email: user.email,
-            url,
-            tokenLength: token.length,
-          }),
-        );
-        return;
-      }
-
-      await resendClient.emails.send({
-        from: RESEND_FROM_EMAIL,
-        to: user.email,
-        subject: "Réinitialisation de votre mot de passe Alternance Hunter",
-        html: `
-          <p>Bonjour,</p>
-          <p>Vous avez demandé la réinitialisation de votre mot de passe pour votre compte Alternance Hunter.</p>
-          <p>Cliquez sur le lien ci-dessous pour définir un nouveau mot de passe&nbsp;:</p>
-          <p><a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a></p>
-          <p>Ce lien est valable pendant 60 minutes. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.</p>
-          <p>À bientôt,<br/>L'équipe Alternance Hunter</p>
-        `,
-      });
-    },
-    resetPasswordTokenExpiresIn: 60 * 60,
+    enabled: false,
   },
   account: {
     encryptOAuthTokens: true,

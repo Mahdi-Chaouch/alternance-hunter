@@ -379,7 +379,7 @@
 
 .uploadCard {
   border: 1px dashed var(--panel-border);
-  border-radius: 9999px;
+  border-radius: 16px;
   padding: 0.9rem;
   margin-bottom: 1rem;
   display: grid;
@@ -388,7 +388,7 @@
 
 .profileCard {
   border: 1px dashed var(--panel-border);
-  border-radius: 9999px;
+  border-radius: 16px;
   padding: 0.9rem;
   margin-bottom: 1rem;
   display: grid;
