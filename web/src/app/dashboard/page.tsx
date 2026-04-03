@@ -1644,10 +1644,7 @@ function DashboardContent() {
                 {error}
               </p>
             ) : null}
-          </section>
-        </div>
 
-        <section className={styles.panel} id="step-runs">
           <div className={styles.panelHeader}>
             <h2>Recherches récentes</h2>
             {isRefreshingRuns ? <span className={styles.loadingText}>Mise à jour...</span> : null}
