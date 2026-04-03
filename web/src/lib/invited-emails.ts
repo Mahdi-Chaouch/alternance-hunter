@@ -1,21 +1,6 @@
-import { Pool } from "pg";
-import { getDatabaseUrl, isProduction } from "./env";
-
-const DATABASE_URL = getDatabaseUrl();
+import { pgPool } from "./db";
 
 const INVITED_EMAILS_ENV_KEYS = ["AUTH_ALLOWED_EMAILS", "INVITED_EMAILS"] as const;
-
-const globalForInvited = globalThis as unknown as { invitedEmailsPool?: Pool };
-
-const invitedEmailsPool =
-  globalForInvited.invitedEmailsPool ??
-  new Pool({
-    connectionString: DATABASE_URL,
-  });
-
-if (!isProduction) {
-  globalForInvited.invitedEmailsPool = invitedEmailsPool;
-}
 
 let tableReady = false;
 
@@ -34,7 +19,7 @@ function parseEnvEmails(): string[] {
 
 export async function ensureInvitedEmailsTable(): Promise<void> {
   if (tableReady) return;
-  await invitedEmailsPool.query(`
+  await pgPool.query(`
     CREATE TABLE IF NOT EXISTS invited_emails (
       email TEXT PRIMARY KEY,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -50,11 +35,11 @@ export async function seedInvitedEmailsFromEnv(): Promise<number> {
   let inserted = 0;
   for (const email of envEmails) {
     try {
-      await invitedEmailsPool.query(
+      await pgPool.query(
         `INSERT INTO invited_emails (email) VALUES ($1) ON CONFLICT (email) DO NOTHING`,
         [email],
       );
-      const r = await invitedEmailsPool.query(
+      const r = await pgPool.query(
         `SELECT 1 FROM invited_emails WHERE email = $1`,
         [email],
       );
@@ -70,7 +55,7 @@ export type InvitedEmailRow = { email: string; created_at: string };
 
 export async function getInvitedEmails(): Promise<InvitedEmailRow[]> {
   await ensureInvitedEmailsTable();
-  const result = await invitedEmailsPool.query<InvitedEmailRow>(
+  const result = await pgPool.query<InvitedEmailRow>(
     `SELECT email, created_at::text as created_at FROM invited_emails ORDER BY created_at DESC`,
   );
   const rows = result.rows ?? [];
@@ -78,7 +63,7 @@ export async function getInvitedEmails(): Promise<InvitedEmailRow[]> {
     const envList = parseEnvEmails();
     if (envList.length > 0) {
       await seedInvitedEmailsFromEnv();
-      const again = await invitedEmailsPool.query<InvitedEmailRow>(
+      const again = await pgPool.query<InvitedEmailRow>(
         `SELECT email, created_at::text as created_at FROM invited_emails ORDER BY created_at DESC`,
       );
       return again.rows ?? [];
@@ -91,7 +76,7 @@ export async function addInvitedEmail(email: string): Promise<boolean> {
   const normalized = email.trim().toLowerCase();
   if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return false;
   await ensureInvitedEmailsTable();
-  await invitedEmailsPool.query(
+  await pgPool.query(
     `INSERT INTO invited_emails (email) VALUES ($1) ON CONFLICT (email) DO NOTHING`,
     [normalized],
   );
@@ -102,7 +87,7 @@ export async function removeInvitedEmail(email: string): Promise<boolean> {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return false;
   await ensureInvitedEmailsTable();
-  const result = await invitedEmailsPool.query(
+  const result = await pgPool.query(
     `DELETE FROM invited_emails WHERE email = $1`,
     [normalized],
   );
@@ -113,7 +98,7 @@ export async function isInvitedEmail(email: string | null | undefined): Promise<
   const normalized = (email ?? "").trim().toLowerCase();
   if (!normalized) return false;
   await ensureInvitedEmailsTable();
-  const result = await invitedEmailsPool.query(
+  const result = await pgPool.query(
     `SELECT 1 FROM invited_emails WHERE email = $1 LIMIT 1`,
     [normalized],
   );
@@ -128,7 +113,7 @@ export async function isInvitedEmail(email: string | null | undefined): Promise<
 
 export async function getInvitedEmailsCount(): Promise<number> {
   await ensureInvitedEmailsTable();
-  const result = await invitedEmailsPool.query(
+  const result = await pgPool.query(
     `SELECT COUNT(*)::int as c FROM invited_emails`,
   );
   const c = result.rows?.[0]?.c;

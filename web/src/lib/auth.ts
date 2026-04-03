@@ -2,8 +2,8 @@ import { betterAuth } from "better-auth";
 import { createAuthMiddleware, APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { Resend } from "resend";
-import { Pool } from "pg";
 import { getRequiredEnv, isProduction } from "./env";
+import { pgPool } from "./db";
 import { isInvitedEmail } from "./invited-emails";
 
 const DATABASE_URL = getRequiredEnv(
@@ -72,17 +72,6 @@ const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim();
 const resendClient =
   RESEND_API_KEY && RESEND_FROM_EMAIL ? new Resend(RESEND_API_KEY) : null;
 
-const globalForAuth = globalThis as unknown as { authPool?: Pool };
-
-const authPool =
-  globalForAuth.authPool ??
-  new Pool({
-    connectionString: DATABASE_URL,
-  });
-
-if (!isProduction) {
-  globalForAuth.authPool = authPool;
-}
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID?.trim() || undefined;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined;
@@ -104,7 +93,7 @@ export const auth = betterAuth({
   appName: "Alternance Pipeline",
   baseURL: BETTER_AUTH_URL,
   secret: BETTER_AUTH_SECRET,
-  database: authPool,
+  database: pgPool,
   plugins: [nextCookies()],
   session: {
     expiresIn: 60 * 60 * 24 * 7,

@@ -1,25 +1,10 @@
-import { Pool } from "pg";
-import { getDatabaseUrl, isProduction } from "./env";
-
-const DATABASE_URL = getDatabaseUrl();
-
-const globalForRunEvents = globalThis as unknown as { runEventsPool?: Pool };
-
-const runEventsPool =
-  globalForRunEvents.runEventsPool ??
-  new Pool({
-    connectionString: DATABASE_URL,
-  });
-
-if (!isProduction) {
-  globalForRunEvents.runEventsPool = runEventsPool;
-}
+import { pgPool } from "./db";
 
 let tableReady = false;
 
 export async function ensureRunEventsTable(): Promise<void> {
   if (tableReady) return;
-  await runEventsPool.query(`
+  await pgPool.query(`
     CREATE TABLE IF NOT EXISTS run_events (
       id BIGSERIAL PRIMARY KEY,
       run_id TEXT NOT NULL,
@@ -29,7 +14,7 @@ export async function ensureRunEventsTable(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
-  await runEventsPool.query(`
+  await pgPool.query(`
     CREATE INDEX IF NOT EXISTS run_events_created_at_idx ON run_events (created_at);
   `);
   tableReady = true;
@@ -42,7 +27,7 @@ export async function insertRunEvent(params: {
   status?: string;
 }): Promise<void> {
   await ensureRunEventsTable();
-  await runEventsPool.query(
+  await pgPool.query(
     `INSERT INTO run_events (run_id, owner_user_id, owner_email, status)
      VALUES ($1, $2, $3, $4)`,
     [
@@ -63,17 +48,17 @@ export async function getRunEventsStats(): Promise<{
 }> {
   await ensureRunEventsTable();
   const [totalRes, dayRes, usersRes] = await Promise.all([
-    runEventsPool.query<{ total_runs: string }>(
+    pgPool.query<{ total_runs: string }>(
       `SELECT COUNT(*)::text as total_runs FROM run_events`,
     ),
-    runEventsPool.query<{ date: string; count: string }>(
+    pgPool.query<{ date: string; count: string }>(
       `SELECT date_trunc('day', created_at)::date::text as date, COUNT(*)::text as count
        FROM run_events
        WHERE created_at >= NOW() - INTERVAL '30 days'
        GROUP BY date_trunc('day', created_at)
        ORDER BY date ASC`,
     ),
-    runEventsPool.query<{ unique_users: string }>(
+    pgPool.query<{ unique_users: string }>(
       `SELECT COUNT(DISTINCT owner_email)::text as unique_users FROM run_events WHERE owner_email != ''`,
     ),
   ]);
@@ -90,7 +75,7 @@ export type RunEventRow = { run_id: string; owner_email: string; created_at: str
 
 export async function getLastRunEvents(limit: number): Promise<RunEventRow[]> {
   await ensureRunEventsTable();
-  const result = await runEventsPool.query<RunEventRow>(
+  const result = await pgPool.query<RunEventRow>(
     `SELECT run_id, owner_email, created_at::text as created_at
      FROM run_events ORDER BY created_at DESC LIMIT $1`,
     [Math.min(limit, 100)],

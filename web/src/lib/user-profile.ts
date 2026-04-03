@@ -1,5 +1,4 @@
-import { Pool } from "pg";
-import { getDatabaseUrl, isProduction } from "./env";
+import { pgPool } from "./db";
 
 type StoredUserProfile = {
   user_id: string;
@@ -40,27 +39,11 @@ type UserProfileInput = {
   runWorkers: number;
 };
 
-const DATABASE_URL = getDatabaseUrl();
-
-const globalForProfile = globalThis as unknown as { userProfilePool?: Pool };
-
-const userProfilePool =
-  globalForProfile.userProfilePool ??
-  new Pool({
-    connectionString: DATABASE_URL,
-  });
-
-if (!isProduction) {
-  globalForProfile.userProfilePool = userProfilePool;
-}
-
 let profileTableReady = false;
 
 async function ensureUserProfileTable(): Promise<void> {
-  if (profileTableReady) {
-    return;
-  }
-  await userProfilePool.query(`
+  if (profileTableReady) return;
+  await pgPool.query(`
     CREATE TABLE IF NOT EXISTS run_user_profiles (
       user_id TEXT PRIMARY KEY,
       email TEXT NOT NULL,
@@ -82,7 +65,7 @@ async function ensureUserProfileTable(): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
-  await userProfilePool.query(`
+  await pgPool.query(`
     ALTER TABLE run_user_profiles
       ADD COLUMN IF NOT EXISTS run_mode TEXT NOT NULL DEFAULT 'pipeline',
       ADD COLUMN IF NOT EXISTS run_zone TEXT NOT NULL DEFAULT 'all',
@@ -100,7 +83,7 @@ async function ensureUserProfileTable(): Promise<void> {
 
 export async function getUserProfile(userId: string): Promise<StoredUserProfile | null> {
   await ensureUserProfileTable();
-  const result = await userProfilePool.query<StoredUserProfile>(
+  const result = await pgPool.query<StoredUserProfile>(
     `SELECT user_id, email, first_name, last_name, linkedin_url, subject_template, body_template,
             portfolio_url, run_mode, run_zone, run_sector, run_specialty, run_dry_run, run_max_minutes, run_max_sites,
             run_target_found, run_workers, updated_at
@@ -117,7 +100,7 @@ export async function upsertUserProfile(
   input: UserProfileInput,
 ): Promise<StoredUserProfile> {
   await ensureUserProfileTable();
-  const result = await userProfilePool.query<StoredUserProfile>(
+  const result = await pgPool.query<StoredUserProfile>(
     `INSERT INTO run_user_profiles
       (user_id, email, first_name, last_name, linkedin_url, portfolio_url, subject_template, body_template,
        run_mode, run_zone, run_sector, run_specialty, run_dry_run, run_max_minutes, run_max_sites, run_target_found, run_workers,
