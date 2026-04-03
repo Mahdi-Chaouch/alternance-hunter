@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Nunito } from "next/font/google";
+import { Nunito, Space_Grotesk, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { LayoutWrapper } from "./LayoutWrapper";
 
@@ -7,6 +7,18 @@ const nunito = Nunito({
   variable: "--font-nunito",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
 });
 
 const SITE_URL = "https://alternance-hunter.com";
@@ -55,7 +67,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" suppressHydrationWarning>
-      <body className={nunito.variable}>
+      <body className={`${nunito.variable} ${spaceGrotesk.variable} ${dmSans.variable}`}>
         <script
           dangerouslySetInnerHTML={{
             __html: `document.documentElement.dataset.theme = localStorage.getItem('alternance-ui-theme') === 'light' ? 'light' : 'dark';`,
