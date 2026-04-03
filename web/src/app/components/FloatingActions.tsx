@@ -27,9 +27,9 @@ export function FloatingActions() {
 
     // Suit les changements OS en temps réel si pas de préférence manuelle
     const onSystemChange = (e: MediaQueryListEvent) => {
-      if (!window.localStorage.getItem(THEME_KEY)) {
-        apply(e.matches ? "dark" : "light");
-      }
+      // Le changement OS efface la préférence manuelle et prend toujours le dessus
+      window.localStorage.removeItem(THEME_KEY);
+      apply(e.matches ? "dark" : "light");
     };
     systemDark.addEventListener("change", onSystemChange);
     return () => systemDark.removeEventListener("change", onSystemChange);
