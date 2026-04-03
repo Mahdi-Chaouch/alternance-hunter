@@ -2058,152 +2058,33 @@
   background: rgba(239, 68, 68, 0.08);
 }
 
-/* ── Dashboard shell ──────────────────────────────────────────── */
-
-.dashboardShell {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  padding: 0;
-  overflow: hidden;
-}
+/* ── Dashboard layout ─────────────────────────────────────────── */
 
 .demoBanner {
-  padding: 0.75rem 1.5rem;
+  padding: 0.65rem 1.5rem;
   background: rgba(14, 165, 233, 0.1);
-  border-bottom: 1px solid rgba(14, 165, 233, 0.25);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  border-radius: 10px;
   color: var(--color-fg);
   text-align: center;
-  flex-shrink: 0;
-  font-size: 0.9rem;
-}
-
-.dashboardBody {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-/* ── Sidebar ──────────────────────────────────────────────────── */
-
-.sidebar {
-  width: 260px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--color-border-subtle);
-  background: color-mix(in srgb, var(--color-bg-elevated) 80%, transparent 20%);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
-  padding: 1.5rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  overflow-y: auto;
-}
-
-.sidebarBrand {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.sidebarBrandLogo {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #8b5cf6, #d946ef);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-weight: 900;
-  font-size: 1.1rem;
-  flex-shrink: 0;
-  box-shadow: 0 6px 18px rgba(139, 92, 246, 0.4);
-}
-
-.sidebarBrandTitle {
-  font-size: 1.1rem;
-  margin: 0;
-  font-weight: 800;
-  background: linear-gradient(to right, #8b5cf6, #d946ef);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.sidebarBrandSub {
-  display: block;
-  font-size: 0.78rem;
-  color: var(--color-fg-muted);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.sidebarNav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.sidebarNavLabel {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-fg-muted);
-  margin-bottom: 0.5rem;
-  font-weight: 700;
-  padding: 0 0.5rem;
-}
-
-.sidebarLink {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.55rem 0.75rem;
-  border-radius: 10px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--color-fg);
-  text-decoration: none;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-  border: 1px solid transparent;
-}
-
-.sidebarLink:hover {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-  color: var(--color-accent);
-  border-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
-}
-
-.sidebarLinkSeparator {
-  margin-top: 0.5rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-.sidebarFooter {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-/* ── Main content ─────────────────────────────────────────────── */
-
-.mainContent {
-  flex: 1;
-  padding: 2.5rem 2.75rem;
-  overflow-y: auto;
-  background: transparent;
+  font-size: 0.88rem;
+  margin-bottom: 1.5rem;
 }
 
 .dashboardHeader {
-  margin-bottom: 2.5rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-wrap: wrap;
 }
 
 .dashboardHeaderTitle {
-  font-size: clamp(1.6rem, 2.5vw, 2.2rem);
-  margin: 0 0 0.5rem 0;
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  margin: 0 0 0.35rem 0;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -2213,16 +2094,42 @@
 .dashboardHeaderSubtitle {
   color: var(--color-fg-muted);
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
-@media (max-width: 860px) {
-  .sidebar {
-    width: 220px;
-    padding: 1.25rem 1rem;
+.dashboardActions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.dashboardLeft,
+.dashboardRight {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .dashboardGrid {
+    grid-template-columns: 1fr;
   }
 
-  .mainContent {
-    padding: 1.75rem 1.5rem;
+  .dashboardHeader {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .dashboardActions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }

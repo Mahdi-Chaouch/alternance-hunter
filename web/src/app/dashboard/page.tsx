@@ -654,7 +654,7 @@ function DashboardContent() {
         ? "Template LM requis (déposez un fichier ci-dessus)"
         : cvRequired && !cvUploaded
           ? "CV obligatoire (déposez votre CV ci-dessus)"
-          : "<Play size={16} style={{marginRight: '0.4rem'}} /> Lancer la recherche";
+          : "Lancer la recherche";
   const demoLaunchDisabled = showDemoBanner || launchDisabled;
   const demoLaunchLabel = showDemoBanner ? "Connectez-vous pour lancer une recherche" : launchButtonLabel;
 
@@ -1159,57 +1159,32 @@ function DashboardContent() {
   }
 
   return (
-    <div className={`${styles.page} ${styles.dashboardShell} ${theme === "dark" ? styles.pageDark : ""}`}>
+    <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
       {showDemoBanner ? (
         <div className={styles.demoBanner}>
           <strong>Mode démo</strong> — Vous consultez le dashboard sans connexion. <Link href="/login" style={{ fontWeight: 600 }}>Connectez-vous</Link> pour utiliser toutes les fonctions.
         </div>
       ) : null}
 
-      <div className={styles.dashboardBody}>
-        {/* Sidebar */}
-        <aside className={styles.sidebar}>
-
-          <div className={styles.sidebarBrand}>
-            <div className={styles.sidebarBrandLogo}>AH</div>
-            <div>
-              <h2 className={styles.sidebarBrandTitle}>Alternance</h2>
-              <span className={styles.sidebarBrandSub}>Hunter</span>
-            </div>
+      <header className={styles.dashboardHeader}>
+        <div>
+          <h1 className={styles.dashboardHeaderTitle}>Content de vous revoir{firstName ? `, ${firstName}` : ''} <Hand size={24} /></h1>
+          <p className={styles.dashboardHeaderSubtitle}>Poursuivez la configuration ou lancez une nouvelle recherche.</p>
+        </div>
+        {!showDemoBanner && (
+          <div className={styles.dashboardActions}>
+            <button className={styles.secondaryBtn} type="button" onClick={onSignOut} disabled={isSigningOut}>
+              <LogOut size={15} style={{marginRight: '0.3rem'}} />{isSigningOut ? "Déconnexion..." : "Se déconnecter"}
+            </button>
+            <button className={styles.primaryBtn} type="button" onClick={onSaveWorkInProgress}>
+              <Save size={15} style={{marginRight: '0.3rem'}} /> Enregistrer le brouillon
+            </button>
           </div>
+        )}
+      </header>
 
-          <nav className={styles.sidebarNav}>
-            <div className={styles.sidebarNavLabel}>Navigation Principale</div>
-            <a href="#step-profil" className={styles.sidebarLink}><User size={18} /> Profil & Personnalisation</a>
-            <a href="#step-documents" className={styles.sidebarLink}><FolderOpen size={18} /> Documents & Modèles</a>
-            <a href="#step-config" className={styles.sidebarLink}><Settings size={18} /> Config. Recherche</a>
-            <a href="#step-runs" className={styles.sidebarLink}><LayoutDashboard size={18} /> Historique & Suivi</a>
-            <a href="#step-logs" className={styles.sidebarLink}><TerminalIcon size={18} /> Terminal Live</a>
-            <Link href="/explorer" className={`${styles.sidebarLink} ${styles.sidebarLinkSeparator}`}><Search size={18} /> Explorer les entreprises</Link>
-          </nav>
-
-          <div className={styles.sidebarFooter}>
-            {!showDemoBanner && (
-              <>
-                <button className={styles.primaryBtn} type="button" onClick={onSaveWorkInProgress} style={{ width: '100%', justifyContent: 'center' }}>
-                  <Save size={16} style={{marginRight: '0.4rem'}} /> Enregistrer le brouillon
-                </button>
-                <button className={styles.secondaryBtn} type="button" onClick={onSignOut} disabled={isSigningOut} style={{ width: '100%', justifyContent: 'center' }}>
-                  {isSigningOut ? "Déconnexion..." : "Se déconnecter"}
-                </button>
-              </>
-            )}
-          </div>
-        </aside>
-
-        {/* MAIN CONTENT */}
-        <main className={styles.mainContent}>
-          <header className={styles.dashboardHeader}>
-            <h1 className={styles.dashboardHeaderTitle}>Content de vous revoir{firstName ? `, ${firstName}` : ''} <Hand size={28} /></h1>
-            <p className={styles.dashboardHeaderSubtitle}>Poursuivez la configuration ou lancez une nouvelle recherche ludique.</p>
-          </header>
-
-        <div className={styles.topGrid}>
+      <div className={styles.dashboardGrid}>
+        <div className={styles.dashboardLeft}>
           <section className={styles.panel} id="step-profil">
             <h2><span style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><User size={24} /> Profil & personnalisation</span></h2>
             <p className={styles.sectionHint}>
@@ -1345,14 +1320,13 @@ function DashboardContent() {
               </button>
               {profileInfo ? <p className={styles.uploadSuccess}>{profileInfo}</p> : null}
             </div>
-            <section className={styles.stepCard} aria-labelledby="step-zone">
-              <div className={styles.stepCardHeader}>
-                <div className={styles.stepTitle} id="step-zone">
-                  <span className={styles.stepBadge}>3</span>
-                  <span><span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><MapPin size={18} /> Zone geographique</span></span>
-                </div>
-              </div>
-              <p className={styles.stepDescription}>
+          </section>
+        </div>
+
+        <div className={styles.dashboardRight}>
+          <section className={styles.panel} id="step-zone">
+            <h2><span style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><MapPin size={20} /> Zone géographique</span></h2>
+            <p className={styles.sectionHint}>
                 Ajoutez jusqu’à {MAX_ZONES} zones géographiques pour affiner la recherche. Tapez une
                 ville et sélectionnez une suggestion, ou laissez la liste vide pour couvrir toute la France.
               </p>
@@ -1478,16 +1452,10 @@ function DashboardContent() {
               </div>
             </section>
 
-            <section className={styles.stepCard} aria-labelledby="step-config">
-              <div className={styles.stepCardHeader}>
-                <div className={styles.stepTitle} id="step-config">
-                  <span className={styles.stepBadge}>4</span>
-                  <span><span style={{display: 'flex', alignItems: 'center', gap: '0.4rem'}}><Settings size={18} /> Options de recherche</span></span>
-                </div>
-              </div>
-              <p className={styles.stepDescription}>
-                Ajustez la duree maximale, le nombre de sites explores et le nombre de cibles
-                souhaitees avant de lancer la recherche.
+            <section className={styles.panel} id="step-config">
+              <h2><span style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><Settings size={20} /> Options de recherche</span></h2>
+              <p className={styles.sectionHint}>
+                Ajustez la durée, le nombre de sites et les cibles avant de lancer.
               </p>
               <form
                 id="pipeline-config-form"
@@ -1605,6 +1573,7 @@ function DashboardContent() {
                   type="submit"
                   disabled={demoLaunchDisabled}
                 >
+                  {!demoLaunchDisabled && <Play size={16} style={{marginRight: '0.4rem'}} />}
                   {demoLaunchLabel}
                 </button>
                 <p className={styles.launchHint}>
@@ -1613,11 +1582,11 @@ function DashboardContent() {
               </div>
             </form>
           </section>
+        </div>
+      </div>
 
-          </section>
-
-          <section className={styles.panel}>
-            <h2>📋 Etape 4 – Suivi des recherches</h2>
+      <section className={styles.panel} id="step-runs">
+            <h2><span style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><LayoutDashboard size={20} /> Historique des recherches</span></h2>
             <p className={styles.sectionHint}>
               Consultez vos recherches récentes et leur avancement ci-dessous.
             </p>
@@ -1652,6 +1621,7 @@ function DashboardContent() {
                 type="submit"
                 disabled={demoLaunchDisabled}
               >
+                {!demoLaunchDisabled && <Play size={16} style={{marginRight: '0.4rem'}} />}
                 {demoLaunchLabel}
               </button>
               <button
@@ -2076,8 +2046,6 @@ function DashboardContent() {
             </>
           )}
         </section>
-        </main>
-      </div>
     </div>
   );
 }

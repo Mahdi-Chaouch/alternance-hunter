@@ -10,7 +10,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-shell">
-      {!isDashboard && <AppHeader />}
+      <AppHeader />
       <div className="app-main">{children}</div>
       {!isDashboard && (
         <footer className="app-footer">

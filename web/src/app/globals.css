@@ -161,13 +161,26 @@ a {
   left: 0;
   bottom: -0.25rem;
   width: 0;
-  height: 1px;
+  height: 2px;
   background: linear-gradient(to right, #d946ef, #8b5cf6);
   opacity: 0;
   transform-origin: left;
   transition:
     width 0.2s ease-out,
-    opacity 0.2s ease-out;
+    opacity 0.2s ease-out,
+    box-shadow 0.2s ease-out;
+}
+
+/* Lien actif — glow */
+.app-nav-link-active {
+  opacity: 1 !important;
+  color: var(--color-accent) !important;
+}
+
+.app-nav-link-active::after {
+  width: 100% !important;
+  opacity: 1 !important;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.7), 0 0 18px rgba(217, 70, 239, 0.35);
 }
 
 .app-nav-link:focus-visible,

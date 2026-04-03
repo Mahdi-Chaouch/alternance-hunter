@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Search, Home, User, LogIn, LogOut, ExternalLink, List, LayoutDashboard } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
 function getInitials(name: string | null | undefined): string {
@@ -29,6 +29,7 @@ export function AppHeader() {
   const [profilDropdownOpen, setProfilDropdownOpen] = useState(false);
   const profilDropdownRef = useRef<HTMLDivElement>(null);
 
+  const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
   const user = session?.user;
   const isConnected = Boolean(user?.email);
@@ -113,23 +114,23 @@ export function AppHeader() {
           </Link>
         </div>
         <nav className="app-nav" aria-label="Navigation principale">
-          <Link href="/" className="app-nav-link">
+          <Link href="/" className={`app-nav-link${pathname === '/' ? ' app-nav-link-active' : ''}`}>
             <Home size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Accueil
           </Link>
           {isConnected ? (
             <>
-              <Link href="/explorer" className="app-nav-link">
+              <Link href="/explorer" className={`app-nav-link${pathname?.startsWith('/explorer') ? ' app-nav-link-active' : ''}`}>
                 <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Explorer
               </Link>
-              <Link href="/dashboard" className="app-nav-link">
+              <Link href="/dashboard" className={`app-nav-link${pathname?.startsWith('/dashboard') ? ' app-nav-link-active' : ''}`}>
                 <LayoutDashboard size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Dashboard
               </Link>
-              <Link href="/profil" className="app-nav-link">
+              <Link href="/profil" className={`app-nav-link${pathname?.startsWith('/profil') ? ' app-nav-link-active' : ''}`}>
                 <User size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Profil
               </Link>
             </>
           ) : (
-            <Link href="/login" className="app-nav-link">
+            <Link href="/login" className={`app-nav-link${pathname?.startsWith('/login') ? ' app-nav-link-active' : ''}`}>
               <LogIn size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Connexion
             </Link>
           )}
