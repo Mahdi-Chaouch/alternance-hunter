@@ -627,9 +627,30 @@ a {
   filter: brightness(1.08);
 }
 
+/* Bouton déconnexion dans le menu mobile — pleine largeur, aligné à gauche */
+.app-mobile-nav-signout {
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-header-fg);
+}
+
 @media (max-width: 768px) {
+  /* Logo centré, burger ancré à droite */
   .app-header-inner {
     padding-inline: var(--space-md);
+    position: relative;
+    justify-content: center;
+  }
+
+  .app-burger-wrap {
+    display: flex;
+    position: absolute;
+    right: var(--space-md);
+    margin-left: 0;
   }
 
   .app-nav {
@@ -638,10 +659,6 @@ a {
 
   .app-header-cta {
     display: none;
-  }
-
-  .app-burger-wrap {
-    display: flex;
   }
 
   .app-footer-inner {
