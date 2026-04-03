@@ -98,6 +98,8 @@ export function AppHeader() {
   );
 
   return (
+    <>
+    {/* Menu mobile hors du header : sinon backdrop-filter sur .app-header casse position:fixed (overlay pas plein écran). */}
     <header className="app-header">
       <div className="app-header-inner">
         <div className="app-brand">
@@ -214,7 +216,7 @@ export function AppHeader() {
             onClick={() => setMenuOpen(true)}
             aria-controls="app-mobile-menu"
             aria-label="Ouvrir le menu"
-            aria-expanded="false"
+            aria-expanded={menuOpen}
           >
             <span className="app-burger-bar" />
             <span className="app-burger-bar" />
@@ -226,7 +228,7 @@ export function AppHeader() {
             onClick={() => setMenuOpen(false)}
             aria-controls="app-mobile-menu"
             aria-label="Fermer le menu"
-            aria-expanded="true"
+            aria-expanded={menuOpen}
           >
             <span className="app-burger-bar" />
             <span className="app-burger-bar" />
@@ -234,12 +236,14 @@ export function AppHeader() {
           </button>
         </div>
       </div>
+    </header>
       <div
         id="app-mobile-menu"
         className={`app-mobile-menu ${menuOpen ? "app-mobile-menu-open" : ""}`}
+        aria-hidden={!menuOpen}
       >
-        <div className="app-mobile-menu-backdrop" onClick={closeMenu} />
-        <div className="app-mobile-menu-panel">
+        <div className="app-mobile-menu-backdrop" onClick={closeMenu} aria-hidden="true" />
+        <div className="app-mobile-menu-panel" role="dialog" aria-modal="true" aria-label="Menu de navigation">
           <nav className="app-mobile-nav" aria-label="Menu mobile">
             <Link href="/" className="app-mobile-nav-link" onClick={closeMenu}>
               <Home size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Accueil
@@ -288,6 +292,6 @@ export function AppHeader() {
           </nav>
         </div>
       </div>
-    </header>
+    </>
   );
 }

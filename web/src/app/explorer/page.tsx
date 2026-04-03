@@ -445,14 +445,14 @@ export default function ExplorerPage() {
               Pour créer un brouillon, importez votre CV (obligatoire) et votre template de lettre de motivation
               (optionnel).
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <label style={{ fontSize: "0.9rem", fontWeight: 600 }}>
+            <div className={styles.modalFieldGroup}>
+              <label className={styles.modalLabel}>
                 CV (PDF)*
-                <input ref={cvRef} type="file" accept=".pdf" style={{ display: "block", marginTop: "0.3rem" }} />
+                <input ref={cvRef} type="file" accept=".pdf" className={styles.modalFileInput} />
               </label>
-              <label style={{ fontSize: "0.9rem", fontWeight: 600 }}>
+              <label className={styles.modalLabel}>
                 Template LM (.docx, optionnel)
-                <input ref={templateRef} type="file" accept=".docx,.doc" style={{ display: "block", marginTop: "0.3rem" }} />
+                <input ref={templateRef} type="file" accept=".docx,.doc" className={styles.modalFileInput} />
               </label>
             </div>
             <div className={styles.modalActions}>

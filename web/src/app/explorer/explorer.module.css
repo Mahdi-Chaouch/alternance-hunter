@@ -259,24 +259,75 @@
 }
 
 .modal {
-  background: var(--card-bg, #fff);
+  background: color-mix(in srgb, var(--glass-bg-elevated) 96%, var(--color-bg));
+  border: 1px solid var(--glass-border-accent);
   border-radius: 16px;
   padding: 2rem;
   max-width: 480px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  color: var(--color-fg);
+  box-shadow: var(--glass-shadow), 0 24px 64px rgba(0, 0, 0, 0.22);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+:global(:root[data-theme="light"]) .modal {
+  color-scheme: light;
+}
+
+:global(:root[data-theme="dark"]) .modal {
+  color-scheme: dark;
 }
 
 .modalTitle {
   font-size: 1.2rem;
   font-weight: 700;
   margin: 0 0 0.5rem 0;
+  color: var(--color-fg);
 }
 
 .modalSubtitle {
   font-size: 0.9rem;
-  color: var(--subtle-text, #6b7280);
+  color: var(--color-fg-muted);
   margin: 0 0 1.5rem 0;
+}
+
+.modalFieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.modalLabel {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.modalFileInput {
+  display: block;
+  margin-top: 0.35rem;
+  width: 100%;
+  max-width: 100%;
+  font-size: 0.875rem;
+  color: var(--color-fg-muted);
+}
+
+.modalFileInput::file-selector-button {
+  margin-right: 0.75rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border-accent);
+  background: color-mix(in srgb, var(--glass-bg-soft) 88%, var(--color-bg));
+  color: var(--color-fg);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.modalFileInput::file-selector-button:hover {
+  border-color: rgba(139, 92, 246, 0.45);
 }
 
 .modalActions {
@@ -288,12 +339,17 @@
 
 .btnSecondary {
   padding: 0.6rem 1.2rem;
-  border: 1.5px solid rgba(139, 92, 246, 0.3);
+  border: 1.5px solid var(--glass-border-accent);
   border-radius: 9px;
-  background: transparent;
-  color: var(--text, #111);
+  background: color-mix(in srgb, var(--glass-bg-soft) 60%, transparent);
+  color: var(--color-fg);
   font-size: 0.9rem;
   cursor: pointer;
+}
+
+.btnSecondary:hover {
+  background: color-mix(in srgb, var(--glass-bg-soft) 85%, var(--color-bg));
+  border-color: rgba(139, 92, 246, 0.45);
 }
 
 .btnPrimary {

@@ -9,7 +9,7 @@ import { GoogleLogo } from "@/app/components/GoogleLogo";
 import {
   LayoutDashboard, User, FolderOpen, Settings, Terminal as TerminalIcon,
   Save, LogOut, MapPin, Search, FileText, Mail, Play, Square, X, RefreshCw,
-  Hand, Eye
+  Hand, Eye, ChevronLeft, ChevronRight, ListChecks,
 } from "lucide-react";
 
 import { COMMUNES_FRANCE } from "@/data/communes-france";
@@ -70,6 +70,21 @@ const MODE_LABELS: Record<RunMode, string> = {
   generate: "Génération des lettres",
   drafts: "Création des brouillons Gmail",
 };
+
+const DASHBOARD_VIEW_KEY = "alternance-dashboard-view";
+const WIZARD_STEP_KEY = "alternance-wizard-step";
+const WIZARD_STEP_COUNT = 6;
+
+const WIZARD_STEP_LABELS = [
+  "Identité",
+  "Contact et e-mails",
+  "Documents",
+  "Zone géographique",
+  "Lancer une recherche",
+  "Suivi",
+] as const;
+
+type DashboardViewMode = "wizard" | "full" | "summary";
 
 const ZONE_PLACEHOLDER =
   "Tapez une ville (ex: Paris) — laissez vide pour toute la France";
@@ -305,6 +320,11 @@ function DashboardContent() {
   const typingTimerRef = useRef<number | null>(null);
   const animatedLogsRef = useRef("");
   const showDemoBanner = accessState === "unauthenticated" && isDemoView;
+
+  const [uploadsReady, setUploadsReady] = useState(false);
+  const [viewMode, setViewMode] = useState<DashboardViewMode>("wizard");
+  const [wizardStep, setWizardStep] = useState(1);
+  const dashboardViewInitRef = useRef(false);
 
   const pipelineStepsRaw = useMemo(() => {
     if (!runDetails?.logs_tail?.length) return null;
@@ -623,6 +643,10 @@ function DashboardContent() {
         }
       } catch {
         // Ignore upload status failures to avoid blocking the dashboard.
+      } finally {
+        if (!cancelled) {
+          setUploadsReady(true);
+        }
       }
     }
 
@@ -631,6 +655,30 @@ function DashboardContent() {
       cancelled = true;
     };
   }, [accessState]);
+
+  useEffect(() => {
+    if (accessState !== "granted" || !uploadsReady || isProfileLoading || dashboardViewInitRef.current) {
+      return;
+    }
+    dashboardViewInitRef.current = true;
+    const saved = window.localStorage.getItem(DASHBOARD_VIEW_KEY) as DashboardViewMode | null;
+    if (saved === "full" || saved === "wizard" || saved === "summary") {
+      setViewMode(saved);
+    } else if (firstName.trim() && lastName.trim() && cvUploaded) {
+      setViewMode("summary");
+    } else {
+      setViewMode("wizard");
+    }
+    const stepRaw = parseInt(window.localStorage.getItem(WIZARD_STEP_KEY) || "1", 10);
+    if (stepRaw >= 1 && stepRaw <= WIZARD_STEP_COUNT) {
+      setWizardStep(stepRaw);
+    }
+  }, [accessState, uploadsReady, isProfileLoading, firstName, lastName, cvUploaded]);
+
+  useEffect(() => {
+    if (viewMode !== "wizard") return;
+    window.localStorage.setItem(WIZARD_STEP_KEY, String(wizardStep));
+  }, [viewMode, wizardStep]);
 
   const activeRun = useMemo(
     () => runs.find((run) => run.run_id === activeRunId) ?? null,
@@ -1097,6 +1145,35 @@ function DashboardContent() {
     void refreshRunDetails(runId);
   }
 
+  function persistDashboardView(mode: DashboardViewMode) {
+    window.localStorage.setItem(DASHBOARD_VIEW_KEY, mode);
+    setViewMode(mode);
+  }
+
+  function goWizardNext() {
+    setError("");
+    if (wizardStep === 1) {
+      if (!firstName.trim() || !lastName.trim()) {
+        setError("Renseignez votre prénom et votre nom pour continuer.");
+        return;
+      }
+    }
+    if (wizardStep < WIZARD_STEP_COUNT) {
+      setWizardStep((s) => s + 1);
+    }
+  }
+
+  function goWizardPrev() {
+    setError("");
+    if (wizardStep > 1) {
+      setWizardStep((s) => s - 1);
+    }
+  }
+
+  const showRunsAndLogs = viewMode === "full" || (viewMode === "wizard" && wizardStep === 6);
+  const showFullGrid = viewMode === "full";
+  const showWizardSteps = viewMode === "wizard" && wizardStep >= 1 && wizardStep <= 5;
+
   if (accessState === "checking") {
     return (
       <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
@@ -1170,6 +1247,25 @@ function DashboardContent() {
         <div>
           <h1 className={styles.dashboardHeaderTitle}>Content de vous revoir{firstName ? `, ${firstName}` : ''} <Hand size={24} /></h1>
           <p className={styles.dashboardHeaderSubtitle}>Poursuivez la configuration ou lancez une nouvelle recherche.</p>
+          <div className={styles.dashboardViewToolbar} role="navigation" aria-label="Mode d&apos;affichage du dashboard">
+            {viewMode !== "full" ? (
+              <button type="button" className={styles.dashboardViewLink} onClick={() => persistDashboardView("full")}>
+                Vue complète (tout afficher)
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.dashboardViewLink}
+                onClick={() => {
+                  persistDashboardView("wizard");
+                  setWizardStep(1);
+                }}
+              >
+                <ListChecks size={14} style={{ verticalAlign: "middle", marginRight: "0.35rem" }} />
+                Assistant pas à pas
+              </button>
+            )}
+          </div>
         </div>
         {!showDemoBanner && (
           <div className={styles.dashboardActions}>
@@ -1183,6 +1279,514 @@ function DashboardContent() {
         )}
       </header>
 
+      {viewMode === "summary" ? (
+        <section className={`${styles.panel} ${styles.wizardSummaryPanel}`}>
+          <h2 className={styles.wizardSummaryTitle}>Votre profil est prêt</h2>
+          <p className={styles.panelHint}>
+            {firstName} {lastName}
+            {cvUploaded ? " — CV enregistré." : " — Pensez à déposer votre CV (étape Documents) avant de lancer une recherche complète."}
+            {templateUploaded ? " Template de lettre enregistré." : ""}
+          </p>
+          <div className={styles.wizardSummaryActions}>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={() => {
+                persistDashboardView("wizard");
+                setWizardStep(5);
+              }}
+            >
+              Lancer ou modifier une recherche
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => {
+                persistDashboardView("wizard");
+                setWizardStep(1);
+              }}
+            >
+              Reprendre l&apos;assistant depuis le début
+            </button>
+            <button type="button" className={styles.secondaryBtn} onClick={() => persistDashboardView("full")}>
+              Vue complète
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => {
+                persistDashboardView("wizard");
+                setWizardStep(6);
+              }}
+            >
+              Voir l&apos;historique et les logs
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {viewMode === "wizard" ? (
+        <>
+          <nav className={styles.stepNav} aria-label="Étapes de configuration">
+            <p className={styles.stepNavTitle}>Étape {wizardStep} sur {WIZARD_STEP_COUNT}</p>
+            <ol className={styles.stepNavListOrdered}>
+              {WIZARD_STEP_LABELS.map((label, i) => {
+                const n = i + 1;
+                const active = wizardStep === n;
+                const done = wizardStep > n;
+                const canJump = n <= wizardStep || Boolean(firstName.trim() && lastName.trim());
+                return (
+                  <li key={label}>
+                    <button
+                      type="button"
+                      className={`${styles.stepNavPill} ${active ? styles.stepNavPillActive : ""} ${done ? styles.stepNavPillDone : ""}`}
+                      onClick={() => {
+                        if (canJump) setWizardStep(n);
+                      }}
+                      disabled={!canJump}
+                      aria-current={active ? "step" : undefined}
+                    >
+                      <span className={styles.stepNavNumber}>{done ? "✓" : n}</span>
+                      {label}
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+
+          {showWizardSteps ? (
+            <div className={styles.wizardMain}>
+              {wizardStep === 1 ? (
+                <section className={styles.panel} id="step-wizard-identity">
+                  <h2><span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><User size={24} /> Qui êtes-vous ?</span></h2>
+                  <p className={styles.sectionHint}>
+                    Commencez par votre prénom et votre nom — ils seront utilisés pour vos candidatures.
+                  </p>
+                  <form id="profile-form-wizard-1" className={styles.profileCard} onSubmit={onSaveProfile}>
+                    <div className={styles.uploadGrid}>
+                      <label>
+                        Prénom
+                        <input
+                          type="text"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          required
+                          autoComplete="given-name"
+                        />
+                      </label>
+                      <label>
+                        Nom
+                        <input
+                          type="text"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          required
+                          autoComplete="family-name"
+                        />
+                      </label>
+                    </div>
+                  </form>
+                  <div className={styles.wizardStepActions}>
+                    <button
+                      type="submit"
+                      className={styles.secondaryBtn}
+                      form="profile-form-wizard-1"
+                      disabled={isSavingProfile || showDemoBanner}
+                    >
+                      {isSavingProfile ? "Sauvegarde..." : "Enregistrer mon profil"}
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+
+              {wizardStep === 2 ? (
+                <section className={styles.panel} id="step-wizard-contact">
+                  <h2><span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><User size={24} /> Contact et e-mails</span></h2>
+                  <p className={styles.sectionHint}>
+                    Optionnel : liens et modèles de mail. Placeholders : {`{{ENTREPRISE}}`}, {`{{NOM_COMPLET}}`}, {`{{PRENOM}}`}, {`{{NOM}}`}, {`{{LINKEDIN}}`}, {`{{PORTFOLIO}}`}, {`{{DATE}}`}.
+                  </p>
+                  <form id="profile-form-wizard-2" className={styles.profileCard} onSubmit={onSaveProfile}>
+                    <label>
+                      LinkedIn (optionnel)
+                      <input
+                        type="url"
+                        value={linkedinUrl}
+                        onChange={(e) => setLinkedinUrl(e.target.value)}
+                        placeholder="https://www.linkedin.com/in/votre-profil"
+                      />
+                    </label>
+                    <label>
+                      Portfolio (optionnel)
+                      <input
+                        type="url"
+                        value={portfolioUrl}
+                        onChange={(e) => setPortfolioUrl(e.target.value)}
+                        placeholder="https://votre-portfolio.dev"
+                      />
+                    </label>
+                    <label>
+                      Sujet personnalisé (optionnel)
+                      <input
+                        type="text"
+                        value={mailSubjectTemplate}
+                        onChange={(e) => setMailSubjectTemplate(e.target.value)}
+                        placeholder="Ex: Candidature alternance - {{ENTREPRISE}} - {{NOM_COMPLET}}"
+                      />
+                    </label>
+                    <label>
+                      Corps du mail personnalisé (optionnel)
+                      <textarea
+                        value={mailBodyTemplate}
+                        onChange={(e) => setMailBodyTemplate(e.target.value)}
+                        rows={8}
+                        placeholder={"Ex: Bonjour,\nJe suis à la recherche d'une alternance en {{DATE}}.\nJe candidate chez {{ENTREPRISE}}."}
+                      />
+                    </label>
+                    <div className={styles.wizardStepActions}>
+                      <button type="submit" className={styles.secondaryBtn} disabled={isSavingProfile || showDemoBanner}>
+                        {isSavingProfile ? "Sauvegarde..." : "Enregistrer ces informations"}
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              ) : null}
+
+              {wizardStep === 3 ? (
+                <section className={styles.panel} id="step-wizard-documents">
+                  <h2><span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><FolderOpen size={24} /> Vos documents</span></h2>
+                  <p className={styles.sectionHint}>
+                    CV (PDF) obligatoire pour lancer une recherche complète ; template .docx optionnel.
+                  </p>
+                  <form className={styles.uploadCard} onSubmit={onUploadAssets} id="step-documents-wizard">
+                    <div
+                      className={`${styles.dropZone} ${isDraggingDocs ? styles.dropZoneActive : ""} ${cvFile || templateFile ? styles.dropZoneHasFiles : ""}`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!showDemoBanner) setIsDraggingDocs(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsDraggingDocs(false);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsDraggingDocs(false);
+                        if (showDemoBanner) return;
+                        const files = Array.from(e.dataTransfer?.files ?? []);
+                        for (const file of files) {
+                          const name = (file.name || "").toLowerCase();
+                          const isPdf = name.endsWith(".pdf") || file.type === "application/pdf";
+                          const isDoc = name.endsWith(".docx") || name.endsWith(".doc") || file.type.includes("word") || file.type.includes("document");
+                          if (isPdf) setCvFile(file);
+                          if (isDoc) setTemplateFile(file);
+                        }
+                      }}
+                    >
+                      <span className={styles.dropZoneIcon} aria-hidden="true"><FolderOpen size={32} /></span>
+                      <span className={styles.dropZoneText}>
+                        {cvFile || templateFile
+                          ? [cvFile?.name, templateFile?.name].filter(Boolean).join(" • ")
+                          : isDraggingDocs
+                            ? "Déposez les fichiers ici"
+                            : "Déposez votre CV (PDF) et template LM (.docx) ici"}
+                      </span>
+                    </div>
+                    <button className={styles.secondaryBtn} type="submit" disabled={isUploadingAssets || showDemoBanner}>
+                      {isUploadingAssets ? "Upload en cours..." : showDemoBanner ? "Connectez-vous pour uploader" : "Uploader mes fichiers"}
+                    </button>
+                    {assetInfo ? <p className={styles.uploadSuccess}>{assetInfo}</p> : null}
+                    {draftInfo ? <p className={styles.uploadHint}>{draftInfo}</p> : null}
+                  </form>
+                </section>
+              ) : null}
+
+              {wizardStep === 4 ? (
+                <section className={styles.panel} id="step-wizard-zone">
+                  <h2><span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><MapPin size={20} /> Zone géographique</span></h2>
+                  <p className={styles.sectionHint}>
+                    Ajoutez jusqu’à {MAX_ZONES} zones ou laissez vide pour toute la France.
+                  </p>
+                  <div className={styles.zoneSection}>
+                    <label className={styles.zoneFieldLabel} htmlFor="zone-geo-input-wizard">
+                      Zones géographiques (max. {MAX_ZONES})
+                    </label>
+                    {zones.length > 0 ? (
+                      <ul className={styles.zoneChipList} aria-label="Zones sélectionnées">
+                        {zones.map((z) => (
+                          <li key={z} className={styles.zoneChipItem}>
+                            <span className={styles.zoneChipLabel}>{z}</span>
+                            <button
+                              type="button"
+                              className={styles.zoneChipRemove}
+                              onClick={() => setZones((prev) => prev.filter((x) => x !== z))}
+                              aria-label={`Retirer ${z}`}
+                            >
+                              ×
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <div className={styles.zoneFieldRow}>
+                      <div className={styles.zoneFieldInputGroup}>
+                        <div className={styles.zoneFieldInputWrapper}>
+                          <span className={styles.zoneFieldIcon} aria-hidden="true">
+                            <MapPin size={18} style={{position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', opacity: 0.5}} />
+                          </span>
+                          <input
+                            id="zone-geo-input-wizard"
+                            type="text"
+                            aria-label="Ajouter une zone (ville)"
+                            disabled={zones.length >= MAX_ZONES}
+                            className={styles.zoneFieldInput}
+                            value={zoneQuery}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setZoneQuery(value);
+                              const trimmed = value.trim().toLowerCase();
+                              if (!trimmed) {
+                                setZoneSuggestions([]);
+                                return;
+                              }
+                              setZoneSuggestions(
+                                KNOWN_ZONES.filter(
+                                  (z) =>
+                                    z !== "all" &&
+                                    z.toLowerCase().includes(trimmed) &&
+                                    !zones.map((x) => x.toLowerCase()).includes(z.toLowerCase()),
+                                ).slice(0, 8),
+                              );
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                const q = zoneQuery.trim();
+                                if (
+                                  q &&
+                                  zones.length < MAX_ZONES &&
+                                  !zones.map((x) => x.toLowerCase()).includes(q.toLowerCase())
+                                ) {
+                                  setZones((prev) => [...prev, q].slice(0, MAX_ZONES));
+                                }
+                                setZoneQuery("");
+                                setZoneSuggestions([]);
+                              }
+                            }}
+                            onFocus={() => {
+                              if (zones.length >= MAX_ZONES) return;
+                              setIsZoneFocused(true);
+                              const trimmed = zoneQuery.trim().toLowerCase();
+                              if (!trimmed) {
+                                setZoneSuggestions(
+                                  KNOWN_ZONES.filter(
+                                    (z) =>
+                                      z !== "all" &&
+                                      !zones.map((x) => x.toLowerCase()).includes(z.toLowerCase()),
+                                  ).slice(0, 12),
+                                );
+                              } else {
+                                setZoneSuggestions(
+                                  KNOWN_ZONES.filter(
+                                    (z) =>
+                                      z !== "all" &&
+                                      z.toLowerCase().includes(trimmed) &&
+                                      !zones.map((x) => x.toLowerCase()).includes(z.toLowerCase()),
+                                  ).slice(0, 8),
+                                );
+                              }
+                            }}
+                            onBlur={() => {
+                              window.setTimeout(() => setIsZoneFocused(false), 100);
+                            }}
+                            autoComplete="off"
+                            placeholder={ZONE_PLACEHOLDER}
+                          />
+                        </div>
+                        {isZoneFocused && zoneSuggestions.length > 0 && zones.length < MAX_ZONES ? (
+                          <div
+                            className={styles.zoneSuggestions}
+                            role="listbox"
+                            aria-label="Suggestions de zone"
+                          >
+                            {zoneSuggestions.map((suggestion) => (
+                              <button
+                                key={suggestion}
+                                type="button"
+                                role="option"
+                                className={styles.zoneSuggestionItem}
+                                onClick={() => {
+                                  if (zones.length >= MAX_ZONES) return;
+                                  if (!zones.map((x) => x.toLowerCase()).includes(suggestion.toLowerCase())) {
+                                    setZones((prev) => [...prev, suggestion].slice(0, MAX_ZONES));
+                                  }
+                                  setZoneQuery("");
+                                  setZoneSuggestions([]);
+                                  setIsZoneFocused(false);
+                                }}
+                              >
+                                {suggestion}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
+              {wizardStep === 5 ? (
+                <section className={styles.panel} id="step-wizard-config">
+                  <h2><span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Settings size={20} /> Options et lancement</span></h2>
+                  <p className={styles.sectionHint}>
+                    Paramètres de la recherche puis lancez. L&apos;historique et les détails sont à l&apos;étape suivante.
+                  </p>
+                  <form
+                    id="pipeline-config-form-wizard"
+                    className={styles.form}
+                    onSubmit={onSubmit}
+                    aria-label="Paramètres de la recherche"
+                  >
+                    <div className={styles.inputGrid}>
+                      <label>
+                        Type de recherche
+                        <select value={mode} onChange={(e) => setMode(e.target.value as RunMode)}>
+                          {(Object.keys(MODE_LABELS) as RunMode[]).map((option) => (
+                            <option key={option} value={option}>
+                              {MODE_LABELS[option]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className={styles.inputGrid} role="group" aria-label="Domaine de recherche">
+                        <label>
+                          Secteur d&apos;activite
+                          <select
+                            value={sector}
+                            onChange={(e) => {
+                              const next = e.target.value as SectorId;
+                              setSector(next);
+                              setSpecialty("");
+                            }}
+                            aria-label="Secteur d'activité"
+                          >
+                            {SECTOR_ORDER.map((key) => (
+                              <option key={key} value={key}>
+                                {SECTOR_LABELS[key]}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          Metier / specialite
+                          <select
+                            value={specialty}
+                            onChange={(e) => setSpecialty(e.target.value)}
+                            disabled={sector === "all"}
+                            aria-label="Métier ou spécialité"
+                          >
+                            <option value="">Toutes</option>
+                            {(SECTORS_SPECIALTIES[sector as SectorId] ?? []).map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <label>
+                        Duree maximale (minutes)
+                        <input
+                          type="number"
+                          min={1}
+                          value={maxMinutes}
+                          onChange={(e) => setMaxMinutes(Number(e.target.value))}
+                        />
+                      </label>
+                      <label>
+                        Nombre maximal de sites
+                        <input
+                          type="number"
+                          min={1}
+                          value={maxSites}
+                          onChange={(e) => setMaxSites(Number(e.target.value))}
+                        />
+                      </label>
+                      <label>
+                        Objectif de cibles trouvees
+                        <input
+                          type="number"
+                          min={1}
+                          value={targetFound}
+                          onChange={(e) => setTargetFound(Number(e.target.value))}
+                        />
+                      </label>
+                      <label>
+                        Nombre de workers
+                        <input
+                          type="number"
+                          min={1}
+                          value={workers}
+                          onChange={(e) => setWorkers(Number(e.target.value))}
+                        />
+                      </label>
+                    </div>
+                    <fieldset className={styles.switchGroup}>
+                      <legend>Options</legend>
+                      <label className={styles.switchField}>
+                        <span>Mode test (aucun envoi réel)</span>
+                        <span className={styles.switchControl}>
+                          <input
+                            type="checkbox"
+                            checked={dryRun}
+                            onChange={(e) => setDryRun(e.target.checked)}
+                          />
+                          <span className={styles.switchTrack} aria-hidden="true" />
+                        </span>
+                      </label>
+                    </fieldset>
+                    <div className={styles.launchBlock}>
+                      <button
+                        className={styles.primaryBtn}
+                        type="submit"
+                        disabled={demoLaunchDisabled}
+                      >
+                        {!demoLaunchDisabled && <Play size={16} style={{marginRight: '0.3rem'}} />}
+                        {demoLaunchLabel}
+                      </button>
+                      <p className={styles.launchHint}>
+                        Lance une recherche selon le type choisi. Passez à l&apos;étape Suivi pour voir l&apos;historique et les logs.
+                      </p>
+                    </div>
+                  </form>
+                </section>
+              ) : null}
+
+              <div className={styles.wizardFooter}>
+                <button type="button" className={styles.secondaryBtn} onClick={goWizardPrev} disabled={wizardStep <= 1}>
+                  <ChevronLeft size={16} style={{ marginRight: "0.25rem" }} />
+                  Précédent
+                </button>
+                <button type="button" className={styles.primaryBtn} onClick={goWizardNext} disabled={wizardStep >= 5}>
+                  Suivant
+                  <ChevronRight size={16} style={{ marginLeft: "0.25rem" }} />
+                </button>
+                {wizardStep === 5 ? (
+                  <button type="button" className={styles.secondaryBtn} onClick={() => setWizardStep(6)}>
+                    Aller au suivi (historique)
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {showFullGrid ? (
       <div className={styles.dashboardGrid}>
         <div className={styles.dashboardLeft}>
           <section className={styles.panel} id="step-profil">
@@ -1584,7 +2188,18 @@ function DashboardContent() {
           </section>
         </div>
       </div>
+      ) : null}
 
+      {showRunsAndLogs ? (
+      <>
+      {viewMode === "wizard" && wizardStep === 6 ? (
+        <div className={styles.wizardFooter}>
+          <button type="button" className={styles.secondaryBtn} onClick={() => setWizardStep(5)}>
+            <ChevronLeft size={16} style={{ marginRight: "0.25rem" }} />
+            Retour aux options de lancement
+          </button>
+        </div>
+      ) : null}
       <section className={styles.panel} id="step-runs">
             <h2><span style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><LayoutDashboard size={20} /> Historique des recherches</span></h2>
             <p className={styles.sectionHint}>
@@ -1615,23 +2230,41 @@ function DashboardContent() {
               ) : null}
             </div>
             <div className={styles.controls}>
-              <button
-                className={styles.primaryBtn}
-                form="pipeline-config-form"
-                type="submit"
-                disabled={demoLaunchDisabled}
-              >
-                {!demoLaunchDisabled && <Play size={16} style={{marginRight: '0.4rem'}} />}
-                {demoLaunchLabel}
-              </button>
-              <button
-                className={styles.secondaryBtn}
-                type="button"
-                onClick={() => void refreshAll()}
-                disabled={isRefreshingRuns || isRefreshingDetails}
-              >
-                {isRefreshingRuns || isRefreshingDetails ? "Rafraichissement..." : "Rafraichir"}
-              </button>
+              {showFullGrid ? (
+                <>
+                  <button
+                    className={styles.primaryBtn}
+                    form="pipeline-config-form"
+                    type="submit"
+                    disabled={demoLaunchDisabled}
+                  >
+                    {!demoLaunchDisabled && <Play size={16} style={{marginRight: '0.4rem'}} />}
+                    {demoLaunchLabel}
+                  </button>
+                  <button
+                    className={styles.secondaryBtn}
+                    type="button"
+                    onClick={() => void refreshAll()}
+                    disabled={isRefreshingRuns || isRefreshingDetails}
+                  >
+                    {isRefreshingRuns || isRefreshingDetails ? "Rafraichissement..." : "Rafraichir"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className={styles.secondaryBtn}
+                    type="button"
+                    onClick={() => void refreshAll()}
+                    disabled={isRefreshingRuns || isRefreshingDetails}
+                  >
+                    {isRefreshingRuns || isRefreshingDetails ? "Rafraichissement..." : "Rafraichir"}
+                  </button>
+                  <p className={styles.sectionHint} style={{ margin: 0, flex: "1 1 12rem" }}>
+                    Pour lancer une recherche, utilisez l&apos;étape <strong>Options et lancement</strong> (étape 5).
+                  </p>
+                </>
+              )}
             </div>
 
             {info ? (
@@ -2043,6 +2676,8 @@ function DashboardContent() {
             </>
           )}
         </section>
+      </>
+      ) : null}
     </div>
   );
 }

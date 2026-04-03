@@ -2176,6 +2176,105 @@
   flex-shrink: 0;
 }
 
+.dashboardViewToolbar {
+  margin-top: 0.65rem;
+}
+
+.dashboardViewLink {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.dashboardViewLink:hover {
+  color: var(--color-accent-strong);
+}
+
+.wizardSummaryPanel {
+  margin-bottom: 1.5rem;
+  max-width: 52rem;
+}
+
+.wizardSummaryTitle {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+}
+
+.wizardSummaryActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.wizardMain {
+  max-width: 52rem;
+  margin-bottom: 1rem;
+}
+
+.wizardFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  max-width: 52rem;
+}
+
+.wizardStepActions {
+  margin-top: 1rem;
+}
+
+.stepNavListOrdered {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.stepNavPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--glass-border-accent) 85%, transparent);
+  background: color-mix(in srgb, var(--glass-bg-soft) 80%, transparent);
+  font-size: 0.78rem;
+  color: var(--subtle-text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.stepNavPill:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.stepNavPill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.stepNavPillActive {
+  border-color: var(--primary);
+  color: var(--color-fg);
+  background: color-mix(in srgb, var(--primary) 12%, var(--glass-bg-soft));
+  font-weight: 600;
+}
+
+.stepNavPillDone:not(.stepNavPillActive) {
+  opacity: 0.85;
+}
+
 .dashboardGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
