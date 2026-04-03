@@ -1167,7 +1167,7 @@ function DashboardContent() {
       ) : null}
       
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* SIDEBAR B2C POP */}
+        {/* Sidebar */}
         <aside className={styles.sidebar} style={{ width: '280px', flexShrink: 0, borderRight: '1px solid rgba(139,92,246,0.15)', background: theme === 'dark' ? 'rgba(15,23,42,0.8)' : 'rgba(255,255,255,0.7)', backdropFilter: 'blur(20px)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '2.5rem', overflowY: 'auto' }}>
           
           <div className={styles.sidebarBrand} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -1176,7 +1176,7 @@ function DashboardContent() {
             </div>
             <div>
               <h2 style={{ fontSize: '1.15rem', margin: 0, fontWeight: 800, background: 'linear-gradient(to right, #8b5cf6, #d946ef)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Alternance</h2>
-              <span style={{ fontSize: '0.8rem', color: 'var(--subtle-text)', fontWeight: 700, letterSpacing: '0.04em' }}>HUNTER B2C</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--subtle-text)', fontWeight: 700, letterSpacing: '0.04em' }}>Hunter</span>
             </div>
           </div>
 

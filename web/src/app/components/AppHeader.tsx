@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Home, User, LogIn, LogOut, ExternalLink, List } from "lucide-react";
+import { Search, Home, User, LogIn, LogOut, ExternalLink, List, LayoutDashboard } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
@@ -120,6 +120,9 @@ export function AppHeader() {
             <>
               <Link href="/explorer" className="app-nav-link">
                 <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Explorer
+              </Link>
+              <Link href="/dashboard" className="app-nav-link">
+                <LayoutDashboard size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Dashboard
               </Link>
               <Link href="/profil" className="app-nav-link">
                 <User size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Profil
@@ -244,6 +247,9 @@ export function AppHeader() {
               <>
                 <Link href="/explorer" className="app-mobile-nav-link" onClick={closeMenu}>
                   <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Explorer les entreprises
+                </Link>
+                <Link href="/dashboard" className="app-mobile-nav-link" onClick={closeMenu}>
+                  <LayoutDashboard size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Dashboard
                 </Link>
                 <Link href="/profil" className="app-mobile-nav-link" onClick={closeMenu}>
                   <User size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Mon profil
