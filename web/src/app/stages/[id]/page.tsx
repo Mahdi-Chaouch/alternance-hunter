@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, MapPin, Briefcase, CheckCircle, ExternalLink } from "lucide-react";
 import styles from "../stages.module.css";
@@ -18,7 +18,8 @@ type OffreDetail = {
   dureeTravailLibelleConverti?: string;
 };
 
-export default function StageDetailPage({ params }: { params: { id: string } }) {
+export default function StageDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
   const [offre, setOffre] = useState<OffreDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +34,7 @@ export default function StageDetailPage({ params }: { params: { id: string } }) 
   }, []);
 
   useEffect(() => {
-    fetch(`/api/stages/${encodeURIComponent(params.id)}`)
+    fetch(`/api/stages/${encodeURIComponent(id)}`)
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) {
@@ -44,7 +45,7 @@ export default function StageDetailPage({ params }: { params: { id: string } }) 
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Erreur réseau"))
       .finally(() => setLoading(false));
-  }, [params.id]);
+  }, [id]);
 
   const handleAjouter = useCallback(async () => {
     if (!offre) return;
