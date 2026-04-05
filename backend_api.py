@@ -1821,11 +1821,11 @@ def search_offres_stages(
     domaine: Optional[str] = Query(default=None),
     range: str = Query(default="0-19"),
 ) -> dict:
-    """Search France Travail internship offers (typeContrat=ST)."""
+    """Search France Travail internship offers."""
     token = _get_ft_access_token()
-    params: dict[str, str] = {"typeContrat": "ST"}
-    if q:
-        params["motsCles"] = q
+    params: dict[str, str] = {}
+    # Prepend "stage" to narrow results to internship offers
+    params["motsCles"] = f"stage {q}".strip() if q else "stage"
     if commune:
         params["commune"] = commune
     if domaine:
