@@ -61,7 +61,11 @@ export default function StagesPage() {
         }
         return;
       }
-      setOffres(data.resultats ?? []);
+      const resultats: OffreStage[] = data.resultats ?? [];
+      const stageOnly = resultats.filter((o) =>
+        o.intitule.toLowerCase().includes("stage")
+      );
+      setOffres(stageOnly);
       setContentRange(data.content_range ?? "");
       setPage(pageIndex);
     } catch (err) {
