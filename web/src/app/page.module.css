@@ -1720,29 +1720,30 @@
 
 /* Page support */
 .supportPanel {
-  max-width: min(800px, 100%);
+  max-width: min(1000px, 100%);
   margin-left: auto;
   margin-right: auto;
+  padding: 2.2rem 2.5rem;
 }
 
 .supportForm {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
+  gap: 1.5rem;
 }
 
 .supportField {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.55rem;
 }
 
 .supportMessageField {
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .supportLabel {
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text);
 }
@@ -1750,14 +1751,14 @@
 .supportOptional {
   font-weight: 500;
   color: var(--muted-text);
-  font-size: 0.85rem;
+  font-size: 0.92rem;
 }
 
 .supportInput,
 .supportTextarea {
   font: inherit;
-  font-size: 0.95rem;
-  padding: 0.55rem 0.75rem;
+  font-size: 1.05rem;
+  padding: 0.75rem 1rem;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: var(--input-bg);
@@ -1773,9 +1774,9 @@
 
 .supportTextarea {
   resize: vertical;
-  min-height: 280px;
-  line-height: 1.55;
-  padding: 0.75rem 0.9rem;
+  min-height: 360px;
+  line-height: 1.6;
+  padding: 1rem 1.1rem;
 }
 
 .supportHint {
