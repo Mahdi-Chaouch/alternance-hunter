@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   X,
   MessageCircle,
+  Briefcase,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
@@ -134,6 +135,9 @@ export function AppHeader() {
             <>
               <Link href="/explorer" className={`app-nav-link${pathname?.startsWith('/explorer') ? ' app-nav-link-active' : ''}`}>
                 <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Explorer
+              </Link>
+              <Link href="/stages" className={`app-nav-link${pathname?.startsWith('/stages') ? ' app-nav-link-active' : ''}`}>
+                <Briefcase size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Stages
               </Link>
               <Link href="/dashboard" className={`app-nav-link${pathname?.startsWith('/dashboard') ? ' app-nav-link-active' : ''}`}>
                 <LayoutDashboard size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Dashboard
@@ -275,6 +279,9 @@ export function AppHeader() {
               <>
                 <Link href="/explorer" className="app-mobile-nav-link" onClick={closeMenu}>
                   <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Explorer les entreprises
+                </Link>
+                <Link href="/stages" className="app-mobile-nav-link" onClick={closeMenu}>
+                  <Briefcase size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Stages
                 </Link>
                 <Link href="/dashboard" className="app-mobile-nav-link" onClick={closeMenu}>
                   <LayoutDashboard size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Dashboard

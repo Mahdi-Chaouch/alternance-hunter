@@ -13,6 +13,9 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -47,6 +50,15 @@ ALLOWED_TEMPLATE_MIME_TYPES = frozenset({
 })
 UPLOAD_QUOTA_PER_USER_PER_DAY = 20
 UPLOAD_QUOTA_LOCK = threading.Lock()
+
+# France Travail API integration
+_FT_TOKEN_CACHE: dict = {"access_token": None, "expires_at": 0.0}
+_FT_TOKEN_LOCK = threading.Lock()
+FT_TOKEN_URL = os.getenv(
+    "FRANCE_TRAVAIL_TOKEN_URL",
+    "https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire",
+)
+FT_API_BASE = os.getenv("FRANCE_TRAVAIL_API_BASE_URL", "https://api.francetravail.io")
 
 REDACTED_VALUE = "[REDACTED]"
 SENSITIVE_CLI_FLAGS = {
@@ -1756,3 +1768,109 @@ def admin_migrate_shared_companies() -> dict:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Migration échouée: {e!s}")
+
+
+# ---------------------------------------------------------------------------
+# France Travail — offres de stage
+# ---------------------------------------------------------------------------
+
+def _get_ft_access_token() -> str:
+    """Return a valid France Travail OAuth2 access token (cached, thread-safe)."""
+    client_id = (os.getenv("FRANCE_TRAVAIL_CLIENT_ID") or "").strip()
+    client_secret = (os.getenv("FRANCE_TRAVAIL_CLIENT_SECRET") or "").strip()
+    scope = (os.getenv("FRANCE_TRAVAIL_SCOPE") or "").strip()
+    if not client_id or not client_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="Intégration France Travail non configurée (credentials manquants).",
+        )
+    with _FT_TOKEN_LOCK:
+        if _FT_TOKEN_CACHE["access_token"] and time.time() < _FT_TOKEN_CACHE["expires_at"]:
+            return _FT_TOKEN_CACHE["access_token"]  # type: ignore[return-value]
+        payload = urllib.parse.urlencode({
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scope": scope,
+        }).encode()
+        req = urllib.request.Request(
+            FT_TOKEN_URL,
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                token_data = json.loads(resp.read().decode())
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode(errors="replace")
+            raise HTTPException(status_code=502, detail=f"France Travail auth error: {exc.code} {body[:200]}")
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"France Travail auth inaccessible: {exc!s}")
+        access_token: str = token_data.get("access_token", "")
+        expires_in: int = int(token_data.get("expires_in", 3600))
+        _FT_TOKEN_CACHE["access_token"] = access_token
+        _FT_TOKEN_CACHE["expires_at"] = time.time() + expires_in - 60
+        return access_token
+
+
+@app.get("/offres/stages", dependencies=[Depends(verify_token)])
+def search_offres_stages(
+    q: Optional[str] = Query(default=None),
+    commune: Optional[str] = Query(default=None),
+    domaine: Optional[str] = Query(default=None),
+    range: str = Query(default="0-19"),
+) -> dict:
+    """Search France Travail internship offers (typeContrat=ST)."""
+    token = _get_ft_access_token()
+    params: dict[str, str] = {"typeContrat": "ST"}
+    if q:
+        params["motsCles"] = q
+    if commune:
+        params["commune"] = commune
+    if domaine:
+        params["domaine"] = domaine
+    url = f"{FT_API_BASE.rstrip('/')}/partenaire/offresdemploi/v2/offres/search?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Range": f"offres={range}",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            content_range = resp.headers.get("Content-Range", "")
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        raise HTTPException(status_code=exc.code, detail=f"France Travail API: {body[:300]}")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"France Travail inaccessible: {exc!s}")
+    return {"resultats": data.get("resultats", []), "content_range": content_range}
+
+
+_FT_OFFER_ID_RE = re.compile(r"^[A-Za-z0-9]{1,20}$")
+
+
+@app.get("/offres/stages/{offer_id}", dependencies=[Depends(verify_token)])
+def get_offre_stage(offer_id: str) -> dict:
+    """Get a single France Travail internship offer by ID."""
+    if not _FT_OFFER_ID_RE.match(offer_id):
+        raise HTTPException(status_code=400, detail="ID d'offre invalide.")
+    token = _get_ft_access_token()
+    url = f"{FT_API_BASE.rstrip('/')}/partenaire/offresdemploi/v2/offres/{urllib.parse.quote(offer_id)}"
+    req = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        raise HTTPException(status_code=exc.code, detail=f"France Travail API: {body[:300]}")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"France Travail inaccessible: {exc!s}")
+    return data

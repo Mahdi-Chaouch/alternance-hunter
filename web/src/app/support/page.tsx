@@ -150,7 +150,7 @@ export default function SupportPage() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   required
-                  rows={14}
+                  rows={20}
                   minLength={8}
                   maxLength={4000}
                   placeholder="Décrivez votre situation en quelques phrases…"
