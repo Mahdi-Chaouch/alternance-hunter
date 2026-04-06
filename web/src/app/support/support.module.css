@@ -354,22 +354,61 @@
 
 /* ─── DARK MODE ───────────────────────────────── */
 .pageDark .card {
-  background: rgba(20, 18, 30, 0.75);
+  background: rgba(20, 18, 30, 0.85);
   border-color: rgba(139, 92, 246, 0.22);
+}
+
+.pageDark .cardTitle {
+  color: #f3f4f6;
+}
+
+.pageDark .cardSub {
+  color: #9ca3af;
+}
+
+.pageDark .label {
+  color: #e5e7eb;
+}
+
+.pageDark .optional {
+  color: #9ca3af;
+}
+
+.pageDark .hint {
+  color: #9ca3af;
+}
+
+.pageDark .backLink {
+  color: #9ca3af;
+}
+
+.pageDark .successTitle {
+  color: #f3f4f6;
+}
+
+.pageDark .successSub {
+  color: #9ca3af;
 }
 
 .pageDark .input,
 .pageDark .textarea {
-  background: rgba(255, 255, 255, 0.06);
-  color: #f3f4f6 !important;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f3f4f6;
   border-color: rgba(139, 92, 246, 0.25);
   -webkit-text-fill-color: #f3f4f6;
 }
 
+.pageDark .input::placeholder,
+.pageDark .textarea::placeholder {
+  color: #6b7280;
+  -webkit-text-fill-color: #6b7280;
+}
+
 .pageDark .input[readonly] {
   opacity: 1;
-  color: #f3f4f6 !important;
-  -webkit-text-fill-color: #f3f4f6;
+  color: #f3f4f6;
+  -webkit-text-fill-color: #f3f4f6 !important;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .pageDark .input:focus,
