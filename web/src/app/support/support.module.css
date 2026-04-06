@@ -365,6 +365,11 @@
   border-color: rgba(139, 92, 246, 0.25);
 }
 
+.pageDark .input[readonly] {
+  color: #d1d5db;
+  opacity: 0.8;
+}
+
 .pageDark .input:focus,
 .pageDark .textarea:focus {
   border-color: #a78bfa;
