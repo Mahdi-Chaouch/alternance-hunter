@@ -360,14 +360,16 @@
 
 .pageDark .input,
 .pageDark .textarea {
-  background: rgba(255, 255, 255, 0.05);
-  color: #f3f4f6;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f3f4f6 !important;
   border-color: rgba(139, 92, 246, 0.25);
+  -webkit-text-fill-color: #f3f4f6;
 }
 
 .pageDark .input[readonly] {
-  color: #d1d5db;
-  opacity: 0.8;
+  opacity: 1;
+  color: #f3f4f6 !important;
+  -webkit-text-fill-color: #f3f4f6;
 }
 
 .pageDark .input:focus,
