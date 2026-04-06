@@ -66,6 +66,10 @@
   color: var(--text, #111);
 }
 
+.pageDark .trustItem {
+  color: #e5e7eb;
+}
+
 .trustDot {
   width: 8px;
   height: 8px;

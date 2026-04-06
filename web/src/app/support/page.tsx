@@ -106,10 +106,6 @@ export default function SupportPage() {
             </p>
             <div className={styles.trust} style={{ marginTop: "1rem" }}>
               <span className={styles.trustItem}>
-                <span className={styles.trustDot} />
-                +500 étudiants aidés
-              </span>
-              <span className={styles.trustItem}>
                 <span className={styles.trustDot} style={{ background: "#6366f1" }} />
                 Support humain
               </span>
