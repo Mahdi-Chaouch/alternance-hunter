@@ -3,9 +3,36 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
-import styles from "../page.module.css";
+import styles from "./support.module.css";
 
 type ThemeMode = "light" | "dark";
+
+const FAQS = [
+  {
+    q: "Comment connecter mon Gmail ?",
+    a: "Depuis le Dashboard, descendez jusqu'à la section « Connexion Gmail » et cliquez sur « Connecter Gmail ». Autorisez les permissions Gmail (lecture + composition) sur votre compte Google.",
+  },
+  {
+    q: "Pourquoi le bouton « Candidater » est grisé dans l'Explorer ?",
+    a: "Le bouton est désactivé si l'entreprise n'a aucun contact email détecté. Lancez d'abord une recherche depuis le Dashboard pour alimenter la base de données.",
+  },
+  {
+    q: "Comment créer un brouillon Gmail depuis une offre France Travail ?",
+    a: "Sur les pages /stages et /explorer (onglet France Travail), cliquez sur « Brouillon ». Vous devez avoir uploadé votre CV dans votre Profil et connecté votre compte Gmail.",
+  },
+  {
+    q: "Mes brouillons Gmail ne sont pas créés, que faire ?",
+    a: "Vérifiez que votre CV est uploadé (Profil > Documents), que Gmail est connecté, et que votre template de lettre est déposé si vous utilisez le mode « pipeline » ou « generate ».",
+  },
+  {
+    q: "Comment suivre mes candidatures ?",
+    a: "Toutes vos candidatures (pipeline, Explorer, France Travail) apparaissent dans le Dashboard > Suivi. Vous pouvez mettre à jour leur statut (envoyé, relance, réponse positive/négative).",
+  },
+  {
+    q: "La recherche tourne mais ne trouve rien, pourquoi ?",
+    a: "Essayez une zone plus large (ex: « Paris » au lieu d'une commune spécifique), augmentez le nombre de sites maximum, ou changez de secteur. La base enrichit avec chaque recherche.",
+  },
+];
 
 export default function SupportPage() {
   const { data: session } = authClient.useSession();
@@ -63,165 +90,141 @@ export default function SupportPage() {
     [subject, message, email, sessionEmail],
   );
 
-  const faqs = [
-    {
-      q: "Pourquoi l'API France Travail ne retourne rien ?",
-      a: "Vérifiez que FRANCE_TRAVAIL_CLIENT_ID, FRANCE_TRAVAIL_CLIENT_SECRET et FRANCE_TRAVAIL_SCOPE sont bien définis dans les variables d'environnement Render. Le scope doit contenir 'api_offresdemploiv2 o2dsoffre'. Redéployez après toute modification.",
-    },
-    {
-      q: "Comment créer un brouillon Gmail depuis une offre France Travail ?",
-      a: "Sur les pages /stages et /explorer (onglet France Travail), cliquez sur 'Brouillon'. Vous devez avoir uploadé votre CV dans votre Profil et connecté votre compte Gmail depuis le Dashboard.",
-    },
-    {
-      q: "Pourquoi le bouton 'Candidater' est grisé dans l'Explorer ?",
-      a: "Le bouton est désactivé si l'entreprise n'a aucun contact email détecté. Lancez d'abord une recherche depuis le Dashboard pour alimenter la base de données.",
-    },
-    {
-      q: "Comment connecter mon Gmail ?",
-      a: "Depuis le Dashboard, descendez jusqu'à la section 'Connexion Gmail' et cliquez sur 'Connecter Gmail'. Autorisez les permissions Gmail (lecture + composition) sur votre compte Google.",
-    },
-    {
-      q: "Mes brouillons Gmail ne sont pas créés, que faire ?",
-      a: "Vérifiez que votre CV est uploadé (Profil > Documents), que Gmail est connecté, et que votre template de lettre est déposé si vous utilisez le mode 'pipeline' ou 'generate'.",
-    },
-    {
-      q: "Comment suivre mes candidatures ?",
-      a: "Toutes vos candidatures (pipeline, Explorer, France Travail) apparaissent dans le Dashboard > Suivi. Vous pouvez mettre à jour leur statut (envoyé, relance, réponse positive/négative).",
-    },
-    {
-      q: "La recherche tourne mais ne trouve rien, pourquoi ?",
-      a: "Essayez une zone plus large (ex: 'Paris' au lieu d'une commune spécifique), augmentez le nombre de sites maximum, ou changez de secteur. La base de données partagée s'enrichit avec chaque recherche.",
-    },
-  ];
-
   return (
     <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
-      <main className={styles.main}>
-        <header className={styles.headerCard}>
+      <div className={styles.inner}>
+
+        {/* ── LEFT: intro + FAQ ── */}
+        <div className={styles.left}>
           <div>
-            <p className={styles.eyebrow}>Aide</p>
-            <h1>Support</h1>
-            <p className={styles.panelHint}>
-              Décrivez votre question ou votre problème. Le message est transmis à l&apos;équipe via notre canal
-              interne.
+            <span className={styles.badge}>Support</span>
+            <h1 className={styles.heading} style={{ marginTop: "0.75rem" }}>
+              Besoin d&apos;aide ?
+            </h1>
+            <p className={styles.subheading} style={{ marginTop: "0.6rem" }}>
+              Notre équipe te répond en moins de 24h. Décris ton problème et on s&apos;occupe du reste.
             </p>
-          </div>
-        </header>
-
-        <section className={styles.panel}>
-          <h2 style={{ marginBottom: "1.2rem" }}>Questions fréquentes</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {faqs.map((faq, i) => (
-              <details key={i} style={{ borderBottom: "1px solid rgba(139,92,246,0.15)", paddingBottom: "0.8rem" }}>
-                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: "0.95rem", listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  {faq.q}
-                  <span style={{ color: "#8b5cf6", marginLeft: "0.5rem", fontSize: "1.1rem" }}>+</span>
-                </summary>
-                <p className={styles.panelHint} style={{ marginTop: "0.6rem", marginBottom: 0 }}>{faq.a}</p>
-              </details>
-            ))}
-          </div>
-        </section>
-
-        <section className={`${styles.panel} ${styles.supportPanel}`}>
-          {status === "success" ? (
-            <div className={styles.supportSuccess} role="status">
-              <p className={styles.supportSuccessTitle}>Message envoyé</p>
-              <p className={styles.panelHint}>Merci — nous vous répondrons sur l&apos;adresse indiquée.</p>
-              <button
-                type="button"
-                className={styles.secondaryBtn}
-                onClick={() => setStatus("idle")}
-              >
-                Envoyer un autre message
-              </button>
+            <div className={styles.trust} style={{ marginTop: "1rem" }}>
+              <span className={styles.trustItem}>
+                <span className={styles.trustDot} />
+                +500 étudiants aidés
+              </span>
+              <span className={styles.trustItem}>
+                <span className={styles.trustDot} style={{ background: "#6366f1" }} />
+                Support humain
+              </span>
+              <span className={styles.trustItem}>
+                <span className={styles.trustDot} style={{ background: "#10b981" }} />
+                Réponse &lt; 24h
+              </span>
             </div>
-          ) : (
-            <form className={styles.supportForm} onSubmit={(e) => void onSubmit(e)} noValidate>
-              {sessionEmail ? (
-                <div className={styles.supportField}>
-                  <label className={styles.supportLabel} htmlFor="support-email-readonly">
-                    E-mail (compte connecté)
-                  </label>
-                  <input
-                    id="support-email-readonly"
-                    type="email"
-                    className={styles.supportInput}
-                    value={sessionEmail}
-                    readOnly
-                    tabIndex={-1}
-                    aria-readonly="true"
-                  />
-                </div>
-              ) : (
-                <div className={styles.supportField}>
-                  <label className={styles.supportLabel} htmlFor="support-email">
-                    E-mail <span aria-hidden="true">*</span>
-                  </label>
-                  <input
-                    id="support-email"
-                    type="email"
-                    className={styles.supportInput}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    required
-                    placeholder="vous@exemple.fr"
-                  />
-                </div>
-              )}
+          </div>
 
-              <div className={styles.supportField}>
-                <label className={styles.supportLabel} htmlFor="support-subject">
-                  Sujet <span className={styles.supportOptional}>(optionnel)</span>
-                </label>
-                <input
-                  id="support-subject"
-                  type="text"
-                  className={styles.supportInput}
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  maxLength={200}
-                  placeholder="Ex. Problème de synchronisation Gmail"
-                />
-              </div>
+          <div>
+            <p style={{ fontSize: "0.8rem", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#8b5cf6", marginBottom: "0.8rem" }}>
+              Questions fréquentes
+            </p>
+            <div className={styles.faqList}>
+              {FAQS.map((faq, i) => (
+                <details key={i} className={styles.faqItem}>
+                  <summary className={styles.faqSummary}>
+                    {faq.q}
+                    <span className={styles.faqIcon}>+</span>
+                  </summary>
+                  <p className={styles.faqAnswer}>{faq.a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </div>
 
-              <div className={`${styles.supportField} ${styles.supportMessageField}`}>
-                <label className={styles.supportLabel} htmlFor="support-message">
-                  Message <span aria-hidden="true">*</span>
-                </label>
-                <textarea
-                  id="support-message"
-                  className={styles.supportTextarea}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  required
-                  rows={20}
-                  minLength={8}
-                  maxLength={4000}
-                  placeholder="Décrivez votre situation en quelques phrases…"
-                />
-                <p className={styles.supportHint}>{message.length} / 4000 caractères (minimum 8)</p>
-              </div>
-
-              {errorText ? (
-                <div className={styles.candidatureSyncError} role="alert">
-                  {errorText}
-                </div>
-              ) : null}
-
-              <div className={styles.supportActions}>
-                <button type="submit" className={styles.primaryBtn} disabled={status === "sending"}>
-                  {status === "sending" ? "Envoi…" : "Envoyer"}
+        {/* ── RIGHT: form card ── */}
+        <div className={styles.right}>
+          <div className={styles.card}>
+            {status === "success" ? (
+              <div className={styles.success} role="status">
+                <div className={styles.successIcon}>✓</div>
+                <p className={styles.successTitle}>Message envoyé !</p>
+                <p className={styles.successSub}>Merci — nous vous répondrons sur l&apos;adresse indiquée.</p>
+                <button type="button" className={styles.resetBtn} onClick={() => setStatus("idle")}>
+                  Envoyer un autre message
                 </button>
-                <Link href="/" className={`${styles.secondaryBtn} ${styles.supportBackLink}`}>
-                  Retour à l&apos;accueil
-                </Link>
               </div>
-            </form>
-          )}
-        </section>
-      </main>
+            ) : (
+              <>
+                <p className={styles.cardTitle}>Contacte-nous</p>
+                <p className={styles.cardSub}>Remplis ce formulaire et on revient vers toi rapidement.</p>
+                <form className={styles.form} onSubmit={(e) => void onSubmit(e)} noValidate>
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor="support-email-field">
+                      {sessionEmail ? "E-mail (compte connecté)" : <>E-mail <span aria-hidden="true">*</span></>}
+                    </label>
+                    <input
+                      id="support-email-field"
+                      type="email"
+                      className={styles.input}
+                      value={sessionEmail || email}
+                      onChange={sessionEmail ? undefined : (e) => setEmail(e.target.value)}
+                      readOnly={!!sessionEmail}
+                      autoComplete="email"
+                      required={!sessionEmail}
+                      placeholder="vous@exemple.fr"
+                      tabIndex={sessionEmail ? -1 : undefined}
+                    />
+                  </div>
+
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor="support-subject">
+                      Sujet <span className={styles.optional}>(optionnel)</span>
+                    </label>
+                    <input
+                      id="support-subject"
+                      type="text"
+                      className={styles.input}
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      maxLength={200}
+                      placeholder="Ex. Problème de synchronisation Gmail"
+                    />
+                  </div>
+
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor="support-message">
+                      Message <span aria-hidden="true">*</span>
+                    </label>
+                    <textarea
+                      id="support-message"
+                      className={styles.textarea}
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      required
+                      rows={6}
+                      minLength={8}
+                      maxLength={4000}
+                      placeholder="Décris ta situation en quelques phrases…"
+                    />
+                    <p className={styles.hint}>{message.length} / 4000 caractères</p>
+                  </div>
+
+                  {errorText && (
+                    <div className={styles.error} role="alert">{errorText}</div>
+                  )}
+
+                  <div className={styles.actions}>
+                    <button type="submit" className={styles.submitBtn} disabled={status === "sending"}>
+                      {status === "sending" ? "Envoi en cours…" : <>Envoyer le message →</>}
+                    </button>
+                    <Link href="/" className={styles.backLink}>
+                      ← Retour
+                    </Link>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
