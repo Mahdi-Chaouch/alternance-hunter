@@ -295,6 +295,15 @@ function DashboardContent() {
   const MAX_ZONES = 5;
   const [jobType, setJobType] = useState<"alternance" | "stage">("alternance");
   const [sector, setSector] = useState("it");
+
+  // France Travail quick-search state (dashboard widget)
+  const [ftDashQuery, setFtDashQuery] = useState("");
+  const [ftDashCommune, setFtDashCommune] = useState("");
+  const [ftDashOffres, setFtDashOffres] = useState<Array<{ id: string; intitule: string; entreprise?: { nom?: string }; lieuTravail?: { libelle?: string }; contact?: { courriel?: string } }>>([]);
+  const [ftDashLoading, setFtDashLoading] = useState(false);
+  const [ftDashDraftingId, setFtDashDraftingId] = useState<string | null>(null);
+  const [ftDashDraftedIds, setFtDashDraftedIds] = useState<Set<string>>(new Set());
+  const [ftDashAddedIds, setFtDashAddedIds] = useState<Set<string>>(new Set());
   const [specialty, setSpecialty] = useState("");
   const [dryRun, setDryRun] = useState(false);
   const [maxMinutes, setMaxMinutes] = useState(30);
@@ -1151,6 +1160,54 @@ function DashboardContent() {
     window.localStorage.setItem(DASHBOARD_VIEW_KEY, mode);
     setViewMode(mode);
   }
+
+  const searchFtDash = useCallback(async () => {
+    setFtDashLoading(true);
+    setFtDashOffres([]);
+    try {
+      const apiRoute = jobType === "stage" ? "/api/stages" : "/api/alternances";
+      const params = new URLSearchParams({ range: "0-19" });
+      if (ftDashQuery.trim()) params.set("q", ftDashQuery.trim());
+      if (ftDashCommune.trim()) params.set("commune", ftDashCommune.trim());
+      const res = await fetch(`${apiRoute}?${params}`);
+      const data = await res.json() as { resultats?: Array<{ id: string; intitule: string; entreprise?: { nom?: string }; lieuTravail?: { libelle?: string }; contact?: { courriel?: string } }>; detail?: string };
+      if (!res.ok) { setError(data.detail ?? "Erreur France Travail"); return; }
+      const keyword = jobType === "stage" ? "stage" : "alternance";
+      const filtered = (data.resultats ?? []).filter((o) => {
+        const t = o.intitule.toLowerCase();
+        return t.includes(keyword) || t.includes("apprenti") || t.includes("contrat pro");
+      });
+      setFtDashOffres(filtered.slice(0, 10));
+    } catch { setError("Erreur réseau France Travail."); }
+    finally { setFtDashLoading(false); }
+  }, [jobType, ftDashQuery, ftDashCommune]);
+
+  const handleFtDashDraft = useCallback(async (offre: { id: string; intitule: string; entreprise?: { nom?: string }; contact?: { courriel?: string } }) => {
+    if (!cvUploaded) { setError("Uploadez votre CV dans l'étape Documents d'abord."); return; }
+    setFtDashDraftingId(offre.id);
+    try {
+      const res = await fetch("/api/recruiting/quick-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_name: offre.entreprise?.nom ?? offre.intitule, contact_email: offre.contact?.courriel ?? "" }),
+      });
+      const data = await res.json() as { detail?: string };
+      if (!res.ok) { setError(data.detail ?? "Erreur brouillon."); }
+      else { setFtDashDraftedIds((prev) => new Set([...prev, offre.id])); setInfo(`Brouillon créé pour ${offre.entreprise?.nom ?? offre.intitule} !`); setTimeout(() => setInfo(""), 4000); }
+    } catch { setError("Erreur réseau."); }
+    finally { setFtDashDraftingId(null); }
+  }, [cvUploaded]);
+
+  const handleFtDashAjouter = useCallback(async (offre: { id: string; intitule: string; entreprise?: { nom?: string } }) => {
+    try {
+      const res = await fetch("/api/candidatures", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: offre.entreprise?.nom ?? offre.intitule, email: `ft:${offre.id}`, status: "draft_created" }),
+      });
+      if (res.ok) { setFtDashAddedIds((prev) => new Set([...prev, offre.id])); setInfo("Ajouté au suivi."); setTimeout(() => setInfo(""), 3000); }
+    } catch { /* ignore */ }
+  }, []);
 
   function goWizardNext() {
     setError("");
@@ -2217,6 +2274,81 @@ function DashboardContent() {
           </button>
         </div>
       ) : null}
+
+      {/* France Travail quick apply widget */}
+      <section className={styles.panel}>
+        <h2><span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <Search size={20} /> Postuler via France Travail
+        </span></h2>
+        <p className={styles.sectionHint}>
+          Recherchez des offres de {jobType === "stage" ? "stage" : "alternance"} France Travail et créez des brouillons Gmail directement depuis le dashboard.
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", marginBottom: "1rem" }}>
+          <input
+            style={{ flex: "1 1 200px", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1.5px solid rgba(139,92,246,0.3)", background: "var(--input-bg, #fff)", fontSize: "0.9rem" }}
+            type="search"
+            placeholder={`Mots-clés (ex: développeur web)`}
+            value={ftDashQuery}
+            onChange={(e) => setFtDashQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void searchFtDash()}
+          />
+          <input
+            style={{ flex: "0 1 180px", padding: "0.5rem 0.75rem", borderRadius: "8px", border: "1.5px solid rgba(139,92,246,0.3)", background: "var(--input-bg, #fff)", fontSize: "0.9rem" }}
+            type="text"
+            placeholder="Code commune (ex: 75056)"
+            value={ftDashCommune}
+            onChange={(e) => setFtDashCommune(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void searchFtDash()}
+          />
+          <button
+            className={styles.primaryBtn}
+            type="button"
+            onClick={() => void searchFtDash()}
+            disabled={ftDashLoading || showDemoBanner}
+          >
+            {ftDashLoading ? "Recherche…" : <><Search size={14} style={{ marginRight: "0.3rem" }} />Rechercher</>}
+          </button>
+        </div>
+
+        {!ftDashLoading && ftDashOffres.length === 0 && (
+          <p className={styles.emptyState}>Lance une recherche pour voir les offres.</p>
+        )}
+
+        {ftDashOffres.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+            {ftDashOffres.map((offre) => (
+              <div key={offre.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.8rem", padding: "0.6rem 0.8rem", background: "rgba(139,92,246,0.05)", borderRadius: "8px", flexWrap: "wrap" }}>
+                <div style={{ flex: "1 1 200px" }}>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: "0.9rem" }}>{offre.intitule}</p>
+                  {offre.entreprise?.nom && <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--subtle-text, #6b7280)" }}>{offre.entreprise.nom}{offre.lieuTravail?.libelle ? ` — ${offre.lieuTravail.libelle}` : ""}</p>}
+                </div>
+                <div style={{ display: "flex", gap: "0.4rem", flexShrink: 0 }}>
+                  <button
+                    className={styles.secondaryBtn}
+                    type="button"
+                    style={{ padding: "0.3rem 0.7rem", fontSize: "0.8rem" }}
+                    disabled={ftDashAddedIds.has(offre.id)}
+                    onClick={() => void handleFtDashAjouter(offre)}
+                  >
+                    {ftDashAddedIds.has(offre.id) ? "✓ Suivi" : "+ Suivi"}
+                  </button>
+                  <button
+                    className={styles.primaryBtn}
+                    type="button"
+                    style={{ padding: "0.3rem 0.7rem", fontSize: "0.8rem" }}
+                    disabled={ftDashDraftingId === offre.id || ftDashDraftedIds.has(offre.id) || !gmailConnected}
+                    title={!gmailConnected ? "Connectez Gmail d'abord" : ""}
+                    onClick={() => void handleFtDashDraft(offre)}
+                  >
+                    {ftDashDraftedIds.has(offre.id) ? "✓ Brouillon" : ftDashDraftingId === offre.id ? "Création…" : "Brouillon Gmail"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       <section className={styles.panel} id="step-runs">
             <h2><span style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><LayoutDashboard size={20} /> Historique des recherches</span></h2>
             <p className={styles.sectionHint}>

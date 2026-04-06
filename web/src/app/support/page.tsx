@@ -63,6 +63,37 @@ export default function SupportPage() {
     [subject, message, email, sessionEmail],
   );
 
+  const faqs = [
+    {
+      q: "Pourquoi l'API France Travail ne retourne rien ?",
+      a: "Vérifiez que FRANCE_TRAVAIL_CLIENT_ID, FRANCE_TRAVAIL_CLIENT_SECRET et FRANCE_TRAVAIL_SCOPE sont bien définis dans les variables d'environnement Render. Le scope doit contenir 'api_offresdemploiv2 o2dsoffre'. Redéployez après toute modification.",
+    },
+    {
+      q: "Comment créer un brouillon Gmail depuis une offre France Travail ?",
+      a: "Sur les pages /stages et /explorer (onglet France Travail), cliquez sur 'Brouillon'. Vous devez avoir uploadé votre CV dans votre Profil et connecté votre compte Gmail depuis le Dashboard.",
+    },
+    {
+      q: "Pourquoi le bouton 'Candidater' est grisé dans l'Explorer ?",
+      a: "Le bouton est désactivé si l'entreprise n'a aucun contact email détecté. Lancez d'abord une recherche depuis le Dashboard pour alimenter la base de données.",
+    },
+    {
+      q: "Comment connecter mon Gmail ?",
+      a: "Depuis le Dashboard, descendez jusqu'à la section 'Connexion Gmail' et cliquez sur 'Connecter Gmail'. Autorisez les permissions Gmail (lecture + composition) sur votre compte Google.",
+    },
+    {
+      q: "Mes brouillons Gmail ne sont pas créés, que faire ?",
+      a: "Vérifiez que votre CV est uploadé (Profil > Documents), que Gmail est connecté, et que votre template de lettre est déposé si vous utilisez le mode 'pipeline' ou 'generate'.",
+    },
+    {
+      q: "Comment suivre mes candidatures ?",
+      a: "Toutes vos candidatures (pipeline, Explorer, France Travail) apparaissent dans le Dashboard > Suivi. Vous pouvez mettre à jour leur statut (envoyé, relance, réponse positive/négative).",
+    },
+    {
+      q: "La recherche tourne mais ne trouve rien, pourquoi ?",
+      a: "Essayez une zone plus large (ex: 'Paris' au lieu d'une commune spécifique), augmentez le nombre de sites maximum, ou changez de secteur. La base de données partagée s'enrichit avec chaque recherche.",
+    },
+  ];
+
   return (
     <div className={`${styles.page} ${theme === "dark" ? styles.pageDark : ""}`}>
       <main className={styles.main}>
@@ -76,6 +107,21 @@ export default function SupportPage() {
             </p>
           </div>
         </header>
+
+        <section className={styles.panel}>
+          <h2 style={{ marginBottom: "1.2rem" }}>Questions fréquentes</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {faqs.map((faq, i) => (
+              <details key={i} style={{ borderBottom: "1px solid rgba(139,92,246,0.15)", paddingBottom: "0.8rem" }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: "0.95rem", listStyle: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  {faq.q}
+                  <span style={{ color: "#8b5cf6", marginLeft: "0.5rem", fontSize: "1.1rem" }}>+</span>
+                </summary>
+                <p className={styles.panelHint} style={{ marginTop: "0.6rem", marginBottom: 0 }}>{faq.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
 
         <section className={`${styles.panel} ${styles.supportPanel}`}>
           {status === "success" ? (
