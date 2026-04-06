@@ -2,12 +2,25 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Search, Building2, MapPin, Users, Send, X, Upload, CheckCircle, DatabaseZap } from "lucide-react";
+import { Search, Building2, MapPin, Users, Send, X, Upload, CheckCircle, DatabaseZap, Briefcase } from "lucide-react";
 import { SECTOR_LABELS, SECTOR_ORDER } from "@/data/sectors-specialties";
 import { COMMUNES_FRANCE } from "@/data/communes-france";
 import styles from "./explorer.module.css";
 
 const PAGE_SIZE = 50;
+
+type Tab = "db" | "ft";
+
+type OffreAlt = {
+  id: string;
+  intitule: string;
+  entreprise?: { nom?: string };
+  lieuTravail?: { libelle?: string };
+  typeContratLibelle?: string;
+  description?: string;
+  origineOffre?: { urlOrigine?: string };
+  contact?: { courriel?: string };
+};
 
 type Company = {
   id: number;
@@ -23,11 +36,26 @@ type Company = {
 type Toast = { message: string; type: "success" | "error" } | null;
 
 export default function ExplorerPage() {
+  const [tab, setTab] = useState<Tab>("db");
+
+  // DB tab state
   const [query, setQuery] = useState("");
   const [sector, setSector] = useState("");
   const [zone, setZone] = useState("");
   const [zoneInput, setZoneInput] = useState("");
   const [zoneSuggestions, setZoneSuggestions] = useState<string[]>([]);
+
+  // FT tab state
+  const [ftQuery, setFtQuery] = useState("");
+  const [ftCommune, setFtCommune] = useState("");
+  const [ftOffres, setFtOffres] = useState<OffreAlt[]>([]);
+  const [ftPage, setFtPage] = useState(0);
+  const [ftContentRange, setFtContentRange] = useState("");
+  const [ftLoading, setFtLoading] = useState(false);
+  const [ftAddedIds, setFtAddedIds] = useState<Set<string>>(new Set());
+  const [ftAddingId, setFtAddingId] = useState<string | null>(null);
+  const [ftDraftingId, setFtDraftingId] = useState<string | null>(null);
+  const [ftDraftedIds, setFtDraftedIds] = useState<Set<string>>(new Set());
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [total, setTotal] = useState(0);
@@ -52,6 +80,87 @@ export default function ExplorerPage() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
   }, []);
+
+  const searchFt = useCallback(async (pageIndex: number, q: string, commune: string) => {
+    setFtLoading(true);
+    try {
+      const range = `${pageIndex * 20}-${pageIndex * 20 + 19}`;
+      const params = new URLSearchParams({ range });
+      if (q.trim()) params.set("q", q.trim());
+      if (commune.trim()) params.set("commune", commune.trim());
+      const res = await fetch(`/api/alternances?${params}`);
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data?.detail ?? "Erreur France Travail", "error");
+        return;
+      }
+      const resultats = (data.resultats ?? []).filter((o: OffreAlt) =>
+        o.intitule.toLowerCase().includes("alternance"),
+      );
+      setFtOffres(resultats);
+      setFtContentRange(data.content_range ?? "");
+      setFtPage(pageIndex);
+    } catch {
+      showToast("Erreur réseau", "error");
+    } finally {
+      setFtLoading(false);
+    }
+  }, [showToast]);
+
+  const handleFtAjouter = useCallback(async (offre: OffreAlt) => {
+    setFtAddingId(offre.id);
+    try {
+      const res = await fetch("/api/candidatures", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company: offre.entreprise?.nom ?? offre.intitule,
+          email: `ft:${offre.id}`,
+          status: "draft_created",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.detail ?? "Erreur lors de l'ajout.", "error");
+      } else {
+        setFtAddedIds((prev) => new Set([...prev, offre.id]));
+        showToast(`Ajouté au suivi : ${offre.entreprise?.nom ?? offre.intitule}`, "success");
+      }
+    } catch {
+      showToast("Erreur réseau.", "error");
+    } finally {
+      setFtAddingId(null);
+    }
+  }, [showToast]);
+
+  const handleFtDraft = useCallback(async (offre: OffreAlt) => {
+    if (!uploadsStatus?.cv) {
+      showToast("Uploadez votre CV dans Profil d'abord.", "error");
+      return;
+    }
+    setFtDraftingId(offre.id);
+    try {
+      const res = await fetch("/api/recruiting/quick-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_name: offre.entreprise?.nom ?? offre.intitule,
+          contact_email: offre.contact?.courriel ?? "",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.detail ?? "Erreur lors de la création du brouillon.", "error");
+      } else {
+        setFtDraftedIds((prev) => new Set([...prev, offre.id]));
+        showToast(`Brouillon créé pour ${offre.entreprise?.nom ?? offre.intitule} !`, "success");
+      }
+    } catch {
+      showToast("Erreur réseau.", "error");
+    } finally {
+      setFtDraftingId(null);
+    }
+  }, [uploadsStatus, showToast]);
 
   // Check upload status once on mount
   useEffect(() => {
@@ -221,6 +330,138 @@ export default function ExplorerPage() {
           Base partagée — {total > 0 ? `${total.toLocaleString("fr-FR")} entreprises` : "…"} enrichie par tous les utilisateurs.
         </p>
       </header>
+
+      {/* Tabs */}
+      <div className={styles.tabs}>
+        <button
+          className={`${styles.tab} ${tab === "db" ? styles.tabActive : ""}`}
+          onClick={() => setTab("db")}
+        >
+          <Building2 size={14} style={{ verticalAlign: "middle", marginRight: "0.3rem" }} />
+          Base de données
+        </button>
+        <button
+          className={`${styles.tab} ${tab === "ft" ? styles.tabActive : ""}`}
+          onClick={() => setTab("ft")}
+        >
+          <Briefcase size={14} style={{ verticalAlign: "middle", marginRight: "0.3rem" }} />
+          France Travail
+        </button>
+      </div>
+
+      {/* France Travail tab */}
+      {tab === "ft" && (
+        <div>
+          <div className={styles.searchBar}>
+            <input
+              className={styles.searchInput}
+              type="search"
+              placeholder="Mots-clés (ex: développeur, marketing…)"
+              value={ftQuery}
+              onChange={(e) => setFtQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && searchFt(0, ftQuery, ftCommune)}
+            />
+            <input
+              className={styles.searchInput}
+              type="text"
+              placeholder="Code commune (ex: 75056 pour Paris)"
+              value={ftCommune}
+              onChange={(e) => setFtCommune(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && searchFt(0, ftQuery, ftCommune)}
+              style={{ maxWidth: 240 }}
+            />
+            <button
+              className={styles.searchBtn}
+              onClick={() => searchFt(0, ftQuery, ftCommune)}
+              disabled={ftLoading}
+            >
+              <Search size={16} /> Rechercher
+            </button>
+          </div>
+
+          {ftLoading && <div className={styles.loading}>Chargement des offres…</div>}
+
+          {!ftLoading && ftOffres.length === 0 && ftContentRange === "" && (
+            <div className={styles.empty}>
+              <div className={styles.emptyIcon}><Briefcase size={40} /></div>
+              <p>Lance une recherche pour voir les offres d&apos;alternance France Travail.</p>
+            </div>
+          )}
+
+          {!ftLoading && ftOffres.length === 0 && ftContentRange !== "" && (
+            <div className={styles.empty}>
+              <div className={styles.emptyIcon}><Search size={40} /></div>
+              <p>Aucune offre trouvée pour ces critères.</p>
+            </div>
+          )}
+
+          {!ftLoading && ftOffres.length > 0 && (
+            <>
+              <div className={styles.grid}>
+                {ftOffres.map((offre) => (
+                  <div key={offre.id} className={styles.card}>
+                    <h3 className={styles.cardName} title={offre.intitule}>{offre.intitule}</h3>
+                    {offre.entreprise?.nom && (
+                      <p style={{ fontSize: "0.85rem", color: "var(--text-muted, #888)", margin: "0 0 0.4rem" }}>
+                        {offre.entreprise.nom}
+                      </p>
+                    )}
+                    <div className={styles.cardMeta}>
+                      {offre.lieuTravail?.libelle && (
+                        <span className={`${styles.badge} ${styles.badgeGray}`}>
+                          <MapPin size={11} /> {offre.lieuTravail.libelle}
+                        </span>
+                      )}
+                      {offre.typeContratLibelle && (
+                        <span className={styles.badge}>{offre.typeContratLibelle}</span>
+                      )}
+                    </div>
+                    {offre.description && (
+                      <p style={{ fontSize: "0.8rem", color: "var(--text-muted, #888)", margin: "0.4rem 0 0.8rem", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {offre.description}
+                      </p>
+                    )}
+                    <div className={styles.cardMeta} style={{ gap: "0.4rem", marginTop: "auto" }}>
+                      <button
+                        className={`${styles.candidaterBtn} ${ftAddedIds.has(offre.id) ? styles.candidaterBtnDone : ""}`}
+                        disabled={ftAddingId === offre.id || ftAddedIds.has(offre.id)}
+                        onClick={() => handleFtAjouter(offre)}
+                        style={{ flex: 1 }}
+                      >
+                        {ftAddedIds.has(offre.id) ? <><CheckCircle size={14} /> Ajouté</> : ftAddingId === offre.id ? "Ajout…" : "Ajouter au suivi"}
+                      </button>
+                      <button
+                        className={`${styles.candidaterBtn} ${ftDraftedIds.has(offre.id) ? styles.candidaterBtnDone : ""}`}
+                        disabled={ftDraftingId === offre.id || ftDraftedIds.has(offre.id)}
+                        onClick={() => handleFtDraft(offre)}
+                        style={{ flex: 1 }}
+                      >
+                        {ftDraftedIds.has(offre.id) ? <><CheckCircle size={14} /> Brouillon créé</> : ftDraftingId === offre.id ? "Création…" : <><Send size={14} /> Brouillon</>}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {(() => {
+                const m = ftContentRange.match(/\/(\d+)$/);
+                const total = m ? parseInt(m[1]!, 10) : 0;
+                const totalPages = total ? Math.ceil(total / 20) : 0;
+                return totalPages > 1 ? (
+                  <div className={styles.pagination}>
+                    <button className={styles.pageBtn} disabled={ftPage === 0} onClick={() => searchFt(ftPage - 1, ftQuery, ftCommune)}>← Précédent</button>
+                    <span className={styles.pageCurrent}>Page {ftPage + 1} / {totalPages}</span>
+                    <button className={styles.pageBtn} disabled={ftPage >= totalPages - 1} onClick={() => searchFt(ftPage + 1, ftQuery, ftCommune)}>Suivant →</button>
+                  </div>
+                ) : null;
+              })()}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* DB tab content wrapper */}
+      {tab === "db" && (
+        <>
 
       {/* Migration banner */}
       {needsMigration && (

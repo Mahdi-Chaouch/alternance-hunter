@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Search, MapPin, Briefcase, CheckCircle, ExternalLink } from "lucide-react";
+import { Search, MapPin, Briefcase, CheckCircle, ExternalLink, Send } from "lucide-react";
 import styles from "./stages.module.css";
 
 type OffreStage = {
@@ -15,6 +15,7 @@ type OffreStage = {
   description?: string;
   origineOffre?: { urlOrigine?: string };
   salaire?: { libelle?: string };
+  contact?: { courriel?: string };
 };
 
 type Toast = { message: string; type: "success" | "error" } | null;
@@ -36,10 +37,20 @@ export default function StagesPage() {
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [addingId, setAddingId] = useState<string | null>(null);
   const [notConfigured, setNotConfigured] = useState(false);
+  const [uploadsHasCv, setUploadsHasCv] = useState(false);
+  const [draftingId, setDraftingId] = useState<string | null>(null);
+  const [draftedIds, setDraftedIds] = useState<Set<string>>(new Set());
 
   const showToast = useCallback((message: string, type: "success" | "error") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/uploads")
+      .then((r) => r.json())
+      .then((d) => setUploadsHasCv(!!d.cv))
+      .catch(() => {});
   }, []);
 
   const search = useCallback(async (pageIndex: number, q: string, com: string) => {
@@ -76,6 +87,35 @@ export default function StagesPage() {
   }, [showToast]);
 
   const handleSearch = () => search(0, query, commune);
+
+  const handleDraft = useCallback(async (offre: OffreStage) => {
+    if (!uploadsHasCv) {
+      showToast("Uploadez votre CV dans Profil d'abord.", "error");
+      return;
+    }
+    setDraftingId(offre.id);
+    try {
+      const res = await fetch("/api/recruiting/quick-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_name: offre.entreprise?.nom ?? offre.intitule,
+          contact_email: offre.contact?.courriel ?? "",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.detail ?? "Erreur lors de la création du brouillon.", "error");
+      } else {
+        setDraftedIds((prev) => new Set([...prev, offre.id]));
+        showToast(`Brouillon créé pour ${offre.entreprise?.nom ?? offre.intitule} !`, "success");
+      }
+    } catch {
+      showToast("Erreur réseau.", "error");
+    } finally {
+      setDraftingId(null);
+    }
+  }, [uploadsHasCv, showToast]);
 
   const handleAjouter = useCallback(async (offre: OffreStage) => {
     setAddingId(offre.id);
@@ -208,6 +248,19 @@ export default function StagesPage() {
                       "Ajout…"
                     ) : (
                       "Ajouter au suivi"
+                    )}
+                  </button>
+                  <button
+                    className={`${styles.candidaterBtn} ${draftedIds.has(offre.id) ? styles.candidaterBtnDone : ""}`}
+                    disabled={draftingId === offre.id || draftedIds.has(offre.id)}
+                    onClick={() => handleDraft(offre)}
+                  >
+                    {draftedIds.has(offre.id) ? (
+                      <><CheckCircle size={14} /> Brouillon créé</>
+                    ) : draftingId === offre.id ? (
+                      "Création…"
+                    ) : (
+                      <><Send size={14} /> Brouillon</>
                     )}
                   </button>
                   <Link href={`/stages/${offre.id}`} className={styles.voirBtn}>

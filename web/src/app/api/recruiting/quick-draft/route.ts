@@ -35,8 +35,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     contact_email?: string;
   };
 
-  if (!body.company_name || !body.contact_email) {
-    return NextResponse.json({ detail: "company_name et contact_email sont requis." }, { status: 400 });
+  if (!body.company_name) {
+    return NextResponse.json({ detail: "company_name est requis." }, { status: 400 });
   }
 
   const payload = {

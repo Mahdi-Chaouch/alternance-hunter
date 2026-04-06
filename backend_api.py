@@ -1854,6 +1854,61 @@ def search_offres_stages(
 _FT_OFFER_ID_RE = re.compile(r"^[A-Za-z0-9]{1,20}$")
 
 
+@app.get("/offres/alternances", dependencies=[Depends(verify_token)])
+def search_offres_alternances(
+    q: Optional[str] = Query(default=None),
+    commune: Optional[str] = Query(default=None),
+    range: str = Query(default="0-19"),
+) -> dict:
+    """Search France Travail alternance offers."""
+    token = _get_ft_access_token()
+    params: dict[str, str] = {}
+    params["motsCles"] = f"alternance {q}".strip() if q else "alternance"
+    if commune:
+        params["commune"] = commune
+    url = f"{FT_API_BASE.rstrip('/')}/partenaire/offresdemploi/v2/offres/search?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Range": f"offres={range}",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            content_range = resp.headers.get("Content-Range", "")
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        raise HTTPException(status_code=exc.code, detail=f"France Travail API: {body[:300]}")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"France Travail inaccessible: {exc!s}")
+    return {"resultats": data.get("resultats", []), "content_range": content_range}
+
+
+@app.get("/offres/alternances/{offer_id}", dependencies=[Depends(verify_token)])
+def get_offre_alternance(offer_id: str) -> dict:
+    """Get a single France Travail alternance offer by ID."""
+    if not _FT_OFFER_ID_RE.match(offer_id):
+        raise HTTPException(status_code=400, detail="ID d'offre invalide.")
+    token = _get_ft_access_token()
+    url = f"{FT_API_BASE.rstrip('/')}/partenaire/offresdemploi/v2/offres/{urllib.parse.quote(offer_id)}"
+    req = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        raise HTTPException(status_code=exc.code, detail=f"France Travail API: {body[:300]}")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"France Travail inaccessible: {exc!s}")
+    return data
+
+
 @app.get("/offres/stages/{offer_id}", dependencies=[Depends(verify_token)])
 def get_offre_stage(offer_id: str) -> dict:
     """Get a single France Travail internship offer by ID."""
