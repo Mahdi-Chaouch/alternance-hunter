@@ -94,9 +94,10 @@ export default function ExplorerPage() {
         showToast(data?.detail ?? "Erreur France Travail", "error");
         return;
       }
-      const resultats = (data.resultats ?? []).filter((o: OffreAlt) =>
-        o.intitule.toLowerCase().includes("alternance"),
-      );
+      const resultats = (data.resultats ?? []).filter((o: OffreAlt) => {
+        const t = o.intitule.toLowerCase();
+        return t.includes("alternance") || t.includes("apprenti") || t.includes("contrat pro");
+      });
       setFtOffres(resultats);
       setFtContentRange(data.content_range ?? "");
       setFtPage(pageIndex);
@@ -713,6 +714,9 @@ export default function ExplorerPage() {
             </div>
           </div>
         </div>
+      )}
+
+        </>
       )}
 
       {/* Toast */}
