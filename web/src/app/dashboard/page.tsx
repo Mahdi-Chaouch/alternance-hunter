@@ -293,6 +293,7 @@ function DashboardContent() {
   const [zoneSuggestions, setZoneSuggestions] = useState<Zone[]>([]);
   const [isZoneFocused, setIsZoneFocused] = useState(false);
   const MAX_ZONES = 5;
+  const [jobType, setJobType] = useState<"alternance" | "stage">("alternance");
   const [sector, setSector] = useState("it");
   const [specialty, setSpecialty] = useState("");
   const [dryRun, setDryRun] = useState(false);
@@ -825,6 +826,7 @@ function DashboardContent() {
       const payload = {
         mode,
         zone: zones.length ? zones.join(", ") : "all",
+        job_type: jobType,
         sector,
         specialty: specialty || undefined,
         dry_run: dryRun,
@@ -1662,6 +1664,13 @@ function DashboardContent() {
                           ))}
                         </select>
                       </label>
+                      <label>
+                        Type de candidature
+                        <select value={jobType} onChange={(e) => setJobType(e.target.value as "alternance" | "stage")}>
+                          <option value="alternance">Alternance</option>
+                          <option value="stage">Stage</option>
+                        </select>
+                      </label>
                       <div className={styles.inputGrid} role="group" aria-label="Domaine de recherche">
                         <label>
                           Secteur d&apos;activite
@@ -2076,6 +2085,14 @@ function DashboardContent() {
                         {MODE_LABELS[option]}
                       </option>
                     ))}
+                  </select>
+                </label>
+
+                <label>
+                  Type de candidature
+                  <select value={jobType} onChange={(e) => setJobType(e.target.value as "alternance" | "stage")}>
+                    <option value="alternance">Alternance</option>
+                    <option value="stage">Stage</option>
                   </select>
                 </label>
 

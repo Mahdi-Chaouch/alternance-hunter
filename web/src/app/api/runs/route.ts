@@ -26,6 +26,7 @@ const MODES_REQUIRING_GMAIL_CONTEXT = new Set(["pipeline", "drafts"]);
 const ACCEPTED_RUN_REQUEST_FIELDS = new Set([
   "mode",
   "zone",
+  "job_type",
   "dry_run",
   "python",
   "max_minutes",
@@ -226,13 +227,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       const profile = await getUserProfile(userIdForProfile);
       if (profile) {
+        const jobType = typeof payload.job_type === "string" ? payload.job_type : "alternance";
+        const isStage = jobType === "stage";
+        const subjectTemplate = profile.subject_template ||
+          (isStage ? "Candidature stage — {{ENTREPRISE}}" : "Candidature alternance — {{ENTREPRISE}}");
         bodyPayload = {
           ...bodyPayload,
           sender_first_name: profile.first_name,
           sender_last_name: profile.last_name,
           sender_linkedin_url: profile.linkedin_url,
           sender_portfolio_url: profile.portfolio_url,
-          mail_subject_template: profile.subject_template,
+          mail_subject_template: subjectTemplate,
           mail_body_template: profile.body_template,
         };
       }
