@@ -136,14 +136,8 @@ export function AppHeader() {
               <Link href="/explorer" className={`app-nav-link${pathname?.startsWith('/explorer') ? ' app-nav-link-active' : ''}`}>
                 <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Explorer
               </Link>
-              <Link href="/stages" className={`app-nav-link${pathname?.startsWith('/stages') ? ' app-nav-link-active' : ''}`}>
-                <Briefcase size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Stages
-              </Link>
               <Link href="/dashboard" className={`app-nav-link${pathname?.startsWith('/dashboard') ? ' app-nav-link-active' : ''}`}>
                 <LayoutDashboard size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Dashboard
-              </Link>
-              <Link href="/profil" className={`app-nav-link${pathname?.startsWith('/profil') ? ' app-nav-link-active' : ''}`}>
-                <User size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Profil
               </Link>
             </>
           ) : (
@@ -154,9 +148,6 @@ export function AppHeader() {
           <Link href="/support" className={`app-nav-link${pathname?.startsWith('/support') ? ' app-nav-link-active' : ''}`}>
             <MessageCircle size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />Support
           </Link>
-          <a href="https://github.com/Mahdi-Chaouch/alternance-killer" target="_blank" rel="noreferrer noopener" className="app-nav-link">
-            <ExternalLink size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />GitHub
-          </a>
         </nav>
         <div className="app-header-cta">
           {isPending ? (
@@ -203,6 +194,14 @@ export function AppHeader() {
                     <User size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Mon profil
                   </Link>
                   <Link
+                    href="/stages"
+                    className="app-header-profil-dropdown-item"
+                    role="menuitem"
+                    onClick={() => setProfilDropdownOpen(false)}
+                  >
+                    <Briefcase size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Stages
+                  </Link>
+                  <Link
                     href="/profil#candidatures"
                     className="app-header-profil-dropdown-item"
                     role="menuitem"
@@ -210,6 +209,16 @@ export function AppHeader() {
                   >
                     <List size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Suivi de candidatures
                   </Link>
+                  <a
+                    href="https://github.com/Mahdi-Chaouch/alternance-killer"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="app-header-profil-dropdown-item"
+                    role="menuitem"
+                    onClick={() => setProfilDropdownOpen(false)}
+                  >
+                    <ExternalLink size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />GitHub
+                  </a>
                   <button
                     type="button"
                     className="app-header-profil-dropdown-item app-header-profil-dropdown-item-signout"
@@ -280,11 +289,11 @@ export function AppHeader() {
                 <Link href="/explorer" className="app-mobile-nav-link" onClick={closeMenu}>
                   <Search size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Explorer les entreprises
                 </Link>
-                <Link href="/stages" className="app-mobile-nav-link" onClick={closeMenu}>
-                  <Briefcase size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Stages
-                </Link>
                 <Link href="/dashboard" className="app-mobile-nav-link" onClick={closeMenu}>
                   <LayoutDashboard size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Dashboard
+                </Link>
+                <Link href="/stages" className="app-mobile-nav-link" onClick={closeMenu}>
+                  <Briefcase size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Stages
                 </Link>
                 <Link href="/profil" className="app-mobile-nav-link" onClick={closeMenu}>
                   <User size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Mon profil
@@ -292,6 +301,15 @@ export function AppHeader() {
                 <Link href="/profil#candidatures" className="app-mobile-nav-link" onClick={closeMenu}>
                   <List size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Suivi de candidatures
                 </Link>
+                <a
+                  href="https://github.com/Mahdi-Chaouch/alternance-killer"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="app-mobile-nav-link"
+                  onClick={closeMenu}
+                >
+                  <ExternalLink size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />GitHub
+                </a>
                 <button
                   type="button"
                   className="app-mobile-nav-link app-mobile-nav-signout"
@@ -308,15 +326,6 @@ export function AppHeader() {
             <Link href="/support" className="app-mobile-nav-link" onClick={closeMenu}>
               <MessageCircle size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />Support
             </Link>
-            <a
-              href="https://github.com/Mahdi-Chaouch/alternance-killer"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="app-mobile-nav-link"
-              onClick={closeMenu}
-            >
-              <ExternalLink size={14} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />GitHub
-            </a>
           </nav>
         </div>
       </div>

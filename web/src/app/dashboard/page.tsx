@@ -9,7 +9,8 @@ import { GoogleLogo } from "@/app/components/GoogleLogo";
 import {
   LayoutDashboard, User, FolderOpen, Settings, Terminal as TerminalIcon,
   Save, LogOut, MapPin, Search, FileText, Mail, Play, Square, X, RefreshCw,
-  Hand, Eye, ChevronLeft, ChevronRight, ListChecks,
+  Hand, Eye, ChevronLeft, ChevronRight, ListChecks, CheckCircle2, ChevronDown,
+  Inbox, Pencil,
 } from "lucide-react";
 
 import { COMMUNES_FRANCE } from "@/data/communes-france";
@@ -85,6 +86,13 @@ const WIZARD_STEP_LABELS = [
 ] as const;
 
 type DashboardViewMode = "wizard" | "full" | "summary";
+
+const SEARCH_PRESETS = {
+  fast:     { maxMinutes: 5,  maxSites: 100,  targetFound: 3,   workers: 5,  label: "Recherche rapide",      desc: "~5 min, 100 sites, 3 cibles",     icon: "⚡" },
+  standard: { maxMinutes: 15, maxSites: 500,  targetFound: 10,  workers: 10, label: "Recherche standard",     desc: "~15 min, 500 sites, 10 cibles",   icon: "🔍" },
+  deep:     { maxMinutes: 30, maxSites: 1500, targetFound: 100, workers: 20, label: "Recherche approfondie",  desc: "~30 min, 1500 sites, 100 cibles",  icon: "🔬" },
+} as const;
+type PresetKey = keyof typeof SEARCH_PRESETS;
 
 const ZONE_PLACEHOLDER =
   "Tapez une ville (ex: Paris) — laissez vide pour toute la France";
@@ -326,6 +334,11 @@ function DashboardContent() {
   const [isTypingLogs, setIsTypingLogs] = useState(false);
   const [showLogsSection, setShowLogsSection] = useState(false);
   const [isDraggingDocs, setIsDraggingDocs] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const [showVariables, setShowVariables] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<PresetKey | null>(null);
   const logsRef = useRef<HTMLPreElement | null>(null);
   const typingTimerRef = useRef<number | null>(null);
   const animatedLogsRef = useRef("");
@@ -359,6 +372,25 @@ function DashboardContent() {
     [runDetails?.command],
   );
 
+  const today = useMemo(() => new Date().toLocaleDateString("fr-FR"), []);
+
+  function applyTemplateVars(tpl: string) {
+    return tpl
+      .replace(/\{\{ENTREPRISE\}\}/g, "Capgemini")
+      .replace(/\{\{NOM_COMPLET\}\}/g, `${firstName || "Mahdi"} ${lastName || "Chaouch"}`)
+      .replace(/\{\{PRENOM\}\}/g, firstName || "Mahdi")
+      .replace(/\{\{NOM\}\}/g, lastName || "Chaouch")
+      .replace(/\{\{LINKEDIN\}\}/g, linkedinUrl || "https://linkedin.com/in/votre-profil")
+      .replace(/\{\{PORTFOLIO\}\}/g, portfolioUrl || "https://votre-portfolio.dev")
+      .replace(/\{\{DATE\}\}/g, today);
+  }
+
+  const mailBodyPreview = useMemo(
+    () => mailBodyTemplate ? applyTemplateVars(mailBodyTemplate) : "",
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mailBodyTemplate, firstName, lastName, linkedinUrl, portfolioUrl, today],
+  );
+
   useEffect(() => {
     const saved = window.localStorage.getItem("alternance-ui-theme");
     const initialTheme: ThemeMode = saved === "dark" || saved === "light" ? saved : "light";
@@ -381,6 +413,51 @@ function DashboardContent() {
     window.localStorage.setItem("alternance-ui-theme", theme);
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  // Debounced auto-save: fires 3 s after last change on key profile fields
+  useEffect(() => {
+    if (!firstName.trim() || !lastName.trim() || accessState !== "granted") return;
+    if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      void (async () => {
+        setAutoSaveStatus("saving");
+        try {
+          const resp = await fetch("/api/profile", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              linkedin_url: linkedinUrl,
+              subject_template: mailSubjectTemplate,
+              body_template: mailBodyTemplate,
+              run_mode: mode,
+              run_zone: zones.length ? zones.join(", ") : "all",
+              run_sector: sector,
+              run_specialty: specialty.trim() || "",
+              run_dry_run: dryRun,
+              run_max_minutes: maxMinutes,
+              run_max_sites: maxSites,
+              run_target_found: targetFound,
+              run_workers: workers,
+            }),
+          });
+          const data = (await safeJson<{ ok?: boolean }>(resp)) as { ok?: boolean };
+          if (!resp.ok || !data.ok) throw new Error();
+          setAutoSaveStatus("saved");
+          window.setTimeout(() => setAutoSaveStatus((s) => s === "saved" ? "idle" : s), 3000);
+        } catch {
+          setAutoSaveStatus("error");
+          window.setTimeout(() => setAutoSaveStatus((s) => s === "error" ? "idle" : s), 4000);
+        }
+      })();
+    }, 3000);
+    return () => {
+      if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
+    };
+    // Only trigger on profile text fields, not every state change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstName, lastName, linkedinUrl, portfolioUrl, mailSubjectTemplate, mailBodyTemplate, accessState]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -675,7 +752,7 @@ function DashboardContent() {
     if (saved === "full" || saved === "wizard" || saved === "summary") {
       setViewMode(saved);
     } else if (firstName.trim() && lastName.trim() && cvUploaded) {
-      setViewMode("summary");
+      setViewMode("full");
     } else {
       setViewMode("wizard");
     }
@@ -1161,6 +1238,15 @@ function DashboardContent() {
     setViewMode(mode);
   }
 
+  function applyPreset(preset: PresetKey) {
+    const p = SEARCH_PRESETS[preset];
+    setMaxMinutes(p.maxMinutes);
+    setMaxSites(p.maxSites);
+    setTargetFound(p.targetFound);
+    setWorkers(p.workers);
+    setSelectedPreset(preset);
+  }
+
   const searchFtDash = useCallback(async () => {
     setFtDashLoading(true);
     setFtDashOffres([]);
@@ -1218,6 +1304,9 @@ function DashboardContent() {
       }
     }
     if (wizardStep < WIZARD_STEP_COUNT) {
+      // Trigger immediate save on step change (cancel debounce)
+      if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
+      void onSaveWorkInProgress();
       setWizardStep((s) => s + 1);
     }
   }
@@ -1324,16 +1413,36 @@ function DashboardContent() {
                 Assistant pas à pas
               </button>
             )}
+            {firstName.trim() && lastName.trim() ? (
+              <button
+                type="button"
+                className={styles.editProfileLink}
+                onClick={() => { persistDashboardView("wizard"); setWizardStep(1); }}
+              >
+                <Pencil size={11} style={{ verticalAlign: "middle", marginRight: "0.2rem" }} />
+                Modifier mon profil
+              </button>
+            ) : null}
           </div>
         </div>
         {!showDemoBanner && (
           <div className={styles.dashboardActions}>
-            <button className={styles.secondaryBtn} type="button" onClick={onSignOut} disabled={isSigningOut}>
-              <LogOut size={15} style={{marginRight: '0.3rem'}} />{isSigningOut ? "Déconnexion..." : "Se déconnecter"}
-            </button>
-            <button className={styles.primaryBtn} type="button" onClick={onSaveWorkInProgress}>
-              <Save size={15} style={{marginRight: '0.3rem'}} /> Enregistrer le brouillon
-            </button>
+            <div className={styles.autoSaveWrap}>
+              {autoSaveStatus !== "idle" ? (
+                <span className={`${styles.autoSaveIndicator} ${
+                  autoSaveStatus === "saved" ? styles.autoSaveSaved :
+                  autoSaveStatus === "error" ? styles.autoSaveError :
+                  styles.autoSaveSaving
+                }`}>
+                  {autoSaveStatus === "saving" ? "Sauvegarde..." :
+                   autoSaveStatus === "saved" ? "✓ Brouillon sauvegardé" :
+                   "Erreur de sauvegarde"}
+                </span>
+              ) : null}
+              <button className={styles.saveOutlineBtn} type="button" onClick={onSaveWorkInProgress} title="Sauvegarder maintenant">
+                <Save size={13} />Sauvegarder
+              </button>
+            </div>
           </div>
         )}
       </header>
@@ -1387,7 +1496,6 @@ function DashboardContent() {
       {viewMode === "wizard" ? (
         <>
           <nav className={styles.stepNav} aria-label="Étapes de configuration">
-            <p className={styles.stepNavTitle}>Étape {wizardStep} sur {WIZARD_STEP_COUNT}</p>
             <ol className={styles.stepNavListOrdered}>
               {WIZARD_STEP_LABELS.map((label, i) => {
                 const n = i + 1;
@@ -1405,13 +1513,26 @@ function DashboardContent() {
                       disabled={!canJump}
                       aria-current={active ? "step" : undefined}
                     >
-                      <span className={styles.stepNavNumber}>{done ? "✓" : n}</span>
+                      <span className={styles.stepNavNumber}>
+                        {done ? <CheckCircle2 size={12} /> : n}
+                      </span>
                       {label}
                     </button>
                   </li>
                 );
               })}
             </ol>
+            <div className={styles.wizardProgressWrap} aria-hidden="true">
+              <div className={styles.wizardProgressTrack}>
+                <div
+                  className={styles.wizardProgressFill}
+                  style={{ width: `${Math.round(((wizardStep - 1) / (WIZARD_STEP_COUNT - 1)) * 100)}%` }}
+                />
+              </div>
+              <span className={styles.wizardProgressText}>
+                {wizardStep - 1}/{WIZARD_STEP_COUNT - 1} complété
+              </span>
+            </div>
           </nav>
 
           {showWizardSteps ? (
@@ -1461,10 +1582,37 @@ function DashboardContent() {
 
               {wizardStep === 2 ? (
                 <section className={styles.panel} id="step-wizard-contact">
-                  <h2><span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><User size={24} /> Contact et e-mails</span></h2>
+                  <h2><span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Mail size={24} /> Contact et e-mails</span></h2>
                   <p className={styles.sectionHint}>
-                    Optionnel : liens et modèles de mail. Placeholders : {`{{ENTREPRISE}}`}, {`{{NOM_COMPLET}}`}, {`{{PRENOM}}`}, {`{{NOM}}`}, {`{{LINKEDIN}}`}, {`{{PORTFOLIO}}`}, {`{{DATE}}`}.
+                    Optionnel : renseignez vos liens et personnalisez les modèles de mail avec des variables dynamiques.
                   </p>
+                  {/* Variables accordion */}
+                  <div className={styles.variablesAccordion}>
+                    <button
+                      type="button"
+                      className={styles.variablesAccordionHeader}
+                      onClick={() => setShowVariables((v) => !v)}
+                      aria-expanded={showVariables}
+                    >
+                      <span>📌 Variables disponibles</span>
+                      <ChevronDown size={15} className={`${styles.variablesChevron} ${showVariables ? styles.variablesChevronOpen : ""}`} />
+                    </button>
+                    {showVariables ? (
+                      <div className={styles.variablesAccordionBody}>
+                        <table className={styles.variablesTable}>
+                          <tbody>
+                            <tr><td>{`{{ENTREPRISE}}`}</td><td>Nom de l'entreprise <em>(ex : Capgemini)</em></td></tr>
+                            <tr><td>{`{{NOM_COMPLET}}`}</td><td>Votre nom complet <em>(ex : Mahdi Chaouch)</em></td></tr>
+                            <tr><td>{`{{PRENOM}}`}</td><td>Votre prénom <em>(ex : Mahdi)</em></td></tr>
+                            <tr><td>{`{{NOM}}`}</td><td>Votre nom <em>(ex : Chaouch)</em></td></tr>
+                            <tr><td>{`{{LINKEDIN}}`}</td><td>Votre lien LinkedIn</td></tr>
+                            <tr><td>{`{{PORTFOLIO}}`}</td><td>Votre lien portfolio</td></tr>
+                            <tr><td>{`{{DATE}}`}</td><td>Date du jour <em>(ex : {today})</em></td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
+                  </div>
                   <form id="profile-form-wizard-2" className={styles.profileCard} onSubmit={onSaveProfile}>
                     <label>
                       LinkedIn (optionnel)
@@ -1502,6 +1650,12 @@ function DashboardContent() {
                         placeholder={"Ex: Bonjour,\nJe suis à la recherche d'une alternance en {{DATE}}.\nJe candidate chez {{ENTREPRISE}}."}
                       />
                     </label>
+                    {mailBodyPreview ? (
+                      <div className={styles.mailPreview}>
+                        <p className={styles.mailPreviewTitle}>Aperçu</p>
+                        <p className={styles.mailPreviewText}>{mailBodyPreview}</p>
+                      </div>
+                    ) : null}
                     <div className={styles.wizardStepActions}>
                       <button type="submit" className={styles.secondaryBtn} disabled={isSavingProfile || showDemoBanner}>
                         {isSavingProfile ? "Sauvegarde..." : "Enregistrer ces informations"}
@@ -1518,47 +1672,106 @@ function DashboardContent() {
                     CV (PDF) obligatoire pour lancer une recherche complète ; template .docx optionnel.
                   </p>
                   <form className={styles.uploadCard} onSubmit={onUploadAssets} id="step-documents-wizard">
-                    <div
-                      className={`${styles.dropZone} ${isDraggingDocs ? styles.dropZoneActive : ""} ${cvFile || templateFile ? styles.dropZoneHasFiles : ""}`}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (!showDemoBanner) setIsDraggingDocs(true);
-                      }}
-                      onDragLeave={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setIsDraggingDocs(false);
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setIsDraggingDocs(false);
-                        if (showDemoBanner) return;
-                        const files = Array.from(e.dataTransfer?.files ?? []);
-                        for (const file of files) {
-                          const name = (file.name || "").toLowerCase();
-                          const isPdf = name.endsWith(".pdf") || file.type === "application/pdf";
-                          const isDoc = name.endsWith(".docx") || name.endsWith(".doc") || file.type.includes("word") || file.type.includes("document");
-                          if (isPdf) setCvFile(file);
-                          if (isDoc) setTemplateFile(file);
-                        }
-                      }}
-                    >
-                      <span className={styles.dropZoneIcon} aria-hidden="true"><FolderOpen size={32} /></span>
-                      <span className={styles.dropZoneText}>
-                        {cvFile || templateFile
-                          ? [cvFile?.name, templateFile?.name].filter(Boolean).join(" • ")
-                          : isDraggingDocs
-                            ? "Déposez les fichiers ici"
-                            : "Déposez votre CV (PDF) et template LM (.docx) ici"}
-                      </span>
-                    </div>
-                    <button className={styles.secondaryBtn} type="submit" disabled={isUploadingAssets || showDemoBanner}>
+                    {/* Uploaded CV success state */}
+                    {cvUploaded && !cvFile ? (
+                      <div className={styles.dropZoneSuccessWrap}>
+                        <CheckCircle2 size={22} className={styles.dropZoneSuccessIcon} />
+                        <div className={styles.dropZoneSuccessInfo}>
+                          <p className={styles.dropZoneSuccessName}>CV enregistré</p>
+                          <p className={styles.dropZoneSuccessSize}>Déposez un nouveau fichier pour le remplacer</p>
+                        </div>
+                      </div>
+                    ) : null}
+                    {/* Drop zone */}
+                    <label style={{ display: "block", cursor: showDemoBanner ? "not-allowed" : "pointer" }}>
+                      <input
+                        type="file"
+                        accept=".pdf,.docx,.doc"
+                        multiple
+                        style={{ display: "none" }}
+                        disabled={showDemoBanner}
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files ?? []);
+                          for (const file of files) {
+                            const name = (file.name || "").toLowerCase();
+                            const isPdf = name.endsWith(".pdf") || file.type === "application/pdf";
+                            const isDoc = name.endsWith(".docx") || name.endsWith(".doc") || file.type.includes("word") || file.type.includes("document");
+                            if (isPdf) setCvFile(file);
+                            if (isDoc) setTemplateFile(file);
+                          }
+                        }}
+                      />
+                      <div
+                        className={`${styles.dropZone} ${isDraggingDocs ? styles.dropZoneActive : ""} ${cvFile || templateFile ? styles.dropZoneHasFiles : ""}`}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!showDemoBanner) setIsDraggingDocs(true);
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsDraggingDocs(false);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsDraggingDocs(false);
+                          if (showDemoBanner) return;
+                          const files = Array.from(e.dataTransfer?.files ?? []);
+                          for (const file of files) {
+                            const name = (file.name || "").toLowerCase();
+                            const isPdf = name.endsWith(".pdf") || file.type === "application/pdf";
+                            const isDoc = name.endsWith(".docx") || name.endsWith(".doc") || file.type.includes("word") || file.type.includes("document");
+                            if (isPdf) setCvFile(file);
+                            if (isDoc) setTemplateFile(file);
+                          }
+                        }}
+                      >
+                        <span className={styles.dropZoneIcon} aria-hidden="true"><FolderOpen size={44} /></span>
+                        <span className={styles.dropZoneText}>
+                          {cvFile || templateFile
+                            ? [cvFile?.name, templateFile?.name].filter(Boolean).join(" • ")
+                            : isDraggingDocs
+                              ? "Déposez les fichiers ici"
+                              : "Glissez votre CV ici ou cliquez pour parcourir"}
+                        </span>
+                        {!cvFile && !templateFile && !isDraggingDocs ? (
+                          <span style={{ fontSize: "0.78rem", color: "var(--subtle-text)", marginTop: "0.25rem" }}>
+                            Formats acceptés : PDF (obligatoire), .docx (optionnel) · max 5 Mo
+                          </span>
+                        ) : null}
+                      </div>
+                    </label>
+                    {/* Per-file success states when new files selected */}
+                    {cvFile ? (
+                      <div className={styles.dropZoneSuccessWrap}>
+                        <CheckCircle2 size={20} className={styles.dropZoneSuccessIcon} />
+                        <div className={styles.dropZoneSuccessInfo}>
+                          <p className={styles.dropZoneSuccessName}>{cvFile.name}</p>
+                          <p className={styles.dropZoneSuccessSize}>{(cvFile.size / 1024).toFixed(0)} Ko — CV PDF</p>
+                        </div>
+                        <button type="button" className={styles.dropZoneSuccessRemove} onClick={() => setCvFile(null)} aria-label="Supprimer">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : null}
+                    {templateFile ? (
+                      <div className={styles.dropZoneSuccessWrap}>
+                        <CheckCircle2 size={20} className={styles.dropZoneSuccessIcon} />
+                        <div className={styles.dropZoneSuccessInfo}>
+                          <p className={styles.dropZoneSuccessName}>{templateFile.name}</p>
+                          <p className={styles.dropZoneSuccessSize}>{(templateFile.size / 1024).toFixed(0)} Ko — Template LM</p>
+                        </div>
+                        <button type="button" className={styles.dropZoneSuccessRemove} onClick={() => setTemplateFile(null)} aria-label="Supprimer">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : null}
+                    <button className={styles.secondaryBtn} type="submit" disabled={isUploadingAssets || showDemoBanner || (!cvFile && !templateFile)}>
                       {isUploadingAssets ? "Upload en cours..." : showDemoBanner ? "Connectez-vous pour uploader" : "Uploader mes fichiers"}
                     </button>
                     {assetInfo ? <p className={styles.uploadSuccess}>{assetInfo}</p> : null}
-                    {draftInfo ? <p className={styles.uploadHint}>{draftInfo}</p> : null}
                   </form>
                 </section>
               ) : null}
@@ -1702,14 +1915,34 @@ function DashboardContent() {
                 <section className={styles.panel} id="step-wizard-config">
                   <h2><span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}><Settings size={20} /> Options et lancement</span></h2>
                   <p className={styles.sectionHint}>
-                    Paramètres de la recherche puis lancez. L&apos;historique et les détails sont à l&apos;étape suivante.
+                    Choisissez un preset puis lancez. Les paramètres avancés sont disponibles en bas.
                   </p>
+                  {/* Preset cards */}
+                  <div className={styles.presetCards}>
+                    {(Object.keys(SEARCH_PRESETS) as PresetKey[]).map((key) => {
+                      const p = SEARCH_PRESETS[key];
+                      const isActive = selectedPreset === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          className={`${styles.presetCard} ${isActive ? styles.presetCardActive : ""}`}
+                          onClick={() => applyPreset(key)}
+                        >
+                          <span className={styles.presetCardIcon}>{p.icon}</span>
+                          <span className={styles.presetCardLabel}>{p.label}</span>
+                          <span className={styles.presetCardDesc}>{p.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                   <form
                     id="pipeline-config-form-wizard"
                     className={styles.form}
                     onSubmit={onSubmit}
                     aria-label="Paramètres de la recherche"
                   >
+                    {/* Business selects — always visible */}
                     <div className={styles.inputGrid}>
                       <label>
                         Type de recherche
@@ -1730,7 +1963,7 @@ function DashboardContent() {
                       </label>
                       <div className={styles.inputGrid} role="group" aria-label="Domaine de recherche">
                         <label>
-                          Secteur d&apos;activite
+                          Secteur d&apos;activité
                           <select
                             value={sector}
                             onChange={(e) => {
@@ -1748,7 +1981,7 @@ function DashboardContent() {
                           </select>
                         </label>
                         <label>
-                          Metier / specialite
+                          Métier / spécialité
                           <select
                             value={specialty}
                             onChange={(e) => setSpecialty(e.target.value)}
@@ -1764,43 +1997,8 @@ function DashboardContent() {
                           </select>
                         </label>
                       </div>
-                      <label>
-                        Duree maximale (minutes)
-                        <input
-                          type="number"
-                          min={1}
-                          value={maxMinutes}
-                          onChange={(e) => setMaxMinutes(Number(e.target.value))}
-                        />
-                      </label>
-                      <label>
-                        Nombre maximal de sites
-                        <input
-                          type="number"
-                          min={1}
-                          value={maxSites}
-                          onChange={(e) => setMaxSites(Number(e.target.value))}
-                        />
-                      </label>
-                      <label>
-                        Objectif de cibles trouvees
-                        <input
-                          type="number"
-                          min={1}
-                          value={targetFound}
-                          onChange={(e) => setTargetFound(Number(e.target.value))}
-                        />
-                      </label>
-                      <label>
-                        Nombre de workers
-                        <input
-                          type="number"
-                          min={1}
-                          value={workers}
-                          onChange={(e) => setWorkers(Number(e.target.value))}
-                        />
-                      </label>
                     </div>
+                    {/* Mode test toggle — always visible */}
                     <fieldset className={styles.switchGroup}>
                       <legend>Options</legend>
                       <label className={styles.switchField}>
@@ -1815,6 +2013,60 @@ function DashboardContent() {
                         </span>
                       </label>
                     </fieldset>
+                    {/* Advanced settings accordion */}
+                    <div className={styles.advancedAccordion}>
+                      <button
+                        type="button"
+                        className={styles.advancedAccordionHeader}
+                        onClick={() => setShowAdvancedSettings((v) => !v)}
+                        aria-expanded={showAdvancedSettings}
+                      >
+                        <span>⚙️ Paramètres avancés</span>
+                        <ChevronDown size={15} className={`${styles.variablesChevron} ${showAdvancedSettings ? styles.variablesChevronOpen : ""}`} />
+                      </button>
+                      {showAdvancedSettings ? (
+                        <div className={styles.advancedAccordionBody}>
+                          <div className={styles.inputGrid}>
+                            <label>
+                              Durée maximale (minutes)
+                              <input
+                                type="number"
+                                min={1}
+                                value={maxMinutes}
+                                onChange={(e) => { setMaxMinutes(Number(e.target.value)); setSelectedPreset(null); }}
+                              />
+                            </label>
+                            <label>
+                              Nombre maximal de sites
+                              <input
+                                type="number"
+                                min={1}
+                                value={maxSites}
+                                onChange={(e) => { setMaxSites(Number(e.target.value)); setSelectedPreset(null); }}
+                              />
+                            </label>
+                            <label>
+                              Objectif de cibles trouvées
+                              <input
+                                type="number"
+                                min={1}
+                                value={targetFound}
+                                onChange={(e) => { setTargetFound(Number(e.target.value)); setSelectedPreset(null); }}
+                              />
+                            </label>
+                            <label>
+                              Nombre de workers
+                              <input
+                                type="number"
+                                min={1}
+                                value={workers}
+                                onChange={(e) => { setWorkers(Number(e.target.value)); setSelectedPreset(null); }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                     <div className={styles.launchBlock}>
                       <button
                         className={styles.primaryBtn}
@@ -2274,6 +2526,27 @@ function DashboardContent() {
           </button>
         </div>
       ) : null}
+      {/* Gmail status banner — shown at top of suivi section */}
+      <div className={`${styles.gmailBanner} ${gmailConnected ? styles.gmailBannerConnected : styles.gmailBannerMissing}`}>
+        <span className={styles.gmailBannerText}>
+          {gmailConnected
+            ? "✓ Gmail connecté — les brouillons seront créés avec votre compte Google."
+            : googleAccountLinked
+              ? "⚠ Compte Google lié, mais les permissions Gmail manquent."
+              : "⚠ Gmail non connecté — reliez votre compte Google pour créer des brouillons."}
+        </span>
+        {!gmailConnected ? (
+          <button
+            className={styles.secondaryBtn}
+            type="button"
+            onClick={onConnectGoogle}
+            disabled={isConnectingGoogle || showDemoBanner}
+            style={{ flexShrink: 0, fontSize: "0.8rem", padding: "0.3rem 0.75rem" }}
+          >
+            {isConnectingGoogle ? "Connexion..." : "Connecter Gmail"}
+          </button>
+        ) : null}
+      </div>
 
       {/* France Travail quick apply widget */}
       <section className={styles.panel}>
@@ -2351,33 +2624,6 @@ function DashboardContent() {
 
       <section className={styles.panel} id="step-runs">
             <h2><span style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><LayoutDashboard size={20} /> Historique des recherches</span></h2>
-            <p className={styles.sectionHint}>
-              Consultez vos recherches récentes et leur avancement ci-dessous.
-            </p>
-            <div className={styles.gmailStatusCard}>
-              <p className={styles.gmailStatusTitle}>Connexion Gmail</p>
-              <p
-                className={`${styles.gmailStatusText} ${
-                  gmailConnected ? styles.gmailStatusConnected : styles.gmailStatusMissing
-                }`}
-              >
-                {gmailConnected
-                  ? "Connecte: les brouillons seront crees avec votre compte Google."
-                  : googleAccountLinked
-                    ? "Compte Google lie, mais les permissions Gmail manquent."
-                    : "Non connecte: reliez votre compte Google pour le mode brouillons."}
-              </p>
-              {!gmailConnected ? (
-                <button
-                  className={styles.secondaryBtn}
-                  type="button"
-                  onClick={onConnectGoogle}
-                  disabled={isConnectingGoogle || showDemoBanner}
-                >
-                  {isConnectingGoogle ? "Connexion Google..." : showDemoBanner ? "Connectez-vous pour Gmail" : "Connecter Gmail"}
-                </button>
-              ) : null}
-            </div>
             <div className={styles.controls}>
               {showFullGrid ? (
                 <>
@@ -2396,7 +2642,8 @@ function DashboardContent() {
                     onClick={() => void refreshAll()}
                     disabled={isRefreshingRuns || isRefreshingDetails}
                   >
-                    {isRefreshingRuns || isRefreshingDetails ? "Rafraichissement..." : "Rafraichir"}
+                    <RefreshCw size={14} style={{ marginRight: "0.3rem", animation: (isRefreshingRuns || isRefreshingDetails) ? "spin 1s linear infinite" : "none" }} />
+                    {isRefreshingRuns || isRefreshingDetails ? "Rafraîchissement..." : "Rafraîchir"}
                   </button>
                 </>
               ) : (
@@ -2407,7 +2654,8 @@ function DashboardContent() {
                     onClick={() => void refreshAll()}
                     disabled={isRefreshingRuns || isRefreshingDetails}
                   >
-                    {isRefreshingRuns || isRefreshingDetails ? "Rafraichissement..." : "Rafraichir"}
+                    <RefreshCw size={14} style={{ marginRight: "0.3rem", animation: (isRefreshingRuns || isRefreshingDetails) ? "spin 1s linear infinite" : "none" }} />
+                    {isRefreshingRuns || isRefreshingDetails ? "Rafraîchissement..." : "Rafraîchir"}
                   </button>
                   <p className={styles.sectionHint} style={{ margin: 0, flex: "1 1 12rem" }}>
                     Pour lancer une recherche, utilisez l&apos;étape <strong>Options et lancement</strong> (étape 5).
@@ -2432,9 +2680,19 @@ function DashboardContent() {
             {isRefreshingRuns ? <span className={styles.loadingText}>Mise à jour...</span> : null}
           </div>
           {runs.length === 0 ? (
-            <p className={styles.emptyState}>
-              Aucune recherche pour le moment. Remplissez les paramètres ci-dessus puis lancez une recherche.
-            </p>
+            <div className={styles.emptyStateLarge}>
+              <div className={styles.emptyStateLargeIcon}><Inbox size={52} strokeWidth={1.2} /></div>
+              <p className={styles.emptyStateLargeTitle}>Aucune recherche lancée</p>
+              <p className={styles.emptyStateLargeHint}>Configurez votre profil et lancez votre première recherche pour voir les résultats ici.</p>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={() => { persistDashboardView("wizard"); setWizardStep(5); }}
+              >
+                <Play size={14} style={{ marginRight: "0.3rem" }} />
+                Lancer ma première recherche
+              </button>
+            </div>
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.runTable}>

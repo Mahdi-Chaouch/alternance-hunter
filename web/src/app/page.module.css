@@ -3059,3 +3059,377 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
+/* ── 26. UX Refonte ── */
+
+/* Stepper progress bar */
+.wizardProgressWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.65rem;
+}
+.wizardProgressTrack {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-border) 50%, transparent);
+  overflow: hidden;
+}
+.wizardProgressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary), #a855f7);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.wizardProgressText {
+  font-size: 0.75rem;
+  color: var(--subtle-text);
+  white-space: nowrap;
+  font-weight: 600;
+  min-width: 9ch;
+  text-align: right;
+}
+
+/* Done step pill green */
+.stepNavPillDone:not(.stepNavPillActive) {
+  border-color: #10b981;
+  color: #10b981;
+}
+.stepNavPillDone:not(.stepNavPillActive) .stepNavNumber {
+  background: #10b981;
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+/* Variables accordion (Step 2) */
+.variablesAccordion {
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--panel-border));
+  background: color-mix(in srgb, var(--primary) 4%, var(--glass-bg-soft));
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+.variablesAccordionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.85rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  gap: 0.5rem;
+}
+.variablesAccordionHeader:hover {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+.variablesChevron {
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+.variablesChevronOpen {
+  transform: rotate(180deg);
+}
+.variablesAccordionBody {
+  padding: 0 0.85rem 0.75rem;
+}
+.variablesTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.variablesTable tr + tr td {
+  border-top: 1px solid color-mix(in srgb, var(--panel-border) 40%, transparent);
+}
+.variablesTable td {
+  padding: 0.3rem 0.5rem 0.3rem 0;
+  vertical-align: top;
+}
+.variablesTable td:first-child {
+  font-family: monospace;
+  color: var(--primary);
+  font-weight: 600;
+  width: 42%;
+  white-space: nowrap;
+}
+.variablesTable td:last-child {
+  color: var(--subtle-text);
+}
+
+/* Mail live preview */
+.mailPreview {
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--glass-border-accent) 50%, transparent);
+  background: color-mix(in srgb, var(--bg) 60%, var(--glass-bg-soft));
+  padding: 0.75rem 1rem;
+  margin-top: 0.25rem;
+}
+.mailPreviewTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--subtle-text);
+  margin: 0 0 0.4rem;
+}
+.mailPreviewText {
+  font-style: italic;
+  font-size: 0.84rem;
+  color: var(--muted-text);
+  white-space: pre-wrap;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* Step 3: upload success state */
+.dropZoneSuccessWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, #10b981 8%, var(--glass-bg-soft));
+  border: 1px solid color-mix(in srgb, #10b981 28%, transparent);
+}
+.dropZoneSuccessIcon {
+  color: #10b981;
+  flex-shrink: 0;
+}
+.dropZoneSuccessInfo {
+  flex: 1;
+  min-width: 0;
+}
+.dropZoneSuccessName {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-fg);
+  margin: 0 0 0.1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dropZoneSuccessSize {
+  font-size: 0.78rem;
+  color: var(--subtle-text);
+  margin: 0;
+}
+.dropZoneSuccessRemove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--subtle-text);
+  padding: 0.25rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.dropZoneSuccessRemove:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* Step 5: Preset cards */
+.presetCards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+@media (max-width: 640px) {
+  .presetCards { grid-template-columns: 1fr; }
+}
+.presetCard {
+  border-radius: 12px;
+  border: 2px solid color-mix(in srgb, var(--glass-border-accent) 70%, transparent);
+  background: color-mix(in srgb, var(--glass-bg-soft) 80%, transparent);
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.presetCard:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, var(--glass-bg-soft));
+  transform: translateY(-1px);
+}
+.presetCardActive {
+  border-color: var(--primary) !important;
+  background: color-mix(in srgb, var(--primary) 10%, var(--glass-bg-soft)) !important;
+}
+.presetCardIcon { font-size: 1.4rem; line-height: 1; }
+.presetCardLabel { font-size: 0.88rem; font-weight: 700; color: var(--color-fg); }
+.presetCardDesc { font-size: 0.78rem; color: var(--subtle-text); }
+
+/* Advanced settings accordion */
+.advancedAccordion {
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--glass-border-accent) 60%, transparent);
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+.advancedAccordionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.85rem;
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--subtle-text);
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+.advancedAccordionHeader:hover {
+  color: var(--color-fg);
+  background: color-mix(in srgb, var(--panel-border) 20%, transparent);
+}
+.advancedAccordionBody {
+  padding: 0.1rem 0.85rem 0.85rem;
+}
+
+/* Step 6: Gmail horizontal banner */
+.gmailBanner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
+  margin-bottom: 0.85rem;
+  font-size: 0.86rem;
+  flex-wrap: wrap;
+}
+.gmailBannerConnected {
+  background: color-mix(in srgb, #10b981 8%, var(--glass-bg-soft));
+  border: 1px solid color-mix(in srgb, #10b981 30%, transparent);
+  color: #059669;
+}
+.gmailBannerMissing {
+  background: color-mix(in srgb, #f59e0b 8%, var(--glass-bg-soft));
+  border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
+  color: #d97706;
+}
+.gmailBannerText { flex: 1; font-weight: 500; }
+
+/* Step 6: large empty state */
+.emptyStateLarge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2.5rem 1rem;
+  gap: 0.75rem;
+}
+.emptyStateLargeIcon {
+  color: var(--subtle-text);
+  opacity: 0.4;
+  margin-bottom: 0.15rem;
+}
+.emptyStateLargeTitle {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-fg);
+  margin: 0;
+}
+.emptyStateLargeHint {
+  font-size: 0.88rem;
+  color: var(--subtle-text);
+  margin: 0;
+  max-width: 42ch;
+}
+
+/* Auto-save indicator */
+.autoSaveWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.autoSaveIndicator {
+  font-size: 0.79rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: opacity 0.3s ease;
+}
+.autoSaveSaved {
+  color: #059669;
+  background: color-mix(in srgb, #10b981 10%, transparent);
+}
+.autoSaveError {
+  color: #dc2626;
+  background: color-mix(in srgb, #ef4444 10%, transparent);
+}
+.autoSaveSaving {
+  color: var(--subtle-text);
+  background: color-mix(in srgb, var(--panel-border) 30%, transparent);
+}
+.saveOutlineBtn {
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--glass-border-accent) 65%, transparent);
+  color: var(--subtle-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+.saveOutlineBtn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Edit profile link */
+.editProfileLink {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--subtle-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+  margin-left: 0.4rem;
+}
+.editProfileLink:hover { color: var(--primary); }
+
+/* Spin animation for refresh icon */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Dark theme overrides */
+:global(:root[data-theme="dark"]) .page .gmailBannerConnected {
+  color: #34d399;
+  background: color-mix(in srgb, #10b981 12%, rgba(0,0,0,0.25));
+}
+:global(:root[data-theme="dark"]) .page .gmailBannerMissing {
+  color: #fbbf24;
+  background: color-mix(in srgb, #f59e0b 12%, rgba(0,0,0,0.25));
+}
+:global(:root[data-theme="dark"]) .page .mailPreview {
+  background: color-mix(in srgb, var(--bg) 70%, var(--glass-bg-soft));
+}
+:global(:root[data-theme="dark"]) .page .stepNavPillDone:not(.stepNavPillActive) {
+  border-color: #34d399;
+  color: #34d399;
+}
+:global(:root[data-theme="dark"]) .page .stepNavPillDone:not(.stepNavPillActive) .stepNavNumber {
+  background: #059669;
+  color: #fff;
+}
+
