@@ -8,6 +8,7 @@ import {
   retryAfterSeconds,
   RATE_LIMIT_SUPPORT_PER_MINUTE,
 } from "@/lib/rate-limit";
+import { insertSupportTicket } from "@/lib/support-tickets";
 
 function getClientIp(h: Headers): string {
   const forwarded = h.get("x-forwarded-for");
@@ -137,6 +138,18 @@ export async function POST(req: Request) {
       { ok: false, error: "Envoi impossible pour le moment. Réessayez plus tard." },
       { status: 502 },
     );
+  }
+
+  try {
+    await insertSupportTicket({
+      email: displayEmail,
+      name: userName,
+      subject: subjectRaw,
+      message: messageRaw,
+      ip,
+    });
+  } catch (e) {
+    console.error("[support] DB insert error", e);
   }
 
   const resendApiKey = getOptionalEnv("RESEND_API_KEY");

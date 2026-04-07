@@ -1,4 +1,5 @@
 import { pgPool } from "./db";
+import { getWhitelistEnabled } from "./app-settings";
 
 const INVITED_EMAILS_ENV_KEYS = ["AUTH_ALLOWED_EMAILS", "INVITED_EMAILS"] as const;
 
@@ -97,6 +98,8 @@ export async function removeInvitedEmail(email: string): Promise<boolean> {
 export async function isInvitedEmail(email: string | null | undefined): Promise<boolean> {
   const normalized = (email ?? "").trim().toLowerCase();
   if (!normalized) return false;
+  const whitelistEnabled = await getWhitelistEnabled();
+  if (!whitelistEnabled) return true;
   await ensureInvitedEmailsTable();
   const result = await pgPool.query(
     `SELECT 1 FROM invited_emails WHERE email = $1 LIMIT 1`,
