@@ -144,9 +144,7 @@ export async function POST(req: Request) {
     console.warn("[support] RESEND_API_KEY not set — confirmation email skipped");
   } else {
     try {
-      const resend = new Resend(resendApiKey, {
-        baseUrl: "https://api.eu.resend.com",
-      });
+      const resend = new Resend(resendApiKey);
       const { error: resendError } = await resend.emails.send({
         from: "Alternance Hunter <noreply@alternance-hunter.com>",
         to: [displayEmail],
