@@ -51,6 +51,14 @@ export function AdminDashboard() {
   const [expandedTicket, setExpandedTicket] = useState<number | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
+  const [broadcastFrom, setBroadcastFrom] = useState("news@alternance-hunter.com");
+  const [broadcastRecipients, setBroadcastRecipients] = useState("");
+  const [broadcastSubject, setBroadcastSubject] = useState("");
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastError, setBroadcastError] = useState("");
+  const [broadcastResult, setBroadcastResult] = useState("");
+
   const [whitelistEnabled, setWhitelistEnabledState] = useState<boolean | null>(null);
   const [whitelistToggling, setWhitelistToggling] = useState(false);
 
@@ -186,6 +194,47 @@ export function AdminDashboard() {
       setReplyError("Erreur réseau");
     } finally {
       setReplying(false);
+    }
+  }
+
+  async function handleBroadcastSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setBroadcastError("");
+    setBroadcastResult("");
+    setBroadcastSending(true);
+    try {
+      const res = await fetch("/api/admin/broadcast", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          from: broadcastFrom,
+          recipients: broadcastRecipients,
+          subject: broadcastSubject,
+          message: broadcastMessage,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        detail?: string;
+        sent?: number;
+        total?: number;
+        failed?: string[];
+      };
+      if (!res.ok) {
+        setBroadcastError(data.detail ?? "Erreur envoi newsletter.");
+        return;
+      }
+      const failed = data.failed ?? [];
+      if (failed.length > 0) {
+        setBroadcastResult(
+          `${data.sent ?? 0}/${data.total ?? 0} envoyés. Échecs: ${failed.slice(0, 5).join(", ")}`,
+        );
+      } else {
+        setBroadcastResult(`Envoi réussi: ${data.sent ?? 0} destinataire(s).`);
+      }
+    } catch {
+      setBroadcastError("Erreur réseau pendant l'envoi.");
+    } finally {
+      setBroadcastSending(false);
     }
   }
 
@@ -356,6 +405,74 @@ export function AdminDashboard() {
             </table>
           </div>
         )}
+      </section>
+
+      <section className={`${styles.panel} ${styles.adminSection}`}>
+        <h2 className={styles.adminTitle}>Envoi email individuel (admin)</h2>
+        <p className={styles.sectionHint}>
+          Envoie un email personnalisé à plusieurs destinataires, un par un (pas de destinataires visibles entre eux).
+        </p>
+        <form onSubmit={handleBroadcastSubmit} style={{ display: "grid", gap: "0.7rem", maxWidth: "760px" }}>
+          <label style={{ display: "grid", gap: "0.3rem" }}>
+            <span className={styles.sectionHint} style={{ margin: 0 }}>Expéditeur</span>
+            <input
+              type="email"
+              value={broadcastFrom}
+              onChange={(e) => setBroadcastFrom(e.target.value)}
+              placeholder="news@alternance-hunter.com"
+              required
+              disabled={broadcastSending}
+              className={styles.zoneFieldInput}
+            />
+          </label>
+          <label style={{ display: "grid", gap: "0.3rem" }}>
+            <span className={styles.sectionHint} style={{ margin: 0 }}>Destinataires (1 email par ligne, ou séparés par virgules)</span>
+            <textarea
+              value={broadcastRecipients}
+              onChange={(e) => setBroadcastRecipients(e.target.value)}
+              placeholder={"alice@example.com\nbob@example.com"}
+              rows={5}
+              required
+              disabled={broadcastSending}
+              style={{ width: "100%", boxSizing: "border-box", background: "var(--input-bg)", color: "var(--text)", border: "1px solid var(--input-border)", borderRadius: "10px", padding: "10px 12px", fontSize: "0.9rem", resize: "vertical" }}
+            />
+          </label>
+          <label style={{ display: "grid", gap: "0.3rem" }}>
+            <span className={styles.sectionHint} style={{ margin: 0 }}>Sujet</span>
+            <input
+              type="text"
+              value={broadcastSubject}
+              onChange={(e) => setBroadcastSubject(e.target.value)}
+              placeholder="Sujet personnalisé"
+              required
+              disabled={broadcastSending}
+              className={styles.zoneFieldInput}
+            />
+          </label>
+          <label style={{ display: "grid", gap: "0.3rem" }}>
+            <span className={styles.sectionHint} style={{ margin: 0 }}>Message</span>
+            <textarea
+              value={broadcastMessage}
+              onChange={(e) => setBroadcastMessage(e.target.value)}
+              placeholder="Votre message personnalisé..."
+              rows={8}
+              required
+              disabled={broadcastSending}
+              style={{ width: "100%", boxSizing: "border-box", background: "var(--input-bg)", color: "var(--text)", border: "1px solid var(--input-border)", borderRadius: "10px", padding: "10px 12px", fontSize: "0.9rem", resize: "vertical" }}
+            />
+          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button
+              type="submit"
+              className={styles.secondaryBtn}
+              disabled={broadcastSending || !broadcastRecipients.trim() || !broadcastSubject.trim() || !broadcastMessage.trim()}
+            >
+              {broadcastSending ? "Envoi en cours..." : "Envoyer les mails"}
+            </button>
+            {broadcastError ? <span className={styles.adminError}>{broadcastError}</span> : null}
+            {!broadcastError && broadcastResult ? <span className={styles.sectionHint} style={{ margin: 0 }}>{broadcastResult}</span> : null}
+          </div>
+        </form>
       </section>
 
       <dialog
