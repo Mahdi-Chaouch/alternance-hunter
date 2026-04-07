@@ -140,10 +140,14 @@ export async function POST(req: Request) {
   }
 
   const resendApiKey = getOptionalEnv("RESEND_API_KEY");
-  if (resendApiKey) {
+  if (!resendApiKey) {
+    console.warn("[support] RESEND_API_KEY not set — confirmation email skipped");
+  } else {
     try {
-      const resend = new Resend(resendApiKey);
-      await resend.emails.send({
+      const resend = new Resend(resendApiKey, {
+        baseUrl: "https://api.eu.resend.com",
+      });
+      const { error: resendError } = await resend.emails.send({
         from: "Alternance Hunter <noreply@alternance-hunter.com>",
         to: [displayEmail],
         subject: `[Support] ${subjectRaw || "Votre message a bien été reçu"}`,
@@ -159,8 +163,11 @@ export async function POST(req: Request) {
           </div>
         `,
       });
+      if (resendError) {
+        console.error("[support] Resend error", resendError);
+      }
     } catch (e) {
-      console.error("[support] Resend error", e);
+      console.error("[support] Resend exception", e);
     }
   }
 
