@@ -82,20 +82,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Accueil — masquer la barre de défilement (scroll souris / tactile inchangé) */
-html:has(.landing-home),
-body:has(.landing-home) {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* ancien Edge */
-}
-
-html:has(.landing-home)::-webkit-scrollbar,
-body:has(.landing-home)::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  background: transparent;
-}
-
 body {
   color: var(--color-fg);
   background-color: var(--color-bg);
