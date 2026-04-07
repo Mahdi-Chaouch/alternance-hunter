@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { Resend } from "resend";
 import { getOptionalEnv } from "@/lib/env";
 import { getServerSession } from "@/lib/auth-session";
 import {
@@ -136,6 +137,31 @@ export async function POST(req: Request) {
       { ok: false, error: "Envoi impossible pour le moment. Réessayez plus tard." },
       { status: 502 },
     );
+  }
+
+  const resendApiKey = getOptionalEnv("RESEND_API_KEY");
+  if (resendApiKey) {
+    try {
+      const resend = new Resend(resendApiKey);
+      await resend.emails.send({
+        from: "Alternance Hunter <noreply@alternance-hunter.com>",
+        to: [displayEmail],
+        subject: `[Support] ${subjectRaw || "Votre message a bien été reçu"}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a">
+            <h2 style="color:#8b5cf6;margin-bottom:8px">Alternance Hunter — Support</h2>
+            <p>Bonjour${userName ? ` ${userName}` : ""},</p>
+            <p>Nous avons bien reçu votre message et reviendrons vers vous dès que possible.</p>
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0"/>
+            <p style="color:#6b7280;font-size:14px"><strong>Votre message :</strong></p>
+            <blockquote style="border-left:3px solid #8b5cf6;margin:0;padding:12px 16px;background:#f9f7ff;color:#374151;font-size:14px;white-space:pre-wrap">${messageRaw.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</blockquote>
+            <p style="margin-top:24px;color:#6b7280;font-size:13px">Ceci est un accusé de réception automatique. Ne répondez pas à cet e-mail.</p>
+          </div>
+        `,
+      });
+    } catch (e) {
+      console.error("[support] Resend error", e);
+    }
   }
 
   return NextResponse.json({ ok: true });
