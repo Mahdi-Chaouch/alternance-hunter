@@ -26,6 +26,7 @@ const MODES_REQUIRING_GMAIL_CONTEXT = new Set(["pipeline", "drafts"]);
 const ACCEPTED_RUN_REQUEST_FIELDS = new Set([
   "mode",
   "zone",
+  "job_type",
   "dry_run",
   "python",
   "max_minutes",
@@ -58,8 +59,9 @@ const ACCEPTED_RUN_REQUEST_FIELDS = new Set([
   "console_auth",
   "resume_log",
 ]);
+const FRONTEND_ONLY_FIELDS = new Set(["job_type"]);
 const BACKEND_RUN_FIELDS = new Set([
-  ...ACCEPTED_RUN_REQUEST_FIELDS,
+  ...[...ACCEPTED_RUN_REQUEST_FIELDS].filter((f) => !FRONTEND_ONLY_FIELDS.has(f)),
   "oauth_access_token",
   "oauth_refresh_token",
   "oauth_client_id",
