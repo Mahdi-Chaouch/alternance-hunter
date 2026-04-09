@@ -1275,7 +1275,7 @@ function DashboardContent() {
       const res = await fetch("/api/recruiting/quick-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_name: offre.entreprise?.nom ?? offre.intitule, contact_email: offre.contact?.courriel ?? "" }),
+        body: JSON.stringify({ company_name: offre.entreprise?.nom ?? offre.intitule, contact_email: offre.contact?.courriel ?? "", job_type: jobType }),
       });
       const data = await res.json() as { detail?: string };
       if (!res.ok) { setError(data.detail ?? "Erreur brouillon."); }

@@ -33,15 +33,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = (await request.json().catch(() => ({}))) as {
     company_name?: string;
     contact_email?: string;
+    job_type?: string;
   };
 
   if (!body.company_name) {
     return NextResponse.json({ detail: "company_name est requis." }, { status: 400 });
   }
 
+  const jobType = body.job_type === "stage" ? "stage" : "alternance";
   const payload = {
     company_name: body.company_name,
     contact_email: body.contact_email,
+    job_type: jobType,
     sender_first_name: profile?.first_name ?? "",
     sender_last_name: profile?.last_name ?? "",
     sender_linkedin_url: profile?.linkedin_url ?? "",

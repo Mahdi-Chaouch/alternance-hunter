@@ -230,8 +230,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (profile) {
         const jobType = typeof payload.job_type === "string" ? payload.job_type : "alternance";
         const isStage = jobType === "stage";
+        const jobLabel = isStage ? "stage" : "alternance";
+        const jobLabelArticle = isStage ? "de stage" : "d'alternance";
         const subjectTemplate = profile.subject_template ||
-          (isStage ? "Candidature stage — {{ENTREPRISE}}" : "Candidature alternance — {{ENTREPRISE}}");
+          `Candidature ${jobLabel} — {{ENTREPRISE}}`;
+        const bodyTemplate = profile.body_template ||
+          `Bonjour,\n\nJe me permets de vous contacter dans le cadre de ma recherche ${jobLabelArticle}.\nJe suis très intéressé(e) par une opportunité au sein de {{ENTREPRISE}}.\n\nCordialement,\n{{NOM_COMPLET}}`;
         bodyPayload = {
           ...bodyPayload,
           sender_first_name: profile.first_name,
@@ -239,7 +243,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           sender_linkedin_url: profile.linkedin_url,
           sender_portfolio_url: profile.portfolio_url,
           mail_subject_template: subjectTemplate,
-          mail_body_template: profile.body_template,
+          mail_body_template: bodyTemplate,
         };
       }
     } catch {

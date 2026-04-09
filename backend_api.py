@@ -1040,6 +1040,7 @@ class QuickDraftBody(BaseModel):
     sender_linkedin_url: str = ""
     sender_portfolio_url: str = ""
     # Email content templates (placeholders: {ENTREPRISE}, {DATE})
+    job_type: str = "alternance"
     mail_subject_template: str = ""
     mail_body_template: str = ""
     # OAuth tokens for Gmail
@@ -1363,7 +1364,9 @@ def recruiting_quick_draft(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Module Gmail manquant: {e}")
 
     # Subject
-    default_subject = f"Candidature alternance — {body.company_name}"
+    job_label = "stage" if body.job_type == "stage" else "alternance"
+    job_label_article = "de stage" if body.job_type == "stage" else "d'alternance"
+    default_subject = f"Candidature {job_label} — {body.company_name}"
     subject_tpl = (body.mail_subject_template or "").strip() or default_subject
     subject = replace_draft_placeholders(subject_tpl, body.company_name)
 
@@ -1372,7 +1375,7 @@ def recruiting_quick_draft(
     linkedin_line = f"\nLinkedIn : {body.sender_linkedin_url}" if body.sender_linkedin_url else ""
     portfolio_line = f"\nPortfolio : {body.sender_portfolio_url}" if body.sender_portfolio_url else ""
     default_body = (
-        f"Bonjour,\n\nJe me permets de vous contacter dans le cadre de ma recherche d'alternance.\n"
+        f"Bonjour,\n\nJe me permets de vous contacter dans le cadre de ma recherche {job_label_article}.\n"
         f"Je suis très intéressé(e) par une opportunité au sein de {body.company_name}.\n\n"
         f"Cordialement,\n{full_name}{linkedin_line}{portfolio_line}"
     )
