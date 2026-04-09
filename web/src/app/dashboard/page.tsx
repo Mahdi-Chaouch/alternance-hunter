@@ -13,7 +13,7 @@ import {
   Inbox, Pencil,
 } from "lucide-react";
 
-import { COMMUNES_FRANCE } from "@/data/communes-france";
+import { COMMUNES_FRANCE, REGIONS_FRANCE } from "@/data/communes-france";
 import {
   SECTOR_LABELS,
   SECTOR_ORDER,
@@ -95,9 +95,9 @@ const SEARCH_PRESETS = {
 type PresetKey = keyof typeof SEARCH_PRESETS;
 
 const ZONE_PLACEHOLDER =
-  "Tapez une ville (ex: Paris) — laissez vide pour toute la France";
+  "Ville ou région (ex: Paris, Île-de-France) — vide = toute la France";
 
-const KNOWN_ZONES: readonly Zone[] = ["all", ...COMMUNES_FRANCE];
+const KNOWN_ZONES: readonly Zone[] = ["all", ...REGIONS_FRANCE, ...COMMUNES_FRANCE];
 
 async function safeJson<T>(response: Response): Promise<T | Record<string, unknown>> {
   const rawBody = await response.text();

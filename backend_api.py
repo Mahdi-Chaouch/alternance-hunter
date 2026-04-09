@@ -176,6 +176,7 @@ class RunRequest(BaseModel):
     # Zone libre saisie depuis le dashboard (ex: "Paris", "Lyon, Marseille" ou "all").
     # On ne restreint plus la valeur ici : la logique d'interprétation se fait côté pipeline.
     zone: str = "all"
+    job_type: str = "alternance"
     dry_run: bool = False
     python: Optional[str] = None
 
@@ -352,7 +353,7 @@ def build_pipeline_command(
     owner_user_email: Optional[str] = None,
 ) -> List[str]:
     cmd = [payload.python or sys.executable, "-u", str(PIPELINE_PATH)]
-    cmd += ["--mode", payload.mode, "--zone", payload.zone]
+    cmd += ["--mode", payload.mode, "--zone", payload.zone, "--job-type", payload.job_type]
     user_key = sanitize_user_key(owner_user_id, owner_user_email)
     user_cv, user_template = resolve_user_assets(user_key)
     template_path = (payload.template or user_template or "").strip()

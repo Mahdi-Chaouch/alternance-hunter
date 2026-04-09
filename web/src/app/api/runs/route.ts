@@ -59,9 +59,8 @@ const ACCEPTED_RUN_REQUEST_FIELDS = new Set([
   "console_auth",
   "resume_log",
 ]);
-const FRONTEND_ONLY_FIELDS = new Set(["job_type"]);
 const BACKEND_RUN_FIELDS = new Set([
-  ...[...ACCEPTED_RUN_REQUEST_FIELDS].filter((f) => !FRONTEND_ONLY_FIELDS.has(f)),
+  ...ACCEPTED_RUN_REQUEST_FIELDS,
   "oauth_access_token",
   "oauth_refresh_token",
   "oauth_client_id",

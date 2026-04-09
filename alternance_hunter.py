@@ -1600,6 +1600,7 @@ def build_email_draft(
     custom_body_template: str,
     sector: str = "it",
     specialty: str = "",
+    job_type: str = "alternance",
 ) -> Tuple[str, str]:
     full_name = " ".join(part for part in [sender_first_name.strip(), sender_last_name.strip()] if part).strip()
     display_name = full_name or "Candidat"
@@ -1618,7 +1619,9 @@ def build_email_draft(
         "SPECIALITE": domain_label,
     }
 
-    default_subject = f"Candidature alternance {sector_label} - {{DATE}} - {{ENTREPRISE}}"
+    job_label = "stage" if job_type == "stage" else "alternance"
+    job_label_article = "de stage" if job_type == "stage" else "d'alternance"
+    default_subject = f"Candidature {job_label} {sector_label} - {{DATE}} - {{ENTREPRISE}}"
 
     footer_lines = [
         "Cordialement,",
@@ -1633,7 +1636,7 @@ def build_email_draft(
 
     default_body = f"""Madame, Monsieur,
 
-Je suis a la recherche d'une alternance en {domain_label} a partir de {{DATE}}.
+Je suis a la recherche {job_label_article} en {domain_label} a partir de {{DATE}}.
 
 Je souhaite rejoindre {{ENTREPRISE}} afin de contribuer a des projets concrets et progresser au contact d'une equipe.
 
@@ -2187,6 +2190,7 @@ def run_email_finder(
     sector: str = "it",
     specialty: str = "",
     product_export_path: str = "",
+    job_type: str = "alternance",
 ) -> None:
     fieldnames = [
         "entreprise", "zone", "ville", "site", "score",
@@ -2365,6 +2369,7 @@ def run_email_finder(
                                         custom_body_template=mail_body_template,
                                         sector=sector,
                                         specialty=specialty,
+                                        job_type=job_type,
                                     )
                                     fdraft.write(
                                         f"{SEP}\n"
@@ -2620,6 +2625,8 @@ def parse_args():
                    help="Template de sujet avec placeholders (ex: {{ENTREPRISE}}, {{NOM_COMPLET}}).")
     p.add_argument("--mail-body-template", type=str, default="",
                    help="Template complet du corps de mail avec placeholders.")
+    p.add_argument("--job-type", type=str, default="alternance", choices=["alternance", "stage"],
+                   help="Type de recherche : alternance ou stage.")
     return p.parse_args()
 
 def main():
@@ -2662,6 +2669,7 @@ def main():
         sector=getattr(args, "sector", "it") or "it",
         specialty=getattr(args, "specialty", "") or "",
         product_export_path=getattr(args, "product_export", "") or "",
+        job_type=getattr(args, "job_type", "alternance") or "alternance",
     )
 
     print(f"\n✅ emails: {args.emails_found_csv}")

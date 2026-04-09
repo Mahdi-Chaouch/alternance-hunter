@@ -62,11 +62,37 @@ def _python_cmd(python_executable: str) -> List[str]:
     return [python_executable, "-u"]
 
 
+_REGION_ALIASES: dict = {
+    "île-de-france":              "Paris, Versailles, Saint-Denis, Nanterre, Boulogne-Billancourt, Argenteuil, Montreuil, Vitry-sur-Seine",
+    "ile-de-france":              "Paris, Versailles, Saint-Denis, Nanterre, Boulogne-Billancourt",
+    "idf":                        "Paris, Versailles, Saint-Denis",
+    "auvergne-rhône-alpes":       "Lyon, Grenoble, Clermont-Ferrand, Saint-Etienne, Annecy, Chambery",
+    "auvergne-rhone-alpes":       "Lyon, Grenoble, Clermont-Ferrand, Saint-Etienne",
+    "paca":                       "Marseille, Nice, Toulon, Aix-en-Provence, Avignon, Cannes",
+    "provence-alpes-côte-d'azur": "Marseille, Nice, Toulon, Aix-en-Provence, Avignon",
+    "occitanie":                  "Toulouse, Montpellier, Nimes, Perpignan, Beziers",
+    "nouvelle-aquitaine":         "Bordeaux, Limoges, Pau, Bayonne, Poitiers",
+    "bretagne":                   "Rennes, Brest, Lorient, Quimper, Saint-Brieuc",
+    "hauts-de-france":            "Lille, Amiens, Roubaix, Tourcoing, Valenciennes",
+    "normandie":                  "Rouen, Caen, Le Havre",
+    "grand-est":                  "Strasbourg, Nancy, Reims, Mulhouse, Metz",
+    "grand est":                  "Strasbourg, Nancy, Reims, Mulhouse, Metz",
+    "pays-de-la-loire":           "Nantes, Angers, Le Mans, Saint-Nazaire",
+    "pays de la loire":           "Nantes, Angers, Le Mans",
+    "bourgogne-franche-comté":    "Dijon, Besancon",
+    "bourgogne-franche-comte":    "Dijon, Besancon",
+    "centre-val-de-loire":        "Tours, Orleans, Bourges",
+    "centre-val de loire":        "Tours, Orleans",
+    "corse":                      "Ajaccio, Bastia",
+}
+
+
 def _zone_to_hunter_filter(zone: str) -> str:
     """
     Transforme la zone libre en filtre pour alternance_hunter:
     - chaine vide => toutes les zones
     - 'all' (insensible à la casse) => toutes les zones
+    - nom de région => liste de villes (ex: 'Île-de-France' => 'Paris, Versailles, ...')
     - sinon: renvoyee telle quelle (ex: 'Paris, Lyon, Lille')
     """
     cleaned = (zone or "").strip()
@@ -74,6 +100,15 @@ def _zone_to_hunter_filter(zone: str) -> str:
         return ""
     if cleaned.lower() == "all":
         return ""
+    # Expand region aliases (single part only — skip if already a city list)
+    if "," not in cleaned:
+        key = cleaned.lower().replace(" ", "-")
+        if key in _REGION_ALIASES:
+            return _REGION_ALIASES[key]
+        # Try without accents variant
+        key_no_accent = key.replace("î", "i").replace("ô", "o").replace("é", "e").replace("è", "e").replace("â", "a").replace("ê", "e")
+        if key_no_accent in _REGION_ALIASES:
+            return _REGION_ALIASES[key_no_accent]
     return cleaned
 
 
@@ -177,6 +212,8 @@ def build_hunter_cmd(args: argparse.Namespace) -> List[str]:
         cmd.append("--insecure")
     if args.rh_only:
         cmd.append("--rh-only")
+    if getattr(args, "job_type", "alternance") != "alternance" or True:
+        cmd.extend(["--job-type", getattr(args, "job_type", "alternance")])
     if getattr(args, "product_export", ""):
         cmd.extend(["--product-export", args.product_export])
     return cmd
@@ -281,6 +318,8 @@ def parse_args() -> argparse.Namespace:
     )
 
     # Hunter
+    parser.add_argument("--job-type", type=str, default="alternance", choices=["alternance", "stage"],
+                        help="Type de recherche : alternance ou stage")
     parser.add_argument("--max-minutes", type=int, default=30)
     parser.add_argument("--max-sites", type=int, default=1500)
     parser.add_argument("--target-found", type=int, default=100)

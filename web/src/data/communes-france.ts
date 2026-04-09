@@ -257,3 +257,20 @@ export const COMMUNES_FRANCE: readonly string[] = [
   "Sallanches",
   "Chamonix-Mont-Blanc",
 ];
+
+/** French administrative regions — used as zone shortcuts in the dashboard. */
+export const REGIONS_FRANCE: readonly string[] = [
+  "Île-de-France",
+  "Auvergne-Rhône-Alpes",
+  "PACA",
+  "Occitanie",
+  "Nouvelle-Aquitaine",
+  "Bretagne",
+  "Hauts-de-France",
+  "Normandie",
+  "Grand Est",
+  "Pays de la Loire",
+  "Bourgogne-Franche-Comté",
+  "Centre-Val de Loire",
+  "Corse",
+];
