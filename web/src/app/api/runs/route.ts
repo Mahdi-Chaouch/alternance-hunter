@@ -26,7 +26,6 @@ const MODES_REQUIRING_GMAIL_CONTEXT = new Set(["pipeline", "drafts"]);
 const ACCEPTED_RUN_REQUEST_FIELDS = new Set([
   "mode",
   "zone",
-  "job_type",
   "dry_run",
   "python",
   "max_minutes",

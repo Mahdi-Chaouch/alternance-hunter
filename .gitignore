@@ -45,3 +45,4 @@ Thumbs.db
 *.md
 .claude
 .cursor
+.claude-flow
